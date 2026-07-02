@@ -1,0 +1,16 @@
+# 웹 공격 페이로드 이미지화 CNN 탐지 연구 — 의존성
+# Phase 1(데이터 확보/검증) 단계에서 필요한 최소 패키지만 우선 명시.
+# 이후 Phase(모델·공격·방어)에서 torch 등은 필요 시 추가한다.
+
+pandas>=2.0
+kagglehub>=0.3        # Kaggle 데이터셋 다운로드 (CSIC 2010 미러)
+
+# --- 이후 단계에서 활성화 예정 (지금은 주석) ---
+# numpy>=1.26
+# pillow>=10.0         # Phase 3: 바이트 -> 이미지 변환
+# scikit-learn>=1.4    # 베이스라인 ML, stratified split
+# xgboost>=2.0         # 베이스라인
+# torch>=2.2           # 제안 CNN, adversarial training
+# matplotlib>=3.8      # EDA 시각화
+# seaborn>=0.13
+# adversarial-robustness-toolbox>=1.17  # RQ2 feature-space 공격

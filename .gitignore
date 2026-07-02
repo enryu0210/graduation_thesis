@@ -1,0 +1,30 @@
+# --- 데이터 (대용량 원본은 git 에 올리지 않는 것이 원칙) ---
+# 재현성은 DATA_MANIFEST.md 의 출처 URL + SHA256 + 다운로드 스크립트로 보장한다.
+# 주의: 3-class 원본 CSV 2개는 최초 커밋에 이미 포함돼 추적 중이므로 여기서 제외하지 않는다.
+data/raw/csic2010/
+data/raw/payload_supplement/
+data/interim/
+data/processed/
+data/images/
+
+# --- 파이썬 ---
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+*.egg-info/
+
+# --- 실험 산출물 (용량 큼) ---
+experiments/results/*
+!experiments/results/.gitkeep
+
+# --- 자격증명 (절대 커밋 금지) ---
+kaggle.json
+.env
+
+# --- OS / 에디터 ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
