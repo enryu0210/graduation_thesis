@@ -34,8 +34,13 @@ MANIFEST_PATH = PROJECT_ROOT / "docs" / "DATA_MANIFEST.md"
 # 원-핫 라벨로 흔히 쓰이는 컬럼명 (대소문자 무시하고 매칭)
 KNOWN_LABEL_COLUMNS = {"sqlinjection", "xss", "commandinjection", "normal"}
 
+# 단일 범주형 라벨 컬럼 후보 (원-핫이 아니라 한 컬럼에 클래스가 들어있는 경우).
+# 예: CSIC 2010 은 'classification'(0/1) 한 컬럼으로 정상/이상을 표현한다.
+KNOWN_CATEGORICAL_LABEL_COLUMNS = {"classification", "label", "class", "category"}
+
 # 페이로드/문장이 들어있을 법한 텍스트 컬럼 후보
-KNOWN_TEXT_COLUMNS = {"sentence", "payload", "query", "text", "request"}
+# ('url' 은 CSIC 처럼 HTTP 요청 URL 이 대표 텍스트인 데이터셋을 위한 것)
+KNOWN_TEXT_COLUMNS = {"sentence", "payload", "query", "text", "request", "url"}
 
 
 def sha256_of_file(path: Path, chunk_size: int = 1 << 20) -> str:
@@ -66,19 +71,23 @@ def utf8_decode_failure_rate(path: Path, sample_bytes: int = 5 << 20) -> float:
         return 1.0
 
 
-def detect_columns(df: pd.DataFrame) -> tuple[list[str], str | None]:
+def detect_columns(df: pd.DataFrame) -> tuple[list[str], str | None, str | None]:
     """데이터프레임에서 라벨 컬럼들과 텍스트 컬럼을 자동 감지한다.
 
-    반환: (라벨 컬럼 리스트, 텍스트 컬럼명 or None)
+    반환: (원-핫 라벨 컬럼 리스트, 단일 범주형 라벨 컬럼명 or None, 텍스트 컬럼명 or None)
     """
     lower_map = {c.lower(): c for c in df.columns}
 
     label_cols = [lower_map[name] for name in lower_map if name in KNOWN_LABEL_COLUMNS]
+    categorical_label_col = next(
+        (lower_map[name] for name in lower_map if name in KNOWN_CATEGORICAL_LABEL_COLUMNS),
+        None,
+    )
     text_col = next(
         (lower_map[name] for name in lower_map if name in KNOWN_TEXT_COLUMNS),
         None,
     )
-    return label_cols, text_col
+    return label_cols, categorical_label_col, text_col
 
 
 def validate_csv(path: Path) -> str:
@@ -106,7 +115,7 @@ def validate_csv(path: Path) -> str:
     lines.append(f"- Row count (actual): {n_rows:,}")
     lines.append(f"- Columns: {list(df.columns)}")
 
-    label_cols, text_col = detect_columns(df)
+    label_cols, categorical_label_col, text_col = detect_columns(df)
 
     # --- 완전 중복 행 비율 (전처리 전 기준값) ---
     # 텍스트 컬럼이 있으면 그 컬럼 기준 중복을, 없으면 전체 행 기준 중복을 본다.
@@ -146,6 +155,13 @@ def validate_csv(path: Path) -> str:
             f"    - 라벨 무결성: 다중라벨 행={multi:,}, 무라벨 행={zero:,} "
             f"(0이면 깔끔한 단일라벨 데이터)"
         )
+    elif categorical_label_col is not None:
+        # 단일 범주형 라벨(예: CSIC 의 classification=0/1)은 값별 개수를 그대로 센다.
+        lines.append(f"- Class distribution ('{categorical_label_col}' 컬럼 값 분포):")
+        value_counts = df[categorical_label_col].value_counts(dropna=False)
+        for value, count in value_counts.items():
+            share = count / n_rows if n_rows else 0.0
+            lines.append(f"    - {value}: {count:,} ({share:.2%})")
     else:
         lines.append("- Class distribution: (알려진 라벨 컬럼을 찾지 못함 — 수동 확인 필요)")
 
