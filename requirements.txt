@@ -10,9 +10,11 @@ numpy>=1.26
 matplotlib>=3.8      # EDA 시각화 (바이트 길이 분포)
 seaborn>=0.13
 
+# --- Phase 3 (전처리·이미지 변환) 에서 사용 ---
+scikit-learn>=1.4    # stratified train/val/test split
+
 # --- 이후 단계에서 활성화 예정 (지금은 주석) ---
-# pillow>=10.0         # Phase 3: 바이트 -> 이미지 변환
-# scikit-learn>=1.4    # 베이스라인 ML, stratified split
+# pillow>=10.0         # (필요 시) 개별 이미지 저장. 현재는 .npz 로 저장하므로 미사용
 # xgboost>=2.0         # 베이스라인
 # torch>=2.2           # 제안 CNN, adversarial training
 # adversarial-robustness-toolbox>=1.17  # RQ2 feature-space 공격
