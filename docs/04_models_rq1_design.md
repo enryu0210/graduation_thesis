@@ -96,9 +96,11 @@ python src/models/train.py --model cnn --smoke
 
 ---
 
-## 6. 다음 단계로 넘기는 열린 결정
+## 6. 리스크 / 열린 결정 (다음 단계로 넘김)
 
 - [ ] GPU 전면 학습 후 4개 모델 지표 표/그림 확정, 5-fold CV + paired t-test(설계 6.1)
 - [ ] ablation: decoded vs raw, side 32/48/64, RGB 강화(설계 4장 Step 3)
 - [ ] `csic_binary` 일반화 트랙 평가(이미지화 단위 URL vs 전체요청 재검토 포함)
 - [ ] 최종 모델 확정 → Phase 5(RQ2 회피 공격)의 공격 대상 모델로 사용
+- [ ] (운영) 브랜치 정리 — 현재 Phase 2~4 가 모두 `phase1-data-acquisition` 브랜치에
+  커밋돼 있어 이름과 내용이 불일치. phase 별 브랜치 분리 또는 브랜치명 변경 검토 필요
