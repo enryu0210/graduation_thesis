@@ -39,11 +39,11 @@
 
 ## CSIC 2010 HTTP dataset (확보 완료 — 사용자 수동 다운로드)
 
-- Source URL: 사용자가 직접 내려받아 제공 (파일명 `csic_database.csv`).
-  컬럼 구조(`Method, User-Agent, ..., classification, URL` + 선두 `Unnamed: 0` = Normal/Anomalous)가
-  `github.com/msudol/Web-Application-Attack-Datasets` 의 정제 CSV 버전과 일치함 → **정확한 원본 출처는 사용자 확인 필요**.
-- 후보 미러(재현용): `kaggle.com/datasets/ispangler/csic-2010-web-application-attacks`,
-  `gitlab.fing.edu.uy/gsi/web-application-attacks-datasets`
+- Source URL: `https://www.kaggle.com/datasets/ispangler/csic-2010-web-application-attacks` (사용자 확인 완료)
+  - 사용자가 위 Kaggle 미러에서 직접 내려받아 제공 (파일명 `csic_database.csv`).
+  - 컬럼 구조(`Method, User-Agent, ..., classification, URL` + 선두 `Unnamed: 0` = Normal/Anomalous)가
+    `github.com/msudol/Web-Application-Attack-Datasets` 의 정제 CSV 계열과 동일함.
+- 교차검증용 대체 미러: `gitlab.fing.edu.uy/gsi/web-application-attacks-datasets`
 - Accessed: 2026-07-02
 - License: (확인 필요 — CSIC 2010 원본은 연구·교육용 공개 데이터셋)
 - Commit/Version: 파일 mtime 기준 2019-10-11 스냅샷

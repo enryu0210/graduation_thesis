@@ -5,12 +5,15 @@
 pandas>=2.0
 kagglehub>=0.3        # Kaggle 데이터셋 다운로드 (CSIC 2010 미러)
 
+# --- Phase 2 (EDA) 에서 사용 ---
+numpy>=1.26
+matplotlib>=3.8      # EDA 시각화 (바이트 길이 분포)
+seaborn>=0.13
+
 # --- 이후 단계에서 활성화 예정 (지금은 주석) ---
-# numpy>=1.26
 # pillow>=10.0         # Phase 3: 바이트 -> 이미지 변환
 # scikit-learn>=1.4    # 베이스라인 ML, stratified split
 # xgboost>=2.0         # 베이스라인
 # torch>=2.2           # 제안 CNN, adversarial training
-# matplotlib>=3.8      # EDA 시각화
-# seaborn>=0.13
+# adversarial-robustness-toolbox>=1.17  # RQ2 feature-space 공격
 # adversarial-robustness-toolbox>=1.17  # RQ2 feature-space 공격
