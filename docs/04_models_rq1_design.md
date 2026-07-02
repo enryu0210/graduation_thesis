@@ -104,3 +104,35 @@ python src/models/train.py --model cnn --smoke
 - [ ] 최종 모델 확정 → Phase 5(RQ2 회피 공격)의 공격 대상 모델로 사용
 - [ ] (운영) 브랜치 정리 — 현재 Phase 2~4 가 모두 `phase1-data-acquisition` 브랜치에
   커밋돼 있어 이름과 내용이 불일치. phase 별 브랜치 분리 또는 브랜치명 변경 검토 필요
+
+---
+
+## 7. ⚠️ 핵심 리스크 — payload_4class 고성능의 원인 진단 (실측)
+
+TF-IDF+LogReg 가 clean test 에서 **AUC≈0.999 / Macro-F1≈0.977** 로 매우 높게 나온다.
+이것이 실력인지 데이터 편향인지 판단하려고 실측했다.
+재현: `python src/eval/diagnose_payload_bias.py` (2026-07 실행 기준).
+
+**진단 결과**
+
+1. **데이터 누수 아님** — train/test 를 정규화(소문자+공백축약)한 뒤 완전일치는 **0.3%(89/29,969)**.
+   Phase 3 의 exact dedup 이 제대로 동작했고 near-duplicate 누수도 무시할 수준. → 수치는 "진짜"다.
+
+2. **과제가 쉬움(표면 토큰 직교)** — logreg 상위 char n-gram 이 곧 "누가 봐도 아는 토큰":
+   SQLi=`)`,`(`,`=` / XSS=`alert`,`%3`(=`<`),`id=` / CmdI=`find`,`|`,`$`,`-exec`.
+   char n-gram 이 이 구두점을 그대로 잡아 선형 모델도 거의 완벽 분리(이 데이터셋류의 알려진 포화 현상).
+
+3. **가장 중요한 편향 — Normal 클래스가 '영어 산문'** — Normal 예시가 영화 리뷰류 자연어
+   (예: *"I'm a huge fan of war movies..."*)인 반면 공격 3종은 기호 범벅. 즉 모델이
+   *'공격이냐 정상이냐'* 가 아니라 *'문장이냐 기호냐'* 를 배우는 **shortcut** 위험.
+
+**함의 (논문 4·5장·한계에 반드시 서술)**
+- 이 AUC 는 **낙관적으로 부풀려진 값**이며, 실 HTTP 트래픽(정상 요청도 구조적) 에는 그대로 통하지 않는다.
+  → Phase 3 에서 경고한 **도메인 편차** 가 여기서 실측됨.
+- 오히려 이것이 **RQ2(회피 공격) 의 존재 이유**: clean in-distribution 지표는 다 높지만 회피/실트래픽에서
+  무너지는 것을 보이는 게 기여. 즉 높은 clean AUC 는 예상된 결과이자 연구 동기다.
+- AUC(0.999) > accuracy(0.977) 는 AUC 가 관대한 랭킹 지표라 자연스러운 현상.
+
+**후속 조치 후보**
+- [ ] Normal 클래스를 **CSIC 실트래픽 정상 요청**으로 교체/보강해 장르 편차 제거(신뢰도 핵심)
+- [ ] near-duplicate 기준(정규화/유사도) dedup 을 exact dedup 에 추가할지 검토
