@@ -13,9 +13,13 @@ seaborn>=0.13
 # --- Phase 3 (전처리·이미지 변환) 에서 사용 ---
 scikit-learn>=1.4    # stratified train/val/test split
 
+# --- Phase 4 (모델·RQ1) 에서 사용 ---
+torch>=2.2           # 제안 CNN, char-CNN, BiLSTM (device 자동 감지: GPU 있으면 cuda)
+# scikit-learn 은 위에 이미 명시됨 — TF-IDF + LogisticRegression/RandomForest 베이스라인에 사용.
+# 참고: 설계 5장은 XGBoost 도 후보로 들지만, Phase 4 는 sklearn RandomForest 로 대체(추가 설치 불필요).
+#       XGBoost 를 쓰려면 아래 주석을 해제.
+# xgboost>=2.0
+
 # --- 이후 단계에서 활성화 예정 (지금은 주석) ---
 # pillow>=10.0         # (필요 시) 개별 이미지 저장. 현재는 .npz 로 저장하므로 미사용
-# xgboost>=2.0         # 베이스라인
-# torch>=2.2           # 제안 CNN, adversarial training
-# adversarial-robustness-toolbox>=1.17  # RQ2 feature-space 공격
 # adversarial-robustness-toolbox>=1.17  # RQ2 feature-space 공격

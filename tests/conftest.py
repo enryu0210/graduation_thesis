@@ -9,7 +9,12 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-for extra in (PROJECT_ROOT / "src", PROJECT_ROOT / "src" / "imaging"):
+for extra in (
+    PROJECT_ROOT / "src",
+    PROJECT_ROOT / "src" / "imaging",
+    PROJECT_ROOT / "src" / "models",
+    PROJECT_ROOT / "src" / "eval",
+):
     path_str = str(extra)
     if path_str not in sys.path:
         sys.path.insert(0, path_str)
