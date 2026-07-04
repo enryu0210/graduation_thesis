@@ -74,6 +74,8 @@
 
 ---
 
+---
+
 # 자동 검증 결과 (validate.py)
 
 ## csic_database.csv
