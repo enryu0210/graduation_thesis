@@ -29,7 +29,7 @@ from __future__ import annotations
 import html
 import sys
 from pathlib import Path
-from urllib.parse import unquote_plus
+from urllib.parse import unquote_plus, urlsplit
 
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -98,6 +98,41 @@ def load_csic_binary() -> pd.DataFrame:
             "label": cls.map({0: "Normal", 1: "Anomalous"}),
         }
     )
+
+
+def load_payload_4class_csicnorm() -> pd.DataFrame:
+    """RQ1 신뢰도 개선 트랙 — Normal 을 CSIC 실트래픽으로 교체한 4-class 셋.
+
+    왜 만드나 (Phase 4 §7 편향 진단):
+        기존 payload_4class 의 Normal 은 '영화 리뷰 등 영어 산문'이라, 모델이
+        '공격이냐 정상이냐'가 아니라 '문장이냐 기호냐'를 배우는 shortcut 위험이 있었다.
+        → 공격 3종(SQLi/XSS/CmdI)은 그대로 두고, Normal 만 CSIC 2010 정상 요청의
+          '전체 쿼리스트링'으로 교체해 정상/공격이 같은 표현 공간(기호 범벅)에 있게 한다.
+
+    왜 '단일 값'이 아니라 '전체 쿼리스트링'인가:
+        단일 파라미터 값은 길이 중앙값이 9자에 불과해, 공격(75~600자)과 붙이면
+        '짧으면 정상'이라는 새 shortcut 이 생긴다(측정 근거: docs/05_..._design 참조).
+        전체 쿼리스트링(중앙값 71자)은 길이가 공격과 겹쳐 이 문제를 크게 완화한다.
+    """
+    # 1) 공격 3종: 기존 페이로드셋에서 산문 Normal 만 제외하고 그대로 사용
+    payload = load_payload_4class()
+    attacks = payload[payload["label"] != "Normal"].copy()
+
+    # 2) Normal: CSIC 2010 정상(classification==0) 요청의 URL 에서 쿼리스트링만 추출
+    csic = pd.read_csv(CSIC_CSV, low_memory=False)
+    cls = pd.to_numeric(csic["classification"], errors="coerce")
+    normal_urls = csic.loc[cls == 0, "URL"].fillna("").astype(str)
+    query_strings = normal_urls.map(lambda u: urlsplit(u).query)
+    # CSIC 의 URL 필드는 실제로 요청라인('... HTTP/1.1')이라 쿼리 끝에 프로토콜 꼬리표가
+    # 붙는다. 이 ' HTTP/1.1' 은 공격 페이로드엔 전혀 없어 그대로 두면 모델이 이 한 토큰으로
+    # Normal 을 분리하는 인공 shortcut 이 된다(진단 [3]에서 실측). → 반드시 제거한다.
+    query_strings = query_strings.str.replace(r"\s+HTTP/\d(?:\.\d)?\s*$", "", regex=True)
+    # 쿼리스트링이 없는 정적 GET(예: 이미지 요청)은 내용이 없어 제외
+    query_strings = query_strings[query_strings.str.strip() != ""]
+    normal_df = pd.DataFrame({"text_raw": query_strings.values, "label": "Normal"})
+
+    # 완전 중복 제거·분할은 공통 clean_and_split 이 담당하므로 여기선 결합만 한다.
+    return pd.concat([attacks, normal_df], ignore_index=True)
 
 
 # ---------------------------------------------------------------------------
@@ -178,7 +213,15 @@ def save_track(name: str, out: pd.DataFrame) -> list[str]:
 # ---------------------------------------------------------------------------
 TRACKS = {
     "payload_4class": load_payload_4class,
+    "payload_4class_csicnorm": load_payload_4class_csicnorm,
     "csic_binary": load_csic_binary,
+}
+
+# 트랙별로 필요한 원본 파일(존재 확인용). csicnorm 은 두 원본을 모두 필요로 한다.
+REQUIRED_FILES = {
+    "payload_4class": [PAYLOAD_CSV],
+    "payload_4class_csicnorm": [PAYLOAD_CSV, CSIC_CSV],
+    "csic_binary": [CSIC_CSV],
 }
 
 
@@ -224,10 +267,11 @@ def main() -> None:
 
     body: list[str] = []
     for name in requested:
-        # 입력 파일 존재 확인
-        src = PAYLOAD_CSV if name == "payload_4class" else CSIC_CSV
-        if not src.exists():
-            body += [f"## 트랙: {name}", "", f"- [건너뜀] 입력 파일 없음: `{src}`", ""]
+        # 입력 파일 존재 확인 (트랙마다 필요한 원본이 다름)
+        missing = [p for p in REQUIRED_FILES[name] if not p.exists()]
+        if missing:
+            miss_str = ", ".join(f"`{p}`" for p in missing)
+            body += [f"## 트랙: {name}", "", f"- [건너뜀] 입력 파일 없음: {miss_str}", ""]
             continue
         body += process_track(name)
 

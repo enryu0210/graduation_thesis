@@ -92,7 +92,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="payload_4class 고성능 원인 진단")
     parser.add_argument("--track", default="payload_4class",
-                        choices=["payload_4class", "csic_binary"])
+                        choices=["payload_4class", "payload_4class_csicnorm", "csic_binary"])
     parser.add_argument("--text", default="raw", choices=["raw", "decoded"])
     parser.add_argument("--skip-logreg", action="store_true",
                         help="상위 특징 분석(logreg 학습, 수십 초) 생략")

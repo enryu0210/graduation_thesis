@@ -22,6 +22,20 @@
     - `data\processed\payload_4class_val.csv` (29,969 행)
     - `data\processed\payload_4class_test.csv` (29,969 행)
 
+## 트랙: payload_4class_csicnorm
+
+- 시작 행 수: 156,115
+- 빈 문자열 제거: 0 행 → 남은 156,115
+- 완전 중복 제거(raw 기준): 5,260 행 (3.37%) → 남은 150,855
+- 분할 결과(행 수 및 클래스 분포):
+    - train: 105,598 (70.0%) | CommandInjection=33,610, Normal=3,368, SQLInjection=40,096, XSS=28,524
+    - val: 22,628 (15.0%) | CommandInjection=7,202, Normal=722, SQLInjection=8,592, XSS=6,112
+    - test: 22,629 (15.0%) | CommandInjection=7,202, Normal=722, SQLInjection=8,592, XSS=6,113
+- 저장 파일:
+    - `data\processed\payload_4class_csicnorm_train.csv` (105,598 행)
+    - `data\processed\payload_4class_csicnorm_val.csv` (22,628 행)
+    - `data\processed\payload_4class_csicnorm_test.csv` (22,629 행)
+
 ## 트랙: csic_binary
 
 - 시작 행 수: 61,065

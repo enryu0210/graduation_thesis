@@ -32,6 +32,7 @@ src/eval/         # 지표 계산·유의성 검정
 - [x] Phase 2 — EDA (페이로드 길이 분포 → 이미지 폭 W=48 결정)
 - [x] Phase 3 — 전처리·분할 + 바이트→이미지(.npz) 변환
 - [x] Phase 4 — RQ1 실험 완료: 5개 모델 GPU 전면 학습·평가 (제안 CNN Macro-F1 0.950 vs 텍스트 베이스라인 0.977~0.996)
+- [x] Phase 4.5 — Normal 편향 진단: CSIC 실트래픽으로 교체해도 clean 포화(0.99+) 유지 → 표면토큰이 본질임을 실증(04문서 §7.1). RQ2용 `payload_4class_csicnorm` 트랙 확보
 - [~] Phase 5 — 회피 공격(RQ2): **설계 확정**([`docs/05_...`](docs/05_evasion_attacks_rq2_design.md)), 구현 착수 전
 - [ ] Phase 6 — adversarial training(RQ3)
 
