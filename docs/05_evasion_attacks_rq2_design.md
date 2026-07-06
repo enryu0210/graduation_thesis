@@ -196,8 +196,9 @@ python src/attacks/run_evasion.py --attack fgsm --model cnn --eps 0.01,0.03,0.05
 - [ ] **의미보존 검증의 한계**: 라이브 타깃이 없어 "여전히 동작하는 공격"임을 실행으로
   증명하지 못한다. 규칙 수준 보장 + 소수 표본 수동 검토로 갈음하고 한계로 명시.
 - [ ] **GA 쿼리 예산**을 얼마로 고정할지(공정성 vs 계산비용) — 500샘플×세대20이 현실적 후보.
-- [ ] Normal 편향(Phase 4 7절) 미해결 상태에서 회피가 "너무 쉽게" 나올 수 있음
-  → Normal을 CSIC 실트래픽으로 교체한 뒤 재측정할지(신뢰도 vs 일정) 결정 필요.
+- [x] Normal 편향(Phase 4 7절) → **해결**: Normal 을 CSIC 실트래픽으로 교체한
+  `payload_4class_csicnorm` 트랙 확보(04문서 §7.1). 단, clean 점수는 여전히 포화(표면토큰 본질)
+  → 회피가 쉽게 나오는 건 데이터가 아니라 과제 특성이며, 그 자체가 RQ2 의 논지.
 - [ ] feature-space 결과를 논문 본문에 넣을지/부록으로 뺄지(invertibility 한계 때문).
 - [ ] 회피에 성공한 변형 페이로드 집합을 **Phase 6(adversarial training) 학습 소스**로
   그대로 넘기는 인터페이스 확정(산출물 포맷 미리 맞춰두기).
@@ -213,3 +214,36 @@ python src/attacks/run_evasion.py --attack fgsm --model cnn --eps 0.01,0.03,0.05
    제안 CNN 한정 보조 — invertibility 한계 명시.
 4. 공격은 **Phase 3/4 실제 파이프라인을 그대로 통과**시키고, 지표 모듈을 재사용한다.
 5. 핵심 가설: **표면 토큰 의존 모델이 더 취약** → RQ1 clean 순위가 뒤집히는지 검증.
+
+---
+
+## 11. 진행 현황 및 다음 작업 (2026-07-06 기준)
+
+### ✅ 완료 (A) — RQ2 데이터·학습 준비
+- `payload_4class_csicnorm` 트랙 확보(Normal=CSIC 실트래픽, 04문서 §7.1).
+- 이미지 데이터셋 빌드 완료: `data/images/payload_4class_csicnorm_{split}_text_raw_48.npz`.
+- `train.py` 에 **`--balance` 옵션 추가**(train 클래스 균형 언더샘플링, val/test 는 실분포 유지).
+  균형화 산출물은 tag 에 `_bal` 접미사가 붙어 기존 결과와 안 섞임. (스모크로 두 경로 무결성 확인)
+
+### ⬜ 내일 할 일 — B: RQ2 공격 코드 착수
+- `src/attacks/mutations.py` 부터: 4장 카탈로그의 **의미보존 변형 규칙**(SQLi/XSS/CmdI 별)
+  순수 문자열 함수로 구현 + `tests/test_attacks.py`(멱등성·의미보존 스모크).
+- 이어서 `problem_space.py`(단일/조합/GA) → `run_evasion.py`(모델 로드·ASR 리포트).
+- 대상 모델은 아래 C 로 재학습된 `*_bal` 체크포인트를 연결.
+
+### ⬜ 내일 할 일 — C: 불균형 처리 방식 확정 + 5모델 재학습
+- **결정 필요**: RQ2 공격 대상 모델을 (a) `--balance`(언더샘플링, 현재 구현) /
+  (b) 오버샘플링 / (c) class weight 만 중 무엇으로 학습할지.
+  → 권장: **(a) 언더샘플링**. Normal 이 실제 예측 후보가 되어야 benign-evasion 측정이
+    유효(불균형이면 가짜 강건성). 단 데이터가 ~13k 로 줄어드는 트레이드오프 존재.
+- 재학습 명령(GPU 권장, torch 계열):
+  ```bash
+  # 이미지 데이터셋은 이미 빌드됨. 아래로 5모델 재학습(_bal tag 로 저장)
+  python src/models/baseline_tfidf.py --track payload_4class_csicnorm --clf logreg   # (CPU 가능)
+  python src/models/baseline_tfidf.py --track payload_4class_csicnorm --clf rf
+  python src/models/train.py --model cnn     --track payload_4class_csicnorm --balance
+  python src/models/train.py --model charcnn --track payload_4class_csicnorm --balance
+  python src/models/train.py --model bilstm  --track payload_4class_csicnorm --balance
+  ```
+  ※ baseline_tfidf 는 `class_weight="balanced"` 라 `--balance` 불필요(자체 보정).
+- 재학습 후: RQ1 표를 csicnorm 기준으로 재작성할지(04문서 5절 대비) 판단.

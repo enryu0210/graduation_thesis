@@ -71,7 +71,30 @@ def _limit(arr: np.ndarray, limit: int | None) -> np.ndarray:
     return arr[:limit] if limit else arr
 
 
-def build_datasets(model: str, track: str, text: str, side: int, max_len: int, limit: int | None):
+def balance_train_indices(y_train: np.ndarray, seed: int) -> np.ndarray:
+    """훈련셋을 클래스 균형으로 언더샘플링할 인덱스를 만든다(train 전용).
+
+    왜 필요한가 (RQ2 대비):
+        payload_4class_csicnorm 은 Normal(≈3.4k) 이 공격(각 28~40k)보다 10배 이상 적다.
+        이대로 학습하면 모델이 Normal 을 거의 예측하지 않게 되어, RQ2 의 핵심 지표인
+        'benign-evasion(공격→Normal)' 이 인위적으로 어려워진다(=가짜 강건성). 이를 막기 위해
+        각 클래스를 '가장 작은 클래스 수'에 맞춰 무작위 언더샘플링한다.
+
+    왜 언더샘플링(오버샘플링 아님)인가:
+        공격 클래스는 표본이 충분하므로, 소수 클래스에 맞춰 줄이면 데이터 중복 없이
+        균형이 맞고 학습도 빨라진다. val/test 는 건드리지 않는다(실제 분포에서 평가해야 정직).
+    """
+    rng = np.random.default_rng(seed)
+    classes = np.unique(y_train)
+    per_class = min(int((y_train == c).sum()) for c in classes)
+    keep = [rng.choice(np.where(y_train == c)[0], size=per_class, replace=False) for c in classes]
+    keep = np.concatenate(keep)
+    rng.shuffle(keep)  # 클래스별로 뭉치지 않도록 섞는다
+    return keep
+
+
+def build_datasets(model: str, track: str, text: str, side: int, max_len: int,
+                   limit: int | None, balance: bool = False, seed: int = 42):
     """모델 종류에 맞춰 (train/val/test TensorDataset, classes, class_weights) 를 만든다.
 
     - 이미지 모델: data/images 의 .npz → (N,1,H,W) float
@@ -83,6 +106,9 @@ def build_datasets(model: str, track: str, text: str, side: int, max_len: int, l
         va_x, va_y, _ = data_image.load_split(track, "val", text, side)
         te_x, te_y, _ = data_image.load_split(track, "test", text, side)
         tr_x, tr_y = _limit(tr_x, limit), _limit(tr_y, limit)
+        if balance:
+            keep = balance_train_indices(tr_y, seed)
+            tr_x, tr_y = tr_x[keep], tr_y[keep]
 
         train_ds = data_image.make_torch_dataset(tr_x, tr_y)
         val_ds = data_image.make_torch_dataset(va_x, va_y)
@@ -99,6 +125,10 @@ def build_datasets(model: str, track: str, text: str, side: int, max_len: int, l
 
         if limit:
             tr_txt, y_train = tr_txt[:limit], y_train[:limit]
+        if balance:
+            keep = balance_train_indices(y_train, seed)
+            tr_txt = [tr_txt[i] for i in keep]  # tr_txt 는 리스트라 컴프리헨션으로 인덱싱
+            y_train = y_train[keep]
 
         # 문자열 → (N,L) 바이트 시퀀스
         Xtr = data_text.encode_byte_matrix(tr_txt, max_len)
@@ -195,8 +225,12 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="RQ1 학습·평가 (제안 CNN + 텍스트 베이스라인)")
     parser.add_argument("--model", required=True, choices=sorted(IMAGE_MODELS | TEXT_MODELS))
-    parser.add_argument("--track", default="payload_4class", choices=["payload_4class", "csic_binary"])
+    parser.add_argument("--track", default="payload_4class",
+                        choices=["payload_4class", "payload_4class_csicnorm", "csic_binary"])
     parser.add_argument("--text", default="raw", choices=["raw", "decoded"])
+    parser.add_argument("--balance", action="store_true",
+                        help="train 셋을 클래스 균형으로 언더샘플링(불균형 트랙 권장, RQ2 대비). "
+                             "val/test 는 실제 분포 유지. 산출물 tag 에 '_bal' 접미사가 붙음")
     parser.add_argument("--side", type=int, default=48, help="이미지 한 변(이미지 모델 전용)")
     parser.add_argument("--max-len", type=int, default=48 * 48,
                         help="바이트 시퀀스 길이(텍스트 모델 전용). 기본=이미지 용량(48x48)과 동일")
@@ -220,7 +254,10 @@ def main() -> None:
 
     train_ds, val_ds, test_ds, classes, class_weights = build_datasets(
         args.model, args.track, args.text, args.side, args.max_len, args.limit,
+        balance=args.balance, seed=args.seed,
     )
+    if args.balance:
+        print(f"  [balance] train 클래스 균형 언더샘플링 적용 → train={len(train_ds):,}")
     print(f"  train={len(train_ds):,} val={len(val_ds):,} test={len(test_ds):,} "
           f"classes={classes}")
     print(f"  class_weights={np.round(class_weights, 3).tolist()}")
@@ -253,10 +290,12 @@ def main() -> None:
         "track": args.track, "text": args.text, "side": args.side,
         "max_len": args.max_len, "epochs": args.epochs, "batch_size": args.batch_size,
         "lr": args.lr, "device": str(device), "limit": args.limit,
+        "balance": args.balance,
     }
 
     if not args.smoke:
-        tag = f"{args.track}_{args.model}_{args.text}"
+        # 균형화 여부를 tag 에 반영해 balanced/unbalanced 산출물이 서로 덮어쓰지 않게 한다.
+        tag = f"{args.track}_{args.model}_{args.text}" + ("_bal" if args.balance else "")
         M.save_report(result, RESULTS_DIR / f"{tag}.json")
         M.save_confusion_matrix(
             y_true, y_pred, classes, FIG_DIR / f"cm_{tag}.png",

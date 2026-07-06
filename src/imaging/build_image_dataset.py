@@ -117,7 +117,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="전처리 CSV → 이미지(.npz) 빌드")
     parser.add_argument("--track", default="payload_4class",
-                        choices=["payload_4class", "csic_binary"],
+                        choices=["payload_4class", "payload_4class_csicnorm", "csic_binary"],
                         help="변환할 데이터 트랙")
     parser.add_argument("--text", default="raw", choices=["raw", "decoded"],
                         help="이미지화할 텍스트 컬럼 (raw=원본, decoded=디코딩본)")
