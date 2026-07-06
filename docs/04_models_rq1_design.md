@@ -86,19 +86,47 @@ python src/models/train.py --model cnn --smoke
 
 ---
 
-## 5. Phase 4 검증 현황 (이 노트북, CPU)
+## 5. RQ1 실험 결과 (payload_4class / raw / side=48, clean test)
 
-- torch **불필요** 경로는 실데이터로 검증 완료:
-  - TF-IDF + LogisticRegression (payload_4class): **acc≈0.976, Macro-F1≈0.977, AUC≈0.999**
-- torch 경로(cnn/charcnn/bilstm)는 **스모크 테스트로 무결성만 확인**(작은 배치 학습→평가→저장까지 완주).
-  전면 학습은 GPU 환경에서 수행 예정.
+> GPU 전면 학습 완료. 5개 모델을 **동일 test 셋·동일 지표 모듈**(`src/eval/metrics.py`)로 평가한 결과.
+> 지표 원본: `experiments/results/*.json`, 혼동행렬: `docs/figures/models/`.
+
+| # | 모델 | 입력 | Accuracy | Macro-F1 | AUC(OvR) | 학습 비용(비고) |
+|---|---|---|---|---|---|---|
+| 1 | TF-IDF + LogReg | 문자열 | 0.9765 | 0.9775 | 0.9989 | features 85.6s + fit 30.6s (GPU 불필요) |
+| 2 | TF-IDF + RandomForest | 문자열 | 0.9921 | 0.9924 | 0.9997 | features 87.4s + fit 102.9s |
+| **3** | **제안 CNN (바이트 이미지)** | **48×48 이미지** | **0.9490** | **0.9496** | **0.9944** | **best epoch 14, 4.0s/epoch** |
+| 4 | char-CNN | 바이트 시퀀스 | 0.9957 | 0.9958 | 0.9999 | best epoch 8, 29.6s/epoch |
+| 5 | BiLSTM | 바이트 시퀀스 | 0.9960 | 0.9962 | 0.9998 | best epoch 25, 67.3s/epoch |
+
+### 해석 — RQ1에 대한 정직한 답
+
+RQ1은 *"이미지화 CNN이 텍스트 모델과 **유사하거나 더 나은** 성능을 보이는가?"* 였다.
+**clean in-distribution 기준으로는 "약간 낮다"** 가 실측 결론이다.
+
+- **제안 CNN이 5종 중 최하위**(Macro-F1 0.9496). 텍스트 베이스라인(char-CNN/BiLSTM/RF)보다
+  약 4~5%p 낮다. "이미지화가 텍스트보다 우월하다"는 주장은 이 데이터에서 성립하지 않는다.
+- 다만 **학습 효율은 압도적**: 제안 CNN은 4.0s/epoch 로 char-CNN(29.6s)·BiLSTM(67.3s) 대비
+  7~17배 빠르고, best epoch(14)까지 총 학습시간도 가장 짧다. WAF 배포/재학습 관점의 실용 이점.
+- **왜 텍스트 모델이 더 높은가는 7절과 직결**: 텍스트 모델은 페이로드의 표면 구두점 토큰
+  (`(`,`)`,`|`,`alert` 등)을 그대로 특징으로 쓴다. 이 데이터셋은 그 토큰만으로 거의 분리되므로
+  (7절 "과제가 쉬움") 텍스트 모델이 포화 성능에 도달한다. 이미지 CNN은 같은 정보를 2D 리셰이프
+  후 학습해야 하므로 clean 지표에서 손해를 본다.
+- ⚠️ **이 순위는 clean·in-distribution 한정**이다. 텍스트 모델의 높은 점수는 표면 토큰 shortcut에
+  의존한 결과일 수 있고(7절), 이는 **RQ2(회피 공격)에서 무너질 가설**이다. "clean에서 이긴 모델이
+  회피에서도 이기는가"가 RQ2·RQ3의 핵심 질문이 된다. → clean 순위를 최종 결론으로 쓰지 말 것.
+
+### 검증·재현 메모
 - 단위 테스트 `tests/test_models.py` 28건 통과(지표·클래스가중치·시퀀스 인코딩·모델 출력 shape).
+- 재현: 4절 "실행 순서" 명령을 GPU 환경에서 그대로 실행.
+- 남은 통계 검증(5-fold CV + paired t-test)은 6절 참조 — 위 표는 단일 split(seed=42) 결과다.
 
 ---
 
 ## 6. 리스크 / 열린 결정 (다음 단계로 넘김)
 
-- [ ] GPU 전면 학습 후 4개 모델 지표 표/그림 확정, 5-fold CV + paired t-test(설계 6.1)
+- [x] GPU 전면 학습 후 5개 모델 지표 표 확정 (5절) — **단일 split 완료**
+- [ ] 통계 검증: 5-fold CV + paired t-test(설계 6.1) — 위 표는 아직 단일 split
 - [ ] ablation: decoded vs raw, side 32/48/64, RGB 강화(설계 4장 Step 3)
 - [ ] `csic_binary` 일반화 트랙 평가(이미지화 단위 URL vs 전체요청 재검토 포함)
 - [ ] 최종 모델 확정 → Phase 5(RQ2 회피 공격)의 공격 대상 모델로 사용

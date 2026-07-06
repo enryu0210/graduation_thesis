@@ -30,7 +30,7 @@ src/eval/         # 지표 계산·유의성 검정
 - [x] Phase 1 — 데이터 확보/검증 (payload_4class 199,793행 + CSIC 2010)
 - [x] Phase 2 — EDA (페이로드 길이 분포 → 이미지 폭 W=48 결정)
 - [x] Phase 3 — 전처리·분할 + 바이트→이미지(.npz) 변환
-- [x] Phase 4 — 제안 CNN + 베이스라인(TF-IDF/char-CNN/BiLSTM) 구현·평가 파이프라인 (RQ1)
+- [x] Phase 4 — RQ1 실험 완료: 5개 모델 GPU 전면 학습·평가 (제안 CNN Macro-F1 0.950 vs 텍스트 베이스라인 0.977~0.996)
 - [ ] Phase 5 — 회피 공격(RQ2) / Phase 6 — adversarial training(RQ3)
 
 > 상세·열린 결정은 각 Phase 설계 문서 참조. Phase 4 실제 학습은 GPU(Colab/데스크톱) 권장.
