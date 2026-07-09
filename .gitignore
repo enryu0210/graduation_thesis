@@ -20,6 +20,10 @@ experiments/results/*
 !experiments/results/.gitkeep
 experiments/checkpoints/         # 모델 가중치(.pt) — 재현은 학습 스크립트+시드로 보장
 
+# --- 참고 논문 PDF (저작권 · 대용량) ---
+# 서지정보는 docs 관련연구 노트로 관리하고 원문 파일은 git 에 올리지 않는다.
+docs/thetics/
+
 # --- 자격증명 (절대 커밋 금지) ---
 kaggle.json
 .env
