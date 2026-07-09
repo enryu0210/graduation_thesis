@@ -247,3 +247,46 @@ python src/attacks/run_evasion.py --attack fgsm --model cnn --eps 0.01,0.03,0.05
   ```
   ※ baseline_tfidf 는 `class_weight="balanced"` 라 `--balance` 불필요(자체 보정).
 - 재학습 후: RQ1 표를 csicnorm 기준으로 재작성할지(04문서 5절 대비) 판단.
+
+---
+
+## 12. 실측 결과 — TF-IDF 회피 공격 (2026-07-09)
+
+> 산출물: `experiments/results/evasion_payload_4class_csicnorm_tfidf_{logreg,rf}_{single,stacked}.json`,
+> 그림 `docs/figures/attacks/evasion_{single,stacked}_payload_4class_csicnorm_tfidf_{logreg,rf}.png`.
+> 대상: `payload_4class_csicnorm` / raw / test 공격 21,907건(SQLi 8,592·XSS 6,113·CmdI 7,202).
+> 공격 대상 TF-IDF(char_wb 2–4gram, max_features=20k)는 `run_evasion.py` 가 clean train 으로
+> 즉석 학습(clean 정확도 logreg 0.9927). CNN·charCNN·BiLSTM 은 GPU 확보 후 동일 스크립트로 확장.
+
+### 12.1 핵심 결과 — 주 지표(benign-evasion)는 전 구간 0%
+
+| 지표 | logreg | rf |
+|---|---|---|
+| **주 — benign-evasion(공격→Normal)** | **0.0000** (단일·조합 k=1–5 전부) | **0.0000** (전부) |
+| 보조 — any-misclass(clean) | 0.0075 | 0.0031 |
+| 보조 — any-misclass(조합 k=5) | **0.5806** | **0.3421** |
+
+- **주 지표 = 0.** 표면 변형(인코딩·주석·대소문자·구분자)은 공격을 단 한 건도 `Normal` 로
+  밀어넣지 못했다. Normal 을 CSIC 실트래픽으로 교체(§1)한 트랙에서, 실제 HTTP 정상 트래픽과
+  공격 페이로드는 char n-gram 공간에서 워낙 분리돼 있어 표면 변형으로는 그 경계를 못 넘는다.
+  → **WAF 우회(유일하게 위험한 실패)라는 관점에서 TF-IDF 는 이 회피군에 강건**하다.
+- **보조 지표는 폭증**(clean <1% → k=5 에서 logreg 58%·rf 34%). 즉 변형이 탐지기를 크게
+  흔들긴 하나, 방향이 "공격→다른 공격 클래스"(대부분 XSS 로 붕괴)라 **탐지 자체는 유지**된다.
+  주 지표만 보면 "무결"처럼 보이지만 보조 지표가 모델의 실제 동요를 드러낸다(§2.2 의 두 지표
+  분리 측정이 여기서 결정적).
+
+### 12.2 어떤 변형이 통하는가 (보조 지표 기준)
+
+- 압도적으로 **URL 인코딩 계열**: `double_url_encode`(logreg Δ+0.62)·`url_encode`(Δ+0.59).
+  raw 트랙(디코딩 미적용, §3)이라 `%XX` 바이트가 그대로 도달 → char n-gram 분포가 XSS 쪽으로
+  이동. 반면 `space_to_tab`·클래스 전용 변형(주석/엔티티/IFS)은 거의 무효(Δ≈0).
+- **logreg > rf**: 선형 모델이 인코딩 변형에 더 민감(any-misclass 58% vs 34%). 트리 앙상블이
+  표면 n-gram 교란에 상대적으로 견고.
+
+### 12.3 구현 메모 / 문서와의 차이
+
+- `run_evasion.py` 는 §2.2 요구대로 **주·보조 두 지표를 함께** 기록하도록 확장했다(최초 구현은
+  주 지표만 기록 → 주 지표가 전부 0 이라 "빈 결과"로 오독될 위험이 있어 보조 지표 추가).
+- 그림(`evasion_stacked_*`)은 두 지표 곡선을 겹쳐 표시. 라벨은 폰트 문제로 ASCII.
+- **미측정(다음 단계)**: 이미지 CNN·charCNN·BiLSTM 대상 동일 실험(GPU 필요) — RQ2 의 핵심인
+  "표현방식별 상대 취약성" 비교는 이 3종이 들어와야 완성. feature-space(FGSM/PGD)는 §5 대로 CNN 한정.
