@@ -2,8 +2,9 @@
 
 ## 워크플로우
 - Phase 단위 진행. 각 Phase 의 결정/실측/리스크는 `docs/0N_*_design.md`(설계·의사결정 기록)에 남긴다.
-- 실측 지표 → `experiments/results/*.json`, 그림 → `docs/figures/`.
+- 실측 지표 → `experiments/results/*.json`(⚠️ 전체 .gitignore, 재생성으로 확보 — 커밋 대상 아님), 그림 → `docs/figures/`(추적·커밋 대상).
 - 커밋/푸시 대상 브랜치는 `phase1-data-acquisition`(전 Phase 가 여기 쌓임, main 아님).
+- git 커밋 메시지(한글 여러 줄)는 파일로 써서 `git commit -F <file>` 사용. Bash 도구에서 PowerShell here-string(`@'...'@`)은 메시지가 깨짐.
 
 ## 데이터 파이프라인
 - `data/processed`, `data/images` 는 .gitignore(대용량). 재생성으로 확보:
@@ -15,6 +16,7 @@
 
 ## 실행 환경 (Windows)
 - 한글 콘솔(cp949)에서 파이썬 비-ASCII 출력이 깨짐 → Bash 로 파이썬 실행 시 `PYTHONIOENCODING=utf-8` 프리픽스 사용(또는 스크립트가 stdout 재설정).
+- matplotlib 그림 라벨/범례/제목은 ASCII 만(DejaVu Sans 에 Hangul 없음 → □ 로 깨짐+경고). 한글은 콘솔·JSON 에만.
 - torch 학습은 GPU 필요(외부 실행). 로컬 CPU 는 `--smoke` 또는 sklearn 베이스라인(`baseline_tfidf.py`)만 실행.
 - 클래스 불균형 트랙 학습: `train.py --balance`(train 만 언더샘플링, val/test 실분포 유지).
 - 모든 모델 평가는 `src/eval/metrics.py` 로 일원화(계산 방식 차이 배제).
