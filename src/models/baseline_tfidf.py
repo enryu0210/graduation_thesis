@@ -94,6 +94,8 @@ def run(track: str, text: str, clf_name: str, max_features: int) -> dict:
 
     tag = f"{track}_tfidf_{clf_name}_{text}"
     M.save_report(result, RESULTS_DIR / f"{tag}.json")
+    # 샘플 단위 예측 저장(모델 간 '탐지 불일치' 분석용 — detection_analysis.py 가 소비)
+    M.save_predictions(y_test, y_pred, classes, RESULTS_DIR / f"pred_{tag}.npz", y_score=y_score)
     M.save_confusion_matrix(
         y_test, y_pred, classes, FIG_DIR / f"cm_{tag}.png",
         title=f"TF-IDF+{clf_name} ({track})",

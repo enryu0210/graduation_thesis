@@ -297,6 +297,8 @@ def main() -> None:
         # 균형화 여부를 tag 에 반영해 balanced/unbalanced 산출물이 서로 덮어쓰지 않게 한다.
         tag = f"{args.track}_{args.model}_{args.text}" + ("_bal" if args.balance else "")
         M.save_report(result, RESULTS_DIR / f"{tag}.json")
+        # 샘플 단위 예측 저장(모델 간 '탐지 불일치' 분석용 — detection_analysis.py 가 소비)
+        M.save_predictions(y_true, y_pred, classes, RESULTS_DIR / f"pred_{tag}.npz", y_score=y_score)
         M.save_confusion_matrix(
             y_true, y_pred, classes, FIG_DIR / f"cm_{tag}.png",
             title=f"{args.model} ({args.track})",
