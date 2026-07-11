@@ -2,9 +2,12 @@
 Phase 5 (RQ2) — 회피 공격 실행 & ASR 산출 (CLI)
 
 무엇을 하나:
-    1) 대상 탐지기를 clean train 으로 학습하고, clean test 에서 baseline 을 잡는다.
+    1) 대상 탐지기를 준비한다.
+         · TF-IDF(logreg/rf): clean train 으로 즉석 학습(CPU 가능, 체크포인트 불필요).
+         · torch(cnn/charcnn/bilstm): Phase 4 방식으로 미리 학습된 체크포인트를 로드(GPU 권장).
     2) problem_space 의 의미보존 변형을 test 공격 샘플에 적용해, **같은 전처리→예측 경로**로
-       통과시킨다(입력만 오염, 파이프라인 동일 — docs/05 §6).
+       통과시킨다(입력만 오염, 파이프라인 동일 — docs/05 §6). 즉 변형된 텍스트를
+       그 자리에서 이미지/바이트시퀀스로 바꿔 학습된 모델에 넣는다(파일 재빌드 없음).
     3) 회피 성공률(ASR)을 benign-evasion(공격→Normal 예측) 기준으로 측정한다.
          · 단일 기법별 ASR (어떤 회피가 잘 통하는가)
          · 예산(k) 조합 ASR 곡선 (회피를 겹칠수록 얼마나 뚫리나)
@@ -12,13 +15,18 @@ Phase 5 (RQ2) — 회피 공격 실행 & ASR 산출 (CLI)
 지표 정의(docs/05 §2.2) — 둘을 반드시 함께 보고한다:
     주 지표 = benign-evasion = 변형된 공격이 Normal 로 예측된 비율(= WAF 우회, 유일하게 위험한 실패).
     보조 지표 = any-misclassification = 예측≠진짜 클래스 비율(공격 클래스 사이 '동요').
-    주 지표가 0 이어도 보조 지표로 강건성 차이가 드러난다. 이번엔 CPU 로 되는 TF-IDF 대상.
-    CNN 은 GPU 확보 후 동일 스크립트로.
+    주 지표가 0 이어도 보조 지표로 강건성 차이가 드러난다.
+
+핵심 설계 — 예측 인터페이스 추상화:
+    모델 종류(TF-IDF / 이미지 CNN / 바이트 시퀀스)가 달라도 회피 로직은 동일해야 공정하다.
+    그래서 각 모델을 `predict(list[str]) -> np.ndarray(클래스인덱스)` 라는 **하나의 콜러블**로
+    감싼다. run_single/run_stacked 는 이 콜러블만 호출하므로 "같은 공격, 모델만 교체" 가 성립한다.
 
 산출물:
-    experiments/results/evasion_{track}_tfidf_{clf}_single.json / _stacked.json
-    docs/figures/attacks/evasion_single_{track}_tfidf_{clf}.png (기법별 ASR)
-    docs/figures/attacks/evasion_stacked_{track}_tfidf_{clf}.png (예산-ASR 곡선)
+    experiments/results/evasion_{track}_{model}_single.json / _stacked.json
+    docs/figures/attacks/evasion_single_{track}_{model}.png (기법별 ASR)
+    docs/figures/attacks/evasion_stacked_{track}_{model}.png (예산-ASR 곡선)
+    (model 예: tfidf_logreg, tfidf_rf, cnn, charcnn, bilstm)
 """
 
 from __future__ import annotations
@@ -39,20 +47,38 @@ import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-for extra in ("src/models", "src/eval", "src/attacks"):
+for extra in ("src/models", "src/eval", "src/attacks", "src/imaging"):
     sys.path.insert(0, str(PROJECT_ROOT / extra))
 
-from data_text import load_text_split, build_label_encoding, encode_labels_with  # noqa: E402
+from data_text import (  # noqa: E402
+    load_text_split, build_label_encoding, encode_byte_matrix,
+)
 from baseline_tfidf import build_classifier  # noqa: E402
 from metrics import _find_normal_index  # noqa: E402
+from payload_to_image import payload_to_image  # noqa: E402
 import problem_space as PS  # noqa: E402
 
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 FIG_DIR = PROJECT_ROOT / "docs" / "figures" / "attacks"
+CKPT_DIR = PROJECT_ROOT / "experiments" / "checkpoints"
+
+# 모델 종류 구분: TF-IDF 계열은 즉석 학습, torch 계열은 체크포인트 로드.
+TFIDF_MODELS = {"tfidf_logreg": "logreg", "tfidf_rf": "rf"}
+TORCH_IMAGE_MODELS = {"cnn"}          # 변형 텍스트 → 이미지로 예측
+TORCH_SEQ_MODELS = {"charcnn", "bilstm"}  # 변형 텍스트 → 바이트 시퀀스로 예측
+ALL_MODELS = list(TFIDF_MODELS) + sorted(TORCH_IMAGE_MODELS | TORCH_SEQ_MODELS)
 
 
-def train_target(track: str, clf_name: str, max_features: int):
-    """clean train 으로 TF-IDF+분류기를 학습해 (vectorizer, clf, classes) 반환."""
+# ---------------------------------------------------------------------------
+# 대상 모델 → 예측 콜러블 만들기 (predict: list[str] -> np.ndarray[int])
+# ---------------------------------------------------------------------------
+def build_tfidf_predict(track: str, clf_name: str, max_features: int):
+    """clean train 으로 TF-IDF+분류기를 학습해 (predict, classes) 를 반환한다.
+
+    TF-IDF 는 gradient 가 필요 없고 학습이 가벼워, 체크포인트 대신 매 실행마다 clean train 으로
+    즉석 학습한다(재현성: 같은 데이터·시드라 결과 동일). 불균형은 class_weight='balanced' 로
+    보정하므로 별도 언더샘플링이 필요 없다(docs/05 §11-C).
+    """
     tr_txt, tr_lab = load_text_split(track, "train", "raw")
     y_train, classes = build_label_encoding(tr_lab)
     vec = TfidfVectorizer(analyzer="char_wb", ngram_range=(2, 4),
@@ -60,9 +86,79 @@ def train_target(track: str, clf_name: str, max_features: int):
     Xtr = vec.fit_transform(tr_txt)
     clf = build_classifier(clf_name, len(classes))
     clf.fit(Xtr, y_train)
-    return vec, clf, classes
+
+    def predict(texts):
+        return clf.predict(vec.transform(list(texts)))
+
+    return predict, classes
 
 
+def build_torch_predict(track: str, model_name: str, side: int, max_len: int,
+                        balanced: bool, device):
+    """미리 학습된 torch 체크포인트를 로드해 (predict, classes) 를 반환한다.
+
+    체크포인트는 Phase 4 train.py 규칙으로 저장된 것을 그대로 쓴다:
+        experiments/checkpoints/{track}_{model}_raw[_bal].pt
+    RQ2 대상 모델은 --balance 로 학습된 '_bal' 체크포인트가 기본이다(docs/05 §11-C:
+    Normal 이 실제 예측 후보가 되어야 benign-evasion 측정이 유효).
+
+    클래스 순서는 train 라벨에서 build_label_encoding(sorted unique)으로 복원한다.
+    이미지 트랙(build_image_dataset)과 텍스트 트랙(data_text)이 같은 규칙을 쓰므로,
+    체크포인트가 학습된 라벨 인덱스와 정확히 일치한다.
+    """
+    import torch
+
+    _, tr_lab = load_text_split(track, "train", "raw")
+    _, classes = build_label_encoding(tr_lab)
+
+    if model_name in TORCH_IMAGE_MODELS:
+        import cnn as cnn_mod
+        net = cnn_mod.build_model(len(classes))
+    else:
+        import text_models
+        net = text_models.build_model(model_name, len(classes))
+
+    ckpt = CKPT_DIR / (f"{track}_{model_name}_raw" + ("_bal" if balanced else "") + ".pt")
+    if not ckpt.exists():
+        raise FileNotFoundError(
+            f"체크포인트가 없습니다: {ckpt}\n"
+            f"먼저 학습하세요: python src/models/train.py --model {model_name} "
+            f"--track {track}{' --balance' if balanced else ''}"
+        )
+    net.load_state_dict(torch.load(ckpt, map_location=device))
+    net.to(device).eval()
+    is_image = model_name in TORCH_IMAGE_MODELS
+
+    # 배치 크기: BiLSTM 은 긴 시퀀스(max_len=2304)를 순환 처리해 활성값 메모리가
+    # 배치×길이에 비례해 폭증한다(1024 배치에서 30GiB+ OOM 발생). 그래서 bilstm 만
+    # 작은 배치로 예측한다. conv 계열(cnn/charcnn)은 메모리가 가벼워 큰 배치가 안전·빠르다.
+    default_batch = 128 if model_name == "bilstm" else 1024
+
+    def predict(texts, batch: int = default_batch):
+        """변형 텍스트를 이미지/바이트행렬로 그 자리에서 바꿔 배치 예측한다."""
+        texts = list(texts)
+        preds = []
+        with torch.no_grad():
+            for i in range(0, len(texts), batch):
+                chunk = texts[i:i + batch]
+                if is_image:
+                    # 텍스트 → (side,side) uint8 이미지 → (B,1,side,side) float(0~1)
+                    imgs = np.stack([payload_to_image(t, side) for t in chunk])
+                    x = torch.from_numpy(imgs.astype(np.float32) / 255.0).unsqueeze(1).to(device)
+                else:
+                    # 텍스트 → (B, max_len) 바이트 인덱스 시퀀스
+                    X = encode_byte_matrix(chunk, max_len)
+                    x = torch.from_numpy(X).to(device)
+                logits = net(x)
+                preds.append(logits.argmax(dim=1).cpu().numpy())
+        return np.concatenate(preds)
+
+    return predict, classes
+
+
+# ---------------------------------------------------------------------------
+# 지표 (docs/05 §2.2)
+# ---------------------------------------------------------------------------
 def benign_evasion(pred: np.ndarray, mask: np.ndarray, normal_idx: int) -> float:
     """mask(적용 대상) 샘플 중 Normal 로 예측된 비율(= 주 지표 회피 성공률, docs/05 §2.2 ①)."""
     if mask.sum() == 0:
@@ -81,12 +177,12 @@ def any_misclass(pred: np.ndarray, mask: np.ndarray, y_true: np.ndarray) -> floa
     return float((pred[mask] != y_true[mask]).mean())
 
 
-def run_single(vec, clf, classes, te_txt, te_lab, y_true, base_pred, normal_idx, seed):
+def run_single(predict, te_txt, te_lab, y_true, base_pred, normal_idx, seed):
     """단일 기법별 ASR 을 계산한다. 반환: rows(list of dict)."""
     rows = []
     for tech in PS.ALL_TECHNIQUES:
         mutated, applied = PS.mutate_single(te_txt, te_lab, tech, random.Random(seed))
-        pred = clf.predict(vec.transform(mutated))
+        pred = predict(mutated)
         rows.append({
             "technique": tech,
             "n_applied": int(applied.sum()),
@@ -101,13 +197,13 @@ def run_single(vec, clf, classes, te_txt, te_lab, y_true, base_pred, normal_idx,
     return rows
 
 
-def run_stacked(vec, clf, classes, te_txt, te_lab, y_true, base_pred, normal_idx, budget, seed):
+def run_stacked(predict, te_txt, te_lab, y_true, base_pred, normal_idx, budget, seed):
     """예산 k=1..budget 조합 ASR 곡선을 계산한다(주·보조 지표 동시)."""
     attack_mask = np.asarray([bool(l in PS.ATTACK_LABELS) for l in te_lab])
     rows = []
     for k in range(1, budget + 1):
         mutated, applied = PS.mutate_stacked(te_txt, te_lab, k, random.Random(seed))
-        pred = clf.predict(vec.transform(mutated))
+        pred = predict(mutated)
         rows.append({
             "budget_k": k,
             "n_applied": int(applied.sum()),
@@ -157,36 +253,62 @@ def fig_stacked(rows, out_path: Path, title: str):
     fig.savefig(out_path, dpi=120); plt.close(fig)
 
 
+def get_device():
+    """torch 계열일 때만 호출된다. GPU 있으면 cuda, 없으면 cpu."""
+    import torch
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 def main() -> None:
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     except (AttributeError, ValueError):
         pass
 
-    p = argparse.ArgumentParser(description="RQ2 회피 공격 ASR 산출(TF-IDF 대상)")
+    p = argparse.ArgumentParser(description="RQ2 회피 공격 ASR 산출(TF-IDF/torch 대상 공용)")
+    p.add_argument("--model", default="cnn", choices=ALL_MODELS,
+                   help="공격 대상 모델. tfidf_* 는 즉석 학습, cnn/charcnn/bilstm 은 체크포인트 로드")
     p.add_argument("--track", default="payload_4class_csicnorm",
                    choices=["payload_4class", "payload_4class_csicnorm", "csic_binary"])
-    p.add_argument("--clf", default="logreg", choices=["logreg", "rf"])
     p.add_argument("--budget", type=int, default=5, help="조합 공격 최대 예산 k")
-    p.add_argument("--max-features", type=int, default=20000)
+    p.add_argument("--max-features", type=int, default=20000, help="TF-IDF 전용")
+    p.add_argument("--side", type=int, default=48, help="이미지 한 변(cnn 전용)")
+    p.add_argument("--max-len", type=int, default=48 * 48,
+                   help="바이트 시퀀스 길이(charcnn/bilstm 전용). 기본=이미지 용량(48x48)과 동일")
+    p.add_argument("--unbalanced", action="store_true",
+                   help="torch 체크포인트를 '_bal' 없이(불균형 학습본) 로드. 기본은 balanced(_bal)")
     p.add_argument("--seed", type=int, default=42)
     args = p.parse_args()
 
-    print(f"=== RQ2 회피 ASR: track={args.track} clf={args.clf} ===")
+    print(f"=== RQ2 회피 ASR: track={args.track} model={args.model} ===")
     t0 = time.perf_counter()
-    vec, clf, classes = train_target(args.track, args.clf, args.max_features)
+
+    # 대상 모델을 predict 콜러블로 감싼다(모델 종류를 이 지점에서만 분기).
+    if args.model in TFIDF_MODELS:
+        predict, classes = build_tfidf_predict(args.track, TFIDF_MODELS[args.model],
+                                               args.max_features)
+        device_note = "cpu(tfidf)"
+    else:
+        device = get_device()
+        predict, classes = build_torch_predict(
+            args.track, args.model, args.side, args.max_len,
+            balanced=not args.unbalanced, device=device,
+        )
+        device_note = str(device) + ("" if args.unbalanced else " / bal")
+
     normal_idx = _find_normal_index(classes)
-    print(f"  학습 완료({time.perf_counter()-t0:.1f}s) classes={classes} normal_idx={normal_idx}")
+    print(f"  대상 준비 완료({time.perf_counter()-t0:.1f}s) "
+          f"[{device_note}] classes={classes} normal_idx={normal_idx}")
 
     te_txt, te_lab = load_text_split(args.track, "test", "raw")
     te_lab = list(te_lab)
     # 진짜 클래스 인덱스(보조 지표 any-misclass 계산에 필요). classes 순서에 맞춘다.
     lab2idx = {c: i for i, c in enumerate(classes)}
     y_true = np.asarray([lab2idx[l] for l in te_lab])
-    base_pred = clf.predict(vec.transform(te_txt))
+    base_pred = predict(te_txt)
 
     # 단일 기법별 ASR (주: benign-evasion / 보조: any-misclass)
-    single = run_single(vec, clf, classes, te_txt, te_lab, y_true, base_pred, normal_idx, args.seed)
+    single = run_single(predict, te_txt, te_lab, y_true, base_pred, normal_idx, args.seed)
     print("  [단일 기법별 — 주(benign-evasion) / 보조(any-misclass), 변형 후]")
     for r in sorted(single, key=lambda x: -x["anymis_mutated"]):
         print(f"    {r['technique']:<22} n={r['n_applied']:>6,}  "
@@ -194,27 +316,27 @@ def main() -> None:
               f"AM {r['anymis_clean']:.4f}→{r['anymis_mutated']:.4f} (Δ+{r['anymis_delta']:.4f})")
 
     # 예산 조합 곡선
-    stacked = run_stacked(vec, clf, classes, te_txt, te_lab, y_true, base_pred, normal_idx,
+    stacked = run_stacked(predict, te_txt, te_lab, y_true, base_pred, normal_idx,
                           args.budget, args.seed)
     print("  [예산 곡선 — benign-evasion / any-misclass]")
     for r in stacked:
         print(f"    k={r['budget_k']}  BE={r['asr_mutated']:.4f}  AM={r['anymis_mutated']:.4f}")
 
     # 저장
-    tag = f"{args.track}_tfidf_{args.clf}"
+    tag = f"{args.track}_{args.model}"
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     with open(RESULTS_DIR / f"evasion_{tag}_single.json", "w", encoding="utf-8") as f:
-        json.dump({"track": args.track, "clf": args.clf, "classes": classes,
+        json.dump({"track": args.track, "model": args.model, "classes": classes,
                    "results": single}, f, ensure_ascii=False, indent=2)
     with open(RESULTS_DIR / f"evasion_{tag}_stacked.json", "w", encoding="utf-8") as f:
-        json.dump({"track": args.track, "clf": args.clf, "budget": args.budget,
-                   "results": stacked}, f, ensure_ascii=False, indent=2)
+        json.dump({"track": args.track, "model": args.model, "budget": args.budget,
+                   "classes": classes, "results": stacked}, f, ensure_ascii=False, indent=2)
 
     clean_ref = stacked[0]["asr_mutated"]  # k=0 기준(전체 공격 clean benign-evasion)
     fig_single(single, FIG_DIR / f"evasion_single_{tag}.png",
-               f"RQ2 single-technique ASR — {args.clf} ({args.track})", clean_ref)
+               f"RQ2 single-technique ASR — {args.model} ({args.track})", clean_ref)
     fig_stacked(stacked, FIG_DIR / f"evasion_stacked_{tag}.png",
-                f"RQ2 stacked-budget ASR — {args.clf} ({args.track})")
+                f"RQ2 stacked-budget ASR — {args.model} ({args.track})")
     print(f"\n[저장] 결과 → experiments/results/evasion_{tag}_*.json")
     print(f"[저장] 그림 → docs/figures/attacks/evasion_*_{tag}.png")
 

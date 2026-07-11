@@ -288,5 +288,86 @@ python src/attacks/run_evasion.py --attack fgsm --model cnn --eps 0.01,0.03,0.05
 - `run_evasion.py` 는 §2.2 요구대로 **주·보조 두 지표를 함께** 기록하도록 확장했다(최초 구현은
   주 지표만 기록 → 주 지표가 전부 0 이라 "빈 결과"로 오독될 위험이 있어 보조 지표 추가).
 - 그림(`evasion_stacked_*`)은 두 지표 곡선을 겹쳐 표시. 라벨은 폰트 문제로 ASCII.
-- **미측정(다음 단계)**: 이미지 CNN·charCNN·BiLSTM 대상 동일 실험(GPU 필요) — RQ2 의 핵심인
-  "표현방식별 상대 취약성" 비교는 이 3종이 들어와야 완성. feature-space(FGSM/PGD)는 §5 대로 CNN 한정.
+- ~~**미측정(다음 단계)**: 이미지 CNN·charCNN·BiLSTM 대상 동일 실험(GPU 필요)~~ → **§13 에서 완료**.
+
+---
+
+## 13. 실측 결과 — 5모델 전면 회피 실험 (2026-07-11, GPU: RTX 4080 SUPER)
+
+> §12 의 TF-IDF 2종에 더해 **이미지 CNN·charCNN·BiLSTM 3종을 같은 스크립트로** 실측해
+> RQ2 의 핵심 질문("표현방식별 상대 취약성")을 완성했다. 5모델 **모두 동일 트랙·동일 변형·
+> 동일 지표**(docs/05 §2.2)로 평가.
+> 산출물: `experiments/results/evasion_payload_4class_csicnorm_{cnn,charcnn,bilstm,tfidf_logreg,tfidf_rf}_{single,stacked}.json`,
+> 그림 `docs/figures/attacks/evasion_{single,stacked}_*.png` + **통합 비교 `evasion_compare_payload_4class_csicnorm.png`(헤드라인)**.
+> 대상: `payload_4class_csicnorm` / raw / test 공격 21,907건. torch 3종은 `--balance` 재학습본(_bal)을 공격 대상으로 사용.
+
+### 13.1 재현 절차 (이번 세션에서 실제 실행한 순서)
+```bash
+# 0) 데이터 재생성(gitignore 라 매번 재생성) — 인자 없이 전체(노트 유지)
+python src/data/preprocess.py
+python src/imaging/build_image_dataset.py --track payload_4class_csicnorm
+# 1) torch 3모델 csicnorm 균형 재학습(체크포인트 _bal 저장)
+python src/models/train.py --model cnn     --track payload_4class_csicnorm --balance
+python src/models/train.py --model charcnn --track payload_4class_csicnorm --balance
+python src/models/train.py --model bilstm  --track payload_4class_csicnorm --balance
+# 2) 5모델 회피 실행(모델만 교체 — 같은 공격/파이프라인)
+python src/attacks/run_evasion.py --model cnn     --track payload_4class_csicnorm
+python src/attacks/run_evasion.py --model charcnn --track payload_4class_csicnorm
+python src/attacks/run_evasion.py --model bilstm  --track payload_4class_csicnorm
+python src/attacks/run_evasion.py --model tfidf_logreg --track payload_4class_csicnorm
+python src/attacks/run_evasion.py --model tfidf_rf     --track payload_4class_csicnorm
+# 3) 통합 비교 그림
+python src/attacks/compare_evasion.py --track payload_4class_csicnorm
+```
+
+### 13.2 핵심 결과 — ① 주 지표(benign-evasion)는 5모델 전부 ~0
+
+| 모델 | 입력 | clean macro-F1(참고) | benign-evasion (k=0→k=5) | any-misclass (k=5) |
+|---|---|---|---|---|
+| 제안 CNN | 48×48 이미지 | 0.967 | 0.0010 → 0.0022 | **0.594** |
+| char-CNN | 바이트 시퀀스 | 0.995 | 0.0004 → 0.0001 | **0.224** |
+| BiLSTM | 바이트 시퀀스 | 0.984 | 0.0008 → 0.0006 | 0.466 |
+| TF-IDF+LogReg | 문자열 | 0.993 | 0.0000 → 0.0000 | 0.576 |
+| TF-IDF+RF | 문자열 | 0.994 | 0.0000 → 0.0000 | 0.332 |
+
+- **주 지표 = 사실상 0(모든 모델·전 예산).** 의미보존 표면 변형(인코딩·주석·대소문자·구분자)은
+  **어떤 표현방식에서도** 공격을 `Normal` 로 밀어넣지 못한다. CSIC 실트래픽 Normal 과 공격
+  페이로드가 이미지·시퀀스·n-gram **모든 표현 공간에서** 워낙 분리돼 있어, 표면 변형으로는
+  그 경계를 못 넘는다. → **WAF 우회(유일하게 위험한 실패)라는 관점에서 5모델 전부 이 회피군에 강건.**
+
+### 13.3 핵심 결과 — ② 보조 지표(any-misclass)로 본 표현방식별 '동요' 순위
+
+표면 변형이 탐지기를 흔드는 정도(k=5)는 표현방식마다 크게 다르다:
+
+**제안 CNN(0.594) ≳ TF-IDF LogReg(0.576) > BiLSTM(0.466) > TF-IDF RF(0.332) > char-CNN(0.224)**
+
+- **가설 H1(§7)은 이 데이터에서 성립하지 않는다(오히려 반대).** H1 은 *"표면 토큰 의존
+  모델(TF-IDF/charCNN)이 더 취약 → 이미지 CNN 이 상대적으로 강건할 수 있다"* 였다. 실측은
+  **제안 이미지 CNN 이 any-misclass 로는 가장 크게 흔들린다**(0.594, LogReg 보다도 높음). 즉
+  "이미지 표현이 회피에 더 강하다"는 **이 데이터에서 지지되지 않는다.**
+- 단, **이 '동요'는 보안적 실패가 아니다**: 제안 CNN 도 benign-evasion 은 ~0 이라, 변형된 공격이
+  Normal 이 아니라 **다른 공격 클래스로** 흩어질 뿐 탐지 자체는 유지된다(대부분 XSS 로 붕괴).
+- **char-CNN 이 clean 최고이면서 회피 최저 동요**(0.995 / 0.224)로 이 회피군에는 가장 견고.
+  학습형 바이트 임베딩이 TF-IDF 의 생(raw) char n-gram 표면 매칭보다 인코딩 교란에 덜 민감했다.
+- 변형별로는 **URL 인코딩 계열이 압도적**(raw 트랙이라 `%XX` 바이트가 그대로 도달). 클래스 전용
+  변형(주석/엔티티/IFS)은 대부분 무효 — §12 의 TF-IDF 관찰과 일치하며 표현방식 무관하게 재현됐다.
+
+### 13.4 RQ2 에 대한 정직한 중간 결론
+
+- **RQ1 clean 순위는 benign-evasion 관점에서 뒤집히지 않았다** — 모두 안전(0). 그러나 이는
+  모델 강건성보다 **과제/데이터 특성**(Normal=실트래픽이 전 표현공간에서 잘 분리됨)을 더 반영한다.
+- **표면 변형만으로는 이 트랙에서 WAF 우회가 안 된다**가 강건한 실측 사실. 따라서 "정말 뚫리는가"는
+  **Normal 을 모방하도록 방향을 잡는 더 강한 공격**이 필요 → 다음 단계: (a) GA 탐색(§4.5-③,
+  benign 방향 목적함수), (b) feature-space FGSM/PGD(§5, 제안 CNN 한정, invertibility 한계 명시).
+- 논문 서술 축: "표면 변형에 대한 benign-evasion 강건성은 표현방식 무관하게 확보되나,
+  any-misclass 동요는 표현방식별로 최대 2.6배 차이(0.224~0.594) — 제안 이미지 CNN 이 오히려 최상위."
+
+### 13.5 구현 메모
+- `run_evasion.py` 를 **모델 무관 `predict(list[str])→인덱스` 콜러블**로 추상화해 확장(TF-IDF 즉석
+  학습 / torch 체크포인트 로드 두 경로를 한 지점에서만 분기). 변형 텍스트는 **파일 재빌드 없이**
+  그 자리에서 `payload_to_image`(CNN) 또는 `encode_byte_matrix`(charCNN/BiLSTM)로 변환해 예측
+  → docs/05 §6 "같은 파이프라인, 입력만 오염" 원칙 유지.
+- **BiLSTM OOM 주의**: 긴 시퀀스(max_len=2304)라 예측 배치를 크게 잡으면(1024) CUDA OOM(30GiB+).
+  → bilstm 만 배치 128 로 낮춤(conv 계열은 1024 유지). 코드에 근거 주석 명시.
+- `compare_evasion.py` 신규: 5모델 stacked JSON → 2패널(주/보조) 통합 그림. 라벨은 폰트 문제로 ASCII.
+- **미측정(다음 단계)**: GA 탐색(benign 방향), feature-space FGSM/PGD → RQ2 상한 측정 후 Phase 6(RQ3 방어)로.
