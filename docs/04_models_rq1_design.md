@@ -203,3 +203,41 @@ TF-IDF+LogReg 가 clean test 에서 **AUC≈0.999 / Macro-F1≈0.977** 로 매�
   현실성을 얻는다. → **RQ2 는 이 `payload_4class_csicnorm` 트랙 위에서 수행**한다.
 - 남은 한계(둘 다 논문에 명시): ① CSIC 는 단일 앱(tienda1) 트래픽이라 앱 고유 파라미터가 지문이 됨,
   ② 공격 클래스에 잔존하는 degenerate 샘플(`llll…`, 랜덤 노이즈 소수), ③ 공격 길이 편중.
+
+## 8. 탐지 상보성 분석 — "제안 CNN 이 남들이 놓친 공격을 잡는가?" (실측, 2026-07)
+
+**동기**: Macro-F1 같은 집계 지표는 "전체 성적"만 보여줄 뿐, *"이미지 CNN 이 텍스트 모델이 놓친
+공격을 잡는가"* 라는 논문의 핵심 주장에는 답하지 못한다(전체 정확도가 비슷해도 잡는 대상이 다를
+수 있다). 이를 샘플 단위로 검증하려고 `src/eval/detection_analysis.py` 를 만들었다.
+재현: `python src/eval/detection_analysis.py --track payload_4class_csicnorm --bal --ref cnn --baselines tfidf_logreg,tfidf_rf,charcnn,bilstm`
+
+- **'탐지 성공' 정의**(`metrics.attack_focused` 와 동일): 진짜 공격 샘플에 대해 예측이 Normal 이
+  아니면 탐지, Normal 로 새면 미탐(benign-evasion). WAF 관점 실제 위험과 정확히 대응한다.
+- 대상: `payload_4class_csicnorm` test 의 **진짜 공격 21,907 건**. 기준(ref)=제안 CNN.
+
+**결과 — 상보성 표** (지표 원본: `experiments/results/detection_complementarity_..._cnn.json`)
+
+| 베이스라인 | 둘 다 탐지 | CNN만 탐지 | 베이스라인만 탐지 | 둘 다 놓침 | CNN recall | 베이스 recall | 순증(CNN) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| TF-IDF+LogReg | 21,885 | **0** | 22 | 0 | 0.9990 | **1.0000** | **−22** |
+| TF-IDF+RF | 21,885 | **0** | 22 | 0 | 0.9990 | **1.0000** | **−22** |
+| char-CNN | 21,877 | 8 | 22 | 0 | 0.9990 | 0.9996 | **−14** |
+| BiLSTM | 21,868 | 17 | 22 | 0 | 0.9990 | 0.9992 | **−5** |
+
+- `CNN만 탐지` = 베이스라인이 Normal 로 흘린 공격을 CNN 이 잡은 수(주장의 직접 근거).
+- `베이스라인만 탐지` = 반대 방향(과장 방지용 대칭 지표). 케이스 CSV: `experiments/results/detection_cases/`.
+
+**결론 — 주장은 성립하지 않는다(상보적이되 CNN 열위)**
+- **순증이 전부 음수.** 특히 TF-IDF 두 모델은 공격 21,907 건을 **100% 탐지**(recall 1.0)하며,
+  CNN 이 이들보다 더 잡는 건은 **0 건**이다. CNN 은 오히려 이들이 잡은 22 건을 놓친다.
+- CNN recall(0.9990)은 5 종 중 **최저** — 5절 clean Macro-F1 최하위 결론과 일관.
+- **질적으로 더 뼈아픈 점**: CNN 이 놓친 22 건(`cnn_vs_tfidf_logreg_baseONLY.csv`)에는 **명백한
+  공격**이 다수다 — `<script>alert(123)</script>`, `<isindex … onbeforeactivate=alert(1)>`,
+  `rmdir --ignore-fail-on-non-empty …`, `rsync … user@remote.host`. 라벨 분포는 XSS 17 · CmdInj 4 · SQLi 1.
+  반대로 CNN 만 잡은 소수(char-CNN 8·BiLSTM 17)는 대부분 정상과 구분 힘든 짧은 페이로드(`id=55`,
+  `or`, `cd`, `j=0`)라 "실력"보다 경계 잡음에 가깝다.
+- **함의**: 이미지화 표현은 텍스트 베이스라인 대비 **탐지 상보성에서 이득이 없다**(clean 기준).
+  → 제안 모델의 존재 이유는 clean 탐지 우월성이 아니라 **RQ2(회피 강건성)** 에서 찾아야 한다는
+  5·7절 결론을 재확인한다.
+- ⚠️ 한계: 이 비교는 **clean test 한정**이다. TF-IDF 의 완벽한 clean recall 은 표면 토큰 포화(7절)의
+  또 다른 증상이며, 회피 변형 하에서도 유지되는지는 RQ2(05 문서)에서 별도로 다룬다.
