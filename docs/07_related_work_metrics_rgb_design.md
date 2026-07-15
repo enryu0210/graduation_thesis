@@ -79,6 +79,39 @@ Accuracy 대신 **Macro-F1 + MCC + benign-evasion/FPR** 조합으로 보고. (Ac
 3. **B 채널 스왑**: local_entropy ↔ byte_delta
 각 셀은 `train.py --model cnn --channels rgb --rgb-encoders ...` 로 학습, metrics.py 통일 평가.
 
+### 2.4 실측 결과 (2026-07-15, RTX 4080 SUPER, seed=42, 30ep/early-stop patience=5)
+> 지표는 test 셋, metrics.py 통일 계산. F1=Macro-F1, ev=benign-evasion(공격→Normal 오분류율, 낮을수록 좋음).
+> gray 베이스라인은 MCC/PR-AUC 도입(§3) 이전 산출물이라 **동일 조건으로 재학습**해 비교 가능하게 맞춤.
+
+**RQ1 — payload_4class (4클래스, 언더샘플 없음)**
+
+| 채널 조합 (R/G/B) | F1 | MCC | PR-AUC | benign-ev |
+|---|---|---|---|---|
+| gray (1ch, raw_byte) | 0.9714 | 0.9609 | 0.9914 | 0.0281 |
+| rgb 기본 rb/cc/le | 0.9804 | 0.9732 | 0.9956 | 0.0162 |
+| rgb G-swap rb/**ss**/le | 0.9833 | 0.9770 | 0.9954 | 0.0163 |
+| rgb G-swap rb/**bp**/le | 0.9751 | 0.9663 | 0.9939 | 0.0291 |
+| rgb B-swap rb/cc/**bd** | **0.9836** | **0.9775** | **0.9963** | **0.0131** |
+
+**RQ2 — payload_4class_csicnorm (Normal=CSIC 실트래픽, train 균형 언더샘플)**
+
+| 채널 조합 | F1 | MCC | PR-AUC | benign-ev |
+|---|---|---|---|---|
+| gray (1ch) --balance | 0.9676 | 0.9418 | 0.9930 | 0.0005 |
+| rgb 기본 rb/cc/le --balance | **0.9804** | **0.9725** | **0.9983** | 0.0016 |
+
+**RQ4b — ustc_flow_binary (흐름 이미지, 악성/정상 이진)**
+
+| 채널 조합 | F1 | MCC | PR-AUC | benign-ev |
+|---|---|---|---|---|
+| rgb 기본 rb/cc/le | 0.9999 | 0.9999 | 1.0000 | 0.0000 |
+
+**해석**
+- **RGB 강화는 순효과 있음**: 두 페이로드 트랙 모두 gray 대비 F1·MCC·PR-AUC 전부 상승(RQ1 MCC +1.2~1.7pp, RQ2 MCC **+3.1pp**). ①의 전제("RGB가 특징 추출 이득") 실측 확인.
+- **G 채널**: `structural_special`(ss)·`char_class`(cc)가 우세, `bit_popcount`(bp)는 오히려 gray 수준으로 후퇴(비트수 요약이 구문 구분력을 희석). → **bp 제외**.
+- **B 채널**: `byte_delta`(bd)가 `local_entropy`(le)보다 근소 우세(MCC 0.9775 vs 0.9732) — RQ1 최고 조합은 **rb/cc/bd**.
+- **RQ4b는 천장(near-perfect)**: USTC-TFC2016 흐름 이미지가 거의 선형 분리 가능 → 모델 우열 판별력이 없음(문헌 공통 한계). 논문에선 "이 데이터셋은 포화" 캐비엇으로 명시, 경계 실험(§4 엔트로피 스윕)으로 변별력 확보 필요.
+
 ---
 
 ## 3. 성과지표 개편 (③) — 구현 계획
@@ -104,8 +137,8 @@ Accuracy 대신 **Macro-F1 + MCC + benign-evasion/FPR** 조합으로 보고. (Ac
 ---
 
 ## 5. 열린 결정 / 다음 단계
-- [ ] (GPU) gray vs rgb ablation 1라운드 → RGB 강화의 순효과 확인.
-- [ ] metrics.py에 MCC/PR-AUC 추가(§3) 후 기존 산출물 재생성(재현 스크립트로).
-- [ ] USTC-TFC2016 접근성·용량·라이선스 점검(②-2, RQ4b 선행).
+- [x] (GPU) gray vs rgb ablation 1라운드 → RGB 강화의 순효과 확인. **완료(§2.4)**: RGB가 F1·MCC·PR-AUC 모두 상승.
+- [x] metrics.py에 MCC/PR-AUC 추가(§3) 후 기존 산출물 재생성(재현 스크립트로). **완료**: gray CNN 베이스라인 2트랙 재학습으로 동일 스키마 확보.
+- [x] USTC-TFC2016 접근성·용량·라이선스 점검(②-2, RQ4b 선행). **완료**: download_ustc.py 로 pcap 18개 확보(압축 ~387MB), 흐름 rgb 학습까지 통과.
 - [ ] 관련연구 원문 서지정보 확정(§1 표의 연도/저자 재확인 후 인용).
-- [ ] G/B 채널 최적 조합 확정 → 설계문서 §4 Step3를 "계획"에서 "확정"으로 갱신.
+- [x] G/B 채널 최적 조합 확정 → 설계문서 §4 Step3를 "계획"에서 "확정"으로 갱신. **잠정 확정(§2.4)**: R=raw_byte / G=char_class(or structural_special) / B=byte_delta. bit_popcount 제외.

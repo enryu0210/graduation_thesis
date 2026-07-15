@@ -309,7 +309,11 @@ def main() -> None:
 
     if not args.smoke:
         # 균형화·채널 모드를 tag 에 반영해 산출물(gray/rgb, balanced/unbalanced)이 서로 안 덮어쓰게 한다.
-        ch_tag = "_rgb" if (args.model in IMAGE_MODELS and args.channels == "rgb") else ""
+        # ⚠️ rgb ablation(같은 트랙, 다른 R/G/B 조합)이 서로 덮어쓰지 않도록, npz 로드측과 동일한
+        #    채널 접미사 규칙(data_image._channel_suffix: gray="", 기본rgb="_rgb", 커스텀="_rgb-rb-ss-le")을
+        #    그대로 재사용한다(약어 맵 단일 진실 소스 유지 — build_image_dataset 와도 일치).
+        ch_tag = (data_image._channel_suffix(args.channels, encoders)
+                  if args.model in IMAGE_MODELS else "")
         tag = f"{args.track}_{args.model}_{args.text}{ch_tag}" + ("_bal" if args.balance else "")
         M.save_report(result, RESULTS_DIR / f"{tag}.json")
         # 샘플 단위 예측 저장(모델 간 '탐지 불일치' 분석용 — detection_analysis.py 가 소비)

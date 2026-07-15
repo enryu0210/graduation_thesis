@@ -19,7 +19,8 @@ venv/
 # --- 실험 산출물 (용량 큼) ---
 experiments/results/*
 !experiments/results/.gitkeep
-experiments/checkpoints/         # 모델 가중치(.pt) — 재현은 학습 스크립트+시드로 보장
+# 모델 가중치(.pt) — 재현은 학습 스크립트+시드로 보장 (⚠️ .gitignore 는 인라인 주석 미지원 → 주석은 별도 줄)
+experiments/checkpoints/
 
 # --- 참고 논문 PDF (저작권 · 대용량) ---
 # 서지정보는 docs 관련연구 노트로 관리하고 원문 파일은 git 에 올리지 않는다.
