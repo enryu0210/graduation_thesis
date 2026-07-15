@@ -94,17 +94,18 @@ def balance_train_indices(y_train: np.ndarray, seed: int) -> np.ndarray:
 
 
 def build_datasets(model: str, track: str, text: str, side: int, max_len: int,
-                   limit: int | None, balance: bool = False, seed: int = 42):
-    """모델 종류에 맞춰 (train/val/test TensorDataset, classes, class_weights) 를 만든다.
+                   limit: int | None, balance: bool = False, seed: int = 42,
+                   channels: str = "gray", encoders: tuple[str, str, str] | None = None):
+    """모델 종류에 맞춰 (train/val/test TensorDataset, classes, class_weights, in_channels) 를 만든다.
 
-    - 이미지 모델: data/images 의 .npz → (N,1,H,W) float
+    - 이미지 모델: data/images 의 .npz → gray (N,1,H,W) / rgb (N,3,H,W) float
     - 텍스트 모델: data/processed 의 CSV → (N,L) 바이트 인덱스 시퀀스
     두 경로 모두 train 라벨로 클래스 수/가중치를 정한다.
     """
     if model in IMAGE_MODELS:
-        tr_x, tr_y, classes = data_image.load_split(track, "train", text, side)
-        va_x, va_y, _ = data_image.load_split(track, "val", text, side)
-        te_x, te_y, _ = data_image.load_split(track, "test", text, side)
+        tr_x, tr_y, classes = data_image.load_split(track, "train", text, side, channels, encoders)
+        va_x, va_y, _ = data_image.load_split(track, "val", text, side, channels, encoders)
+        te_x, te_y, _ = data_image.load_split(track, "test", text, side, channels, encoders)
         tr_x, tr_y = _limit(tr_x, limit), _limit(tr_y, limit)
         if balance:
             keep = balance_train_indices(tr_y, seed)
@@ -114,6 +115,8 @@ def build_datasets(model: str, track: str, text: str, side: int, max_len: int,
         val_ds = data_image.make_torch_dataset(va_x, va_y)
         test_ds = data_image.make_torch_dataset(te_x, te_y)
         y_train = tr_y
+        # 이미지 채널 수(gray=1, rgb=3)를 배열 형태에서 직접 추론해 모델 in_channels 로 넘긴다.
+        in_channels = 3 if (tr_x.ndim == 4 and tr_x.shape[-1] == 3) else 1
 
     elif model in TEXT_MODELS:
         tr_txt, tr_lab = data_text.load_text_split(track, "train", text)
@@ -137,18 +140,19 @@ def build_datasets(model: str, track: str, text: str, side: int, max_len: int,
         train_ds = TensorDataset(torch.from_numpy(Xtr), torch.from_numpy(y_train))
         val_ds = TensorDataset(torch.from_numpy(Xva), torch.from_numpy(y_val))
         test_ds = TensorDataset(torch.from_numpy(Xte), torch.from_numpy(y_test))
+        in_channels = 1  # 텍스트 모델은 이미지 채널 개념이 없음(자리표시자)
     else:
         raise ValueError(f"알 수 없는 모델: {model}")
 
     class_weights = data_image.compute_class_weights(y_train, len(classes))
-    return train_ds, val_ds, test_ds, classes, class_weights
+    return train_ds, val_ds, test_ds, classes, class_weights, in_channels
 
 
-def build_model(model: str, num_classes: int) -> nn.Module:
+def build_model(model: str, num_classes: int, in_channels: int = 1) -> nn.Module:
     """모델 이름 → nn.Module. cnn 은 cnn.py, 나머지는 text_models.py 에서 가져온다."""
     if model == "cnn":
         import cnn
-        return cnn.build_model(num_classes)
+        return cnn.build_model(num_classes, in_channels=in_channels)
     import text_models
     return text_models.build_model(model, num_classes)
 
@@ -232,6 +236,11 @@ def main() -> None:
                         help="train 셋을 클래스 균형으로 언더샘플링(불균형 트랙 권장, RQ2 대비). "
                              "val/test 는 실제 분포 유지. 산출물 tag 에 '_bal' 접미사가 붙음")
     parser.add_argument("--side", type=int, default=48, help="이미지 한 변(이미지 모델 전용)")
+    parser.add_argument("--channels", default="gray", choices=["gray", "rgb"],
+                        help="이미지 채널(cnn 전용): gray=1채널, rgb=3채널(교수 요구). "
+                             "rgb 는 먼저 build_image_dataset.py --channels rgb 로 빌드해야 함")
+    parser.add_argument("--rgb-encoders", default="raw_byte,char_class,local_entropy",
+                        help="rgb 로드 시 R,G,B 채널 인코더 이름(콤마 구분). 빌드 때와 동일해야 함")
     parser.add_argument("--max-len", type=int, default=48 * 48,
                         help="바이트 시퀀스 길이(텍스트 모델 전용). 기본=이미지 용량(48x48)과 동일")
     parser.add_argument("--epochs", type=int, default=30)
@@ -252,9 +261,12 @@ def main() -> None:
     device = get_device()
     print(f"=== 학습: model={args.model} track={args.track} text={args.text} device={device} ===")
 
-    train_ds, val_ds, test_ds, classes, class_weights = build_datasets(
+    # rgb 채널 인코더 파싱(gray 모드에서는 무시됨)
+    encoders = tuple(name.strip() for name in args.rgb_encoders.split(","))
+
+    train_ds, val_ds, test_ds, classes, class_weights, in_channels = build_datasets(
         args.model, args.track, args.text, args.side, args.max_len, args.limit,
-        balance=args.balance, seed=args.seed,
+        balance=args.balance, seed=args.seed, channels=args.channels, encoders=encoders,
     )
     if args.balance:
         print(f"  [balance] train 클래스 균형 언더샘플링 적용 → train={len(train_ds):,}")
@@ -266,7 +278,7 @@ def main() -> None:
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
     test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
-    model = build_model(args.model, len(classes)).to(device)
+    model = build_model(args.model, len(classes), in_channels=in_channels).to(device)
     n_params = sum(p.numel() for p in model.parameters())
     print(f"  파라미터 수: {n_params:,}")
 
@@ -290,12 +302,14 @@ def main() -> None:
         "track": args.track, "text": args.text, "side": args.side,
         "max_len": args.max_len, "epochs": args.epochs, "batch_size": args.batch_size,
         "lr": args.lr, "device": str(device), "limit": args.limit,
-        "balance": args.balance,
+        "balance": args.balance, "channels": args.channels, "in_channels": in_channels,
+        "rgb_encoders": list(encoders) if (args.model in IMAGE_MODELS and args.channels == "rgb") else None,
     }
 
     if not args.smoke:
-        # 균형화 여부를 tag 에 반영해 balanced/unbalanced 산출물이 서로 덮어쓰지 않게 한다.
-        tag = f"{args.track}_{args.model}_{args.text}" + ("_bal" if args.balance else "")
+        # 균형화·채널 모드를 tag 에 반영해 산출물(gray/rgb, balanced/unbalanced)이 서로 안 덮어쓰게 한다.
+        ch_tag = "_rgb" if (args.model in IMAGE_MODELS and args.channels == "rgb") else ""
+        tag = f"{args.track}_{args.model}_{args.text}{ch_tag}" + ("_bal" if args.balance else "")
         M.save_report(result, RESULTS_DIR / f"{tag}.json")
         # 샘플 단위 예측 저장(모델 간 '탐지 불일치' 분석용 — detection_analysis.py 가 소비)
         M.save_predictions(y_true, y_pred, classes, RESULTS_DIR / f"pred_{tag}.npz", y_score=y_score)

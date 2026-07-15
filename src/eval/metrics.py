@@ -31,11 +31,14 @@ import matplotlib.pyplot as plt
 
 from sklearn.metrics import (
     accuracy_score,
+    average_precision_score,
     confusion_matrix,
     f1_score,
+    matthews_corrcoef,
     precision_recall_fscore_support,
     roc_auc_score,
 )
+from sklearn.preprocessing import label_binarize
 
 
 def compute_metrics(
@@ -79,12 +82,19 @@ def compute_metrics(
         "accuracy": float(accuracy_score(y_true, y_pred)),
         "macro_f1": float(f1_score(y_true, y_pred, labels=labels, average="macro", zero_division=0)),
         "weighted_f1": float(f1_score(y_true, y_pred, labels=labels, average="weighted", zero_division=0)),
+        # MCC(Matthews 상관계수): 불균형 데이터에 강건한 단일 요약 지표.
+        #   문헌 근거(docs/07): "높은 MCC는 항상 높은 ROC-AUC를 함의하나 역은 아님" → Acc/F1이
+        #   다수·shortcut으로 포화될 때 실제 상관을 정직하게 보여준다. 논문 헤드라인 지표로 승격.
+        "mcc": float(matthews_corrcoef(y_true, y_pred)),
         "per_class": per_class,
     }
 
-    # ROC-AUC(OvR macro): 점수가 있을 때만. 이진/다중 클래스 모두 처리.
+    # 점수 기반 지표(ROC-AUC, PR-AUC): 확률/점수가 있을 때만.
     if y_score is not None:
-        result["roc_auc_ovr"] = _safe_roc_auc(y_true, np.asarray(y_score), n_classes)
+        y_score = np.asarray(y_score)
+        result["roc_auc_ovr"] = _safe_roc_auc(y_true, y_score, n_classes)
+        # PR-AUC(Average Precision, macro): 다수 음성(TN) 상황에서 ROC보다 정보량이 큰 불균형 지표.
+        result["pr_auc_macro"] = _safe_pr_auc(y_true, y_score, n_classes)
 
     # 보안 중심 지표: Normal 클래스가 있으면 "공격/정상" 관점으로 접어서 함께 계산한다.
     # (clean Macro-F1 은 다수 Normal·표면토큰 shortcut 때문에 포화되어 실제 탐지력을 가린다.
@@ -219,6 +229,21 @@ def _safe_roc_auc(y_true: np.ndarray, y_score: np.ndarray, n_classes: int) -> fl
         return None
 
 
+def _safe_pr_auc(y_true: np.ndarray, y_score: np.ndarray, n_classes: int) -> float | None:
+    """PR-AUC(Average Precision, OvR macro)를 계산하되 불가 시 None.
+
+    불균형 보안 데이터에서 ROC-AUC 보완 지표(docs/07 리서치 근거). 이진은 양성 열만,
+    다중 클래스는 각 클래스를 one-vs-rest 로 이진화해 macro 평균한다.
+    """
+    try:
+        if n_classes == 2:
+            return float(average_precision_score(y_true, y_score[:, 1]))
+        y_true_bin = label_binarize(y_true, classes=list(range(n_classes)))
+        return float(average_precision_score(y_true_bin, y_score, average="macro"))
+    except ValueError:
+        return None
+
+
 def save_confusion_matrix(
     y_true: np.ndarray,
     y_pred: np.ndarray,
@@ -274,10 +299,17 @@ def format_summary(model_name: str, metrics: dict) -> str:
         f"acc={metrics['accuracy']:.4f}",
         f"macroF1={metrics['macro_f1']:.4f}",
     ]
+    # MCC: 불균형에 강건한 헤드라인 지표(docs/07). 항상 있으므로 함께 노출.
+    if metrics.get("mcc") is not None:
+        parts.append(f"MCC={metrics['mcc']:.4f}")
+    if metrics.get("pr_auc_macro") is not None:
+        parts.append(f"PR-AUC={metrics['pr_auc_macro']:.4f}")
     if metrics.get("roc_auc_ovr") is not None:
         parts.append(f"AUC(OvR)={metrics['roc_auc_ovr']:.4f}")
-    # 보안 지표가 있으면 "공격이 Normal 로 새는 비율"을 함께 보여 준다(포화된 F1 보완).
+    # 보안 지표가 있으면 "공격이 Normal 로 새는 비율"과 오탐률(FPR)을 함께 보여 준다(포화된 F1 보완).
     af = metrics.get("attack_focused")
     if af and af.get("benign_evasion_rate") is not None:
         parts.append(f"benign-evasion={af['benign_evasion_rate']:.4f}")
+        if af.get("normal_false_positive_rate") is not None:
+            parts.append(f"FPR={af['normal_false_positive_rate']:.4f}")
     return " ".join(parts)

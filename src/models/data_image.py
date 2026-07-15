@@ -22,24 +22,52 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 IMAGES_DIR = PROJECT_ROOT / "data" / "images"
 
 
-def npz_path(track: str, split: str, text: str = "raw", side: int = 48) -> Path:
-    """Phase 3 저장 규칙에 맞는 .npz 경로를 만든다."""
-    return IMAGES_DIR / f"{track}_{split}_text_{text}_{side}.npz"
+# 채널 인코더 이름 → 파일명용 짧은 약어.
+# ⚠️ build_image_dataset.dataset_suffix 와 반드시 동일하게 유지(로드/저장 파일명 일치).
+_ENCODER_ABBR = {
+    "raw_byte": "rb",
+    "char_class": "cc",
+    "local_entropy": "le",
+    "bit_popcount": "bp",
+    "structural_special": "ss",
+    "byte_delta": "bd",
+}
+# rgb 기본 채널 조합(R,G,B). channel_encoders.DEFAULT_RGB_ENCODERS 와 동일해야 함.
+_DEFAULT_RGB_ENCODERS = ("raw_byte", "char_class", "local_entropy")
 
 
-def load_split(track: str, split: str, text: str = "raw", side: int = 48):
+def _channel_suffix(channels: str, encoders: tuple[str, str, str] | None) -> str:
+    """저장 파일명의 채널 접미사(build_image_dataset.dataset_suffix 와 동일 규칙)."""
+    if channels == "gray":
+        return ""
+    enc = tuple(encoders) if encoders else _DEFAULT_RGB_ENCODERS
+    if enc == _DEFAULT_RGB_ENCODERS:
+        return "_rgb"
+    return "_rgb-" + "-".join(_ENCODER_ABBR.get(name, name) for name in enc)
+
+
+def npz_path(track: str, split: str, text: str = "raw", side: int = 48,
+             channels: str = "gray", encoders: tuple[str, str, str] | None = None) -> Path:
+    """Phase 3 저장 규칙에 맞는 .npz 경로를 만든다(gray/rgb 채널 접미사 포함)."""
+    suffix = _channel_suffix(channels, encoders)
+    return IMAGES_DIR / f"{track}_{split}_text_{text}_{side}{suffix}.npz"
+
+
+def load_split(track: str, split: str, text: str = "raw", side: int = 48,
+               channels: str = "gray", encoders: tuple[str, str, str] | None = None):
     """한 split 의 (images, labels, classes) 를 로드한다.
 
     반환:
-        images  : (N, side, side) uint8
+        images  : gray → (N, side, side) uint8 / rgb → (N, side, side, 3) uint8
         labels  : (N,) int64
         classes : list[str]  (정수 코드 → 클래스명)
     """
-    path = npz_path(track, split, text, side)
+    path = npz_path(track, split, text, side, channels, encoders)
     if not path.exists():
+        ch_arg = "" if channels == "gray" else f" --channels {channels}"
         raise FileNotFoundError(
             f"이미지셋이 없습니다: {path}\n"
-            f"먼저 build_image_dataset.py 로 --track {track} --text {text} --side {side} 를 빌드하세요."
+            f"먼저 build_image_dataset.py 로 --track {track} --text {text} --side {side}{ch_arg} 를 빌드하세요."
         )
     data = np.load(path, allow_pickle=False)
     images = data["images"]
@@ -72,8 +100,15 @@ def make_torch_dataset(images: np.ndarray, labels: np.ndarray):
     import torch
     from torch.utils.data import TensorDataset
 
-    # (N,H,W) uint8 → (N,1,H,W) float32(0~1)
-    x = torch.from_numpy(images.astype(np.float32) / 255.0).unsqueeze(1)
+    arr = images.astype(np.float32) / 255.0
+    if arr.ndim == 3:
+        # (N,H,W) uint8 → (N,1,H,W): 그레이스케일(채널 축 추가)
+        x = torch.from_numpy(arr).unsqueeze(1)
+    elif arr.ndim == 4 and arr.shape[-1] == 3:
+        # (N,H,W,3) HWC → (N,3,H,W) CHW: RGB(Conv2d 가 기대하는 채널-우선 순서로 전치)
+        x = torch.from_numpy(arr).permute(0, 3, 1, 2).contiguous()
+    else:
+        raise ValueError(f"지원하지 않는 이미지 배열 형태입니다: {images.shape}")
     y = torch.from_numpy(labels.astype(np.int64))
     return TensorDataset(x, y)
 

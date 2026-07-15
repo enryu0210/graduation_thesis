@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from channel_encoders import DEFAULT_RGB_ENCODERS, get_encoder
+
 # EDA 로 결정한 기본 정사각 한 변(픽셀). 근거: docs/EDA_notes.md
 DEFAULT_SIDE = 48
 
@@ -63,8 +65,53 @@ def bytes_to_image(data: bytes, side: int = DEFAULT_SIDE) -> np.ndarray:
 
 
 def payload_to_image(text: str, side: int = DEFAULT_SIDE) -> np.ndarray:
-    """문자열 페이로드를 곧바로 (side, side) uint8 이미지로 변환하는 편의 함수."""
+    """문자열 페이로드를 곧바로 (side, side) uint8 그레이스케일 이미지로 변환하는 편의 함수."""
     return bytes_to_image(text_to_bytes(text), side=side)
+
+
+def _padded_byte_buffer(data: bytes, side: int) -> np.ndarray:
+    """RGB 채널 계산의 공통 입력 — 고정 길이(capacity,) uint8 바이트 버퍼(자동 zero-padding).
+
+    grayscale 의 bytes_to_image 와 같은 truncation/padding 규칙을 쓰되, reshape 전
+    1D 버퍼를 돌려줘 각 채널 인코더가 동일한 바이트열 위에서 계산하도록 한다.
+    """
+    if side <= 0:
+        raise ValueError(f"side 는 양의 정수여야 합니다: {side}")
+    capacity = side * side
+    truncated = data[:capacity]
+    flat = np.zeros(capacity, dtype=np.uint8)
+    if truncated:
+        flat[: len(truncated)] = np.frombuffer(truncated, dtype=np.uint8)
+    return flat
+
+
+def bytes_to_rgb_image(
+    data: bytes,
+    side: int = DEFAULT_SIDE,
+    encoders: tuple[str, str, str] = DEFAULT_RGB_ENCODERS,
+) -> np.ndarray:
+    """바이트 시퀀스를 (side, side, 3) uint8 RGB 이미지로 변환한다.
+
+    각 채널은 encoders(R, G, B 순)에 지정된 채널 인코더로 같은 바이트 버퍼에서 계산된다.
+    - 채널 조합은 문자열 이름으로 지정 → ablation(교수 요구: G/B 값 바꿔보기)이 쉽다.
+    - 반환은 (H, W, 3) 형태(HWC). 저장은 uint8, 모델 입력 직전 CHW·0~1 정규화는 로더가 담당.
+    """
+    if len(encoders) != 3:
+        raise ValueError(f"encoders 는 (R,G,B) 3개여야 합니다: {encoders}")
+
+    flat = _padded_byte_buffer(data, side)
+    channels = [get_encoder(name)(flat).reshape(side, side) for name in encoders]
+    # (H, W) 3장을 마지막 축으로 쌓아 (H, W, 3) 으로 만든다.
+    return np.stack(channels, axis=-1).astype(np.uint8)
+
+
+def payload_to_rgb_image(
+    text: str,
+    side: int = DEFAULT_SIDE,
+    encoders: tuple[str, str, str] = DEFAULT_RGB_ENCODERS,
+) -> np.ndarray:
+    """문자열 페이로드를 곧바로 (side, side, 3) uint8 RGB 이미지로 변환하는 편의 함수."""
+    return bytes_to_rgb_image(text_to_bytes(text), side=side, encoders=encoders)
 
 
 def normalize_01(image: np.ndarray) -> np.ndarray:
