@@ -61,6 +61,29 @@
 
 ---
 
+## USTC-TFC2016 암호화/악성 트래픽 (RQ4b — 흐름 이미지 탐지용, 확보)
+
+> **용도**: RQ4b(신호의 이동). 내용(payload)이 암호화로 사라져도 흐름 수준 신호가 남는지를
+> "동일 이미징 패러다임(48×48)"으로 검증. payload 4클래스와 **다른 데이터·다른 단위(흐름)** 이며,
+> 과제는 **악성 흐름 vs 정상 흐름 이진 탐지**로 분리 서술한다(docs/06 정직성 원칙).
+
+- Source URL: `https://github.com/davidyslu/USTC-TFC2016` (원저 echowei/DeepTraffic, Wei Wang et al.)
+- License: **Mozilla Public License 2.0** (저장소 LICENSE 기준) — 연구·출처표기 시 사용 가능.
+- Accessed: 2026-07-15
+- 다운로드/해제: `python src/data/download_ustc.py` (일부 .7z 압축 → py7zr 로 해제)
+  - 저장소 압축 총량 ~387MB, 해제 시 ~3.71GB.
+- Local path: `data/raw/ustc_tfc2016/{Benign,Malware}/*.pcap` (.gitignore 대상 → git 미추적, 재생성으로 확보)
+- 구성: 악성 10종(Cridex, Geodo, Htbot, Miuref, Neris, Nsis-ay, Shifu, Tinba, Virut, Zeus)
+  + 정상 10종(BitTorrent, FTP, Facetime, Gmail, MySQL, Outlook, SMB, Skype, Weibo, WorldOfWarcraft).
+- 이미지화: `src/imaging/flow_to_image.py` — 세션(양방향 5-tuple) 단위, 앞 2304B(48×48),
+  **이더넷 MAC·IP 주소 0 무력화**(주소 암기 방지, Wang et al. sanitization 재현).
+- ⚠️ 분할 한계(논문 명시): 세션 단위 stratified 분할이라 같은 호스트 세션이 train/test 에 섞여
+  낙관적 편향 가능 → 향후 host 단위 분할로 보강 여지.
+- Notes: 이 데이터셋은 IP/MAC 이 클래스와 강결합되어 sanitization 없이는 CNN 이 주소를 암기해
+  부정 성능을 낸다(알려진 data-snooping 이슈) → flow_to_image 에서 주소 제거로 대응.
+
+---
+
 ## 페이로드 보강 소스 (미확보 — 다운로드 스크립트 준비됨)
 
 | 소스 | URL | Local path | Commit hash |

@@ -3,6 +3,7 @@
 # 주의: 3-class 원본 CSV 2개는 최초 커밋에 이미 포함돼 추적 중이므로 여기서 제외하지 않는다.
 data/raw/csic2010/
 data/raw/payload_supplement/
+data/raw/ustc_tfc2016/
 data/interim/
 data/processed/
 data/images/
