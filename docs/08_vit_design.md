@@ -1,17 +1,33 @@
 # Phase 9 — Vision Transformer 도입 구상 (제안 CNN 대체/비교 arm)
 
-> 이 문서는 사람이 읽는 **설계·의사결정 기록**이며, 현재 상태는 **구상(미구현)** 이다.
-> 실측 수치는 구현 후 `experiments/results/*_vit_*.json`, 그림은 `docs/figures/models/` 에 남긴다.
+> 이 문서는 사람이 읽는 **설계·의사결정 기록**이다. 모델 구현은 **완료**(`src/models/vit.py`),
+> 학습 실측은 **미실시**. 실측 수치는 `experiments/results/*_vit_*.json` / `*_hybrid_*.json`,
+> 그림은 `docs/figures/models/` 에 남긴다.
 > 착수 배경: 2026-07-18 "비전 트랜스포머를 제안 CNN 처럼 사용하도록 구상" 요청.
 
 ---
 
-## 0. 한 줄 요약
+## 0. 전제 — 입력은 제안 CNN 과 **완전히 동일**하다 ⭐
 
-ViT 를 **CNN 의 대체품이 아니라 "질문을 던지는 도구"** 로 도입한다. 핵심 질문은
-*"바이트-플롯 이미지에서 **2D 지역성(locality)** 은 정말 의미가 있는가?"* 이며,
-ViT 의 패치 기하(patch geometry)를 바꾸는 것만으로 이 질문에 정면으로 답할 수 있다.
-이건 선행연구(Nataraj 계열, VulCNN, MDMC)가 **묻지 않은 질문**이라 신규성 논거가 된다.
+이 arm 의 목적은 **"이미지화 파이프라인은 그대로 두고 분류기만 CNN ↔ ViT 로 교체"** 하는 것이다.
+
+| | 입력 파일 | 채널 |
+|---|---|---|
+| 제안 CNN (기존) | `data/images/payload_4class_*_48*.npz` | gray 1ch / RGB 3ch |
+| **ViT (본 문서)** | **동일** | **동일** |
+| **하이브리드 (본 문서)** | **동일** | **동일** |
+
+> ⚠️ 용어 주의: 이 문서에서 **"단일 ViT"** 는 *CNN stem 없이 Transformer 블록만으로 구성한 모델*을
+> 뜻하며, **입력이 다르다는 뜻이 아니다.** (초안에서 "순수 ViT"라 쓴 표현이 "다른 입력을 쓰는 모델"로
+> 오해를 불러 용어를 교체했다.) 두 변형 모두 gray/RGB 이미지를 그대로 먹는다.
+
+## 0.1 한 줄 요약
+
+1순위는 **동일 입력·동일 평가에서의 CNN ↔ ViT 교체 비교**(gray/RGB 각각)다.
+2순위(부가 질문)로, ViT 의 패치 기하를 바꾸면
+*"바이트-플롯 이미지에서 **2D 지역성(locality)** 은 정말 의미가 있는가?"* 에 답할 수 있다(§2~3).
+후자는 선행연구(Nataraj 계열, VulCNN, MDMC)가 **묻지 않은 질문**이라 신규성 논거가 되지만,
+"CNN 처럼 쓴다"는 본래 목적과는 별개 트랙이므로 우선순위를 낮춰 둔다.
 
 ---
 
@@ -73,17 +89,21 @@ ViT 도입은 (b) 의 정공법이면서, 아래 §3 의 패치 기하 실험을
 
 ## 4. 아키텍처 3안과 선택
 
-| 안 | 구성 | 파라미터 | 장점 | 단점 |
+| 안 | 구성 | 파라미터(실측) | 장점 | 단점 |
 |---|---|---|---|---|
-| **A. 소형 ViT (scratch)** | timm ViT, dim192/depth6/heads3 | ~2.7M | 순수 비교, 구현 단순 | 데이터 20만장으로 ViT 는 데이터 부족 위험 |
-| **B. 하이브리드 (CNN stem + Transformer)** | 기존 conv_block 2개 → 12×12 특징맵 → Transformer 4층 | ~1.0M | 지역성 귀납편향 유지 + 전역 attention, 데이터 효율 좋음 | "순수 ViT" 는 아님 |
+| **A. 단일 ViT** (`--model vit`) | timm ViT, dim192/depth6/heads3, 패치 8×8 | **2.69M**(gray) / **2.71M**(rgb) | CNN stem 없는 대조, 패치 기하 교체 가능 | 데이터 20만장으로 ViT 는 데이터 부족 위험 |
+| **B. 하이브리드** (`--model hybrid`) | conv 2블록 → 12×12=144토큰 → Transformer 4층 | **0.58M** | 지역성 귀납편향 유지 + 전역 attention, 데이터 효율 좋음 | CNN stem 이 있어 "ViT 단독 성능"은 아님 |
 | C. 사전학습 전이 | ImageNet DeiT-Tiny, 48→224 업샘플 | 5.7M | 표현력 최고 | 처리량 붕괴(§6), 48×48 도메인과 ImageNet 갭 큼 |
 
-**권고: A(패치 기하 ablation용) + B(성능 경쟁용) 를 하고, C 는 후순위.**
-- A 는 §3 의 질문에 답하는 **도구**라 반드시 필요하다(패치 기하를 바꿔야 하므로 순수 ViT여야 함).
-- B 는 "성능 개선안 채택"(교수 요구 b) 에 가장 현실적인 후보다. 20만장 규모에서 순수 ViT 가
+**A·B 는 구현 완료(2026-07-18), C 는 하지 않는다.**
+- A 는 "CNN stem 없이도 되는가"라는 대조군이자, §3 패치 기하 실험의 **유일한 도구**다
+  (하이브리드는 conv stem 이 공간을 줄여 패치 개념이 사라진다).
+- B 는 "성능 개선안 채택"(교수 요구 b) 에 가장 현실적인 후보다. 20만장 규모에서 단일 ViT 가
   CNN 을 이기기는 어렵지만, 하이브리드는 이길 가능성이 있다.
 - C 는 **우리 논문의 유일한 확실한 우위(처리량)** 를 스스로 무너뜨린다 → 하지 않는다.
+
+> 참고: 제안 CNN 은 **93,988** 파라미터다. hybrid 는 6배, vit 은 29배 크다.
+> **성능이 비슷하다면 CNN 이 우수하다**는 해석을 논문에서 빠뜨리지 말 것.
 
 ---
 
@@ -107,7 +127,7 @@ ViT 도입은 (b) 의 정공법이면서, 아래 §3 의 패치 기하 실험을
 ## 6. 리스크 — 정직하게 먼저 적는다 ⚠️
 
 1. **데이터 규모 부족**: ViT 는 귀납편향이 약해 통상 수백만 장 이상을 요구한다. 우리 풀은 20만 장이고
-   클래스가 4개뿐이라, 순수 ViT(A)가 CNN 에 **질 가능성이 높다**. → B(하이브리드)를 병행하는 이유.
+   클래스가 4개뿐이라, 단일 ViT(A)가 CNN 에 **질 가능성이 높다**. → B(하이브리드)를 병행하는 이유.
 2. **처리량 붕괴 = 현재 유일한 우위 상실**: docs/04 §5 에서 제안 CNN 의 실질 기여는
    "char-CNN 대비 13.6배 빠른 추론(81,964 samples/s)" 이다. ViT-tiny 급은 이보다 **5~10배 느릴 것으로
    예상**(실측 필요). 정확도도 못 이기고 속도도 잃으면 이 arm 은 논문에서 **음성 결과**로만 남는다.
@@ -125,24 +145,36 @@ ViT 도입은 (b) 의 정공법이면서, 아래 §3 의 패치 기하 실험을
 ## 7. 실행 계획 (구현 시)
 
 ```bash
-# 1) 패치 기하 ablation (주력) — RGB 최적 조합 고정 후 패치만 변경
-python src/models/train.py --model vit --channels rgb --rgb-encoders raw_byte,char_class,byte_delta --patch 8x8
-python src/models/train.py --model vit ... --patch 1x48     # 행 패치(핵심 가설)
-python src/models/train.py --model vit ... --patch 48x1     # 음성 대조군
-# 2) 유의성 판정 — 단일 split 로는 결론 못 냄(docs/04 §5 재현성 메모)
-python src/eval/cross_validate.py --model vit --patch 1x48
-# 3) 하이브리드 성능 경쟁
-python src/models/train.py --model hybrid --channels rgb ...
+# 1순위) CNN ↔ ViT 교체 비교 — gray / RGB 각각, 입력은 제안 CNN 과 동일
+python src/models/train.py --model vit    --channels gray
+python src/models/train.py --model vit    --channels rgb --rgb-encoders raw_byte,char_class,byte_delta
+python src/models/train.py --model hybrid --channels gray
+python src/models/train.py --model hybrid --channels rgb --rgb-encoders raw_byte,char_class,byte_delta
+
+# 2순위) 패치 기하 ablation (단일 ViT 전용 — hybrid 는 conv stem 이 대신함)
+python src/models/train.py --model vit --patch 1x48    # 행 패치(핵심 가설)
+python src/models/train.py --model vit --patch 48x1    # 음성 대조군
+
+# 유의성 판정 — 단일 split 로는 결론 못 냄(docs/04 §5 재현성 메모)
+python src/eval/cross_validate.py --model vit --channels rgb --rgb-encoders raw_byte,char_class,byte_delta
+python src/eval/cross_validate.py --model hybrid --channels rgb --rgb-encoders raw_byte,char_class,byte_delta
 ```
 
 **반드시 CV 로 판정할 것**: 2026-07-18 재현 실험에서 단일 split 의 실행 간 변동이 ±0.11pp 였고,
-이는 조합 간 차이보다 크다. 패치 기하 비교도 동일한 함정에 빠진다.
+이는 조합 간 차이보다 크다. CNN↔ViT 비교도 패치 기하 비교도 동일한 함정에 빠진다.
+
+**산출물 태그**: `vit` 은 패치 기하가 다르면 다른 실험이므로 파일명에 `_p8x8` / `_p1x48` 이 붙는다
+(RGB ablation 에서 조합이 서로 덮어쓴 사고 — 커밋 5eede2f — 의 재발 방지). `hybrid` 는 패치 개념이
+없어 접미사가 없다.
 
 ---
 
-## 8. 열린 결정
+## 8. 구현 상태 / 열린 결정
 
-- [ ] A/B/C 중 최종 범위 확정 (권고: A+B, C 제외)
-- [ ] RQ3 대비 우선순위 확정 (권고: RQ3 우선, §3 만 병행)
+- [x] A(단일 ViT)·B(하이브리드) 구현 — `src/models/vit.py`, train.py `IMAGE_MODELS` 에 등록.
+      gray/RGB, 패치 8x8·1x48, 잘못된 패치 에러처리까지 스모크 검증 완료(2026-07-18).
+- [x] C(사전학습 전이) 제외 확정 — 처리량 우위 상실이 이유(§6-2).
+- [ ] **학습 실측 미실시** — RQ1 5-fold CV(9설정)가 GPU 를 점유 중이라 대기. CV 종료 후 착수.
+- [ ] RQ3 대비 우선순위 확정 (권고: RQ3 우선, ViT 실측은 그다음)
 - [ ] 하이브리드의 CNN stem 깊이(2블록 vs 3블록) — 12×12 vs 6×6 토큰맵
 - [ ] attention rollout 을 논문 본문에 넣을지 부록으로 뺄지

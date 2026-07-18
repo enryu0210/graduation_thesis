@@ -49,7 +49,8 @@ FIG_DIR = PROJECT_ROOT / "docs" / "figures" / "models"
 CKPT_DIR = PROJECT_ROOT / "experiments" / "checkpoints"
 
 # 이미지를 쓰는 모델과 바이트 시퀀스를 쓰는 모델을 구분한다.
-IMAGE_MODELS = {"cnn"}
+# vit/hybrid 는 제안 CNN 과 **완전히 같은 이미지 입력**을 받는 비교 arm 이다(vit.py 참조).
+IMAGE_MODELS = {"cnn", "vit", "hybrid"}
 TEXT_MODELS = {"charcnn", "bilstm"}
 
 
@@ -148,11 +149,16 @@ def build_datasets(model: str, track: str, text: str, side: int, max_len: int,
     return train_ds, val_ds, test_ds, classes, class_weights, in_channels
 
 
-def build_model(model: str, num_classes: int, in_channels: int = 1) -> nn.Module:
-    """모델 이름 → nn.Module. cnn 은 cnn.py, 나머지는 text_models.py 에서 가져온다."""
+def build_model(model: str, num_classes: int, in_channels: int = 1,
+                patch: str = "8x8") -> nn.Module:
+    """모델 이름 → nn.Module. 이미지 모델은 cnn.py/vit.py, 텍스트는 text_models.py 에서 가져온다."""
     if model == "cnn":
         import cnn
         return cnn.build_model(num_classes, in_channels=in_channels)
+    if model in ("vit", "hybrid"):
+        import vit
+        return vit.build_model(num_classes, in_channels=in_channels,
+                               variant=model, patch_size=patch)
     import text_models
     return text_models.build_model(model, num_classes)
 
@@ -242,6 +248,10 @@ def main() -> None:
                              "rgb 는 먼저 build_image_dataset.py --channels rgb 로 빌드해야 함")
     parser.add_argument("--rgb-encoders", default="raw_byte,char_class,local_entropy",
                         help="rgb 로드 시 R,G,B 채널 인코더 이름(콤마 구분). 빌드 때와 동일해야 함")
+    parser.add_argument("--patch", default="8x8",
+                        help="ViT 패치 크기 '높이x너비'(--model vit 전용). "
+                             "'1x48' 은 행 패치 = 토큰 1개가 연속 48바이트(docs/08 §2). "
+                             "hybrid 는 conv stem 이 대신하므로 무시됨")
     parser.add_argument("--max-len", type=int, default=48 * 48,
                         help="바이트 시퀀스 길이(텍스트 모델 전용). 기본=이미지 용량(48x48)과 동일")
     parser.add_argument("--epochs", type=int, default=30)
@@ -279,7 +289,8 @@ def main() -> None:
     val_loader = DataLoader(val_ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
     test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
-    model = build_model(args.model, len(classes), in_channels=in_channels).to(device)
+    model = build_model(args.model, len(classes), in_channels=in_channels,
+                        patch=args.patch).to(device)
     n_params = sum(p.numel() for p in model.parameters())
     print(f"  파라미터 수: {n_params:,}")
 
@@ -305,6 +316,7 @@ def main() -> None:
         "lr": args.lr, "device": str(device), "limit": args.limit,
         "balance": args.balance, "channels": args.channels, "in_channels": in_channels,
         "rgb_encoders": list(encoders) if (args.model in IMAGE_MODELS and args.channels == "rgb") else None,
+        "patch": args.patch if args.model == "vit" else None,
     }
 
     if not args.smoke:
@@ -314,7 +326,11 @@ def main() -> None:
         #    그대로 재사용한다(약어 맵 단일 진실 소스 유지 — build_image_dataset 와도 일치).
         ch_tag = (data_image._channel_suffix(args.channels, encoders)
                   if args.model in IMAGE_MODELS else "")
-        tag = f"{args.track}_{args.model}_{args.text}{ch_tag}" + ("_bal" if args.balance else "")
+        # ⚠️ vit 은 패치 기하가 바뀌면 완전히 다른 실험이다. tag 에 안 넣으면 8x8 결과를
+        #    1x48 결과가 덮어쓴다(RGB ablation 에서 실제로 겪은 사고 — 커밋 5eede2f).
+        patch_tag = f"_p{args.patch}" if args.model == "vit" else ""
+        tag = (f"{args.track}_{args.model}_{args.text}{ch_tag}{patch_tag}"
+               + ("_bal" if args.balance else ""))
         M.save_report(result, RESULTS_DIR / f"{tag}.json")
         # 샘플 단위 예측 저장(모델 간 '탐지 불일치' 분석용 — detection_analysis.py 가 소비)
         M.save_predictions(y_true, y_pred, classes, RESULTS_DIR / f"pred_{tag}.npz", y_score=y_score)

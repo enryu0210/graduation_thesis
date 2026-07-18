@@ -45,7 +45,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 
 # 모델 종류별 입력 경로가 다르다(이미지 npz / 문자열 CSV / TF-IDF).
-IMAGE_MODELS = {"cnn"}
+# ⚠️ train.py 의 IMAGE_MODELS 와 함께 갱신할 것(이미지 모델 추가 시 두 곳).
+IMAGE_MODELS = {"cnn", "vit", "hybrid"}
 TEXT_NN_MODELS = {"charcnn", "bilstm"}
 TFIDF_MODELS = {"tfidf_logreg", "tfidf_rf"}
 ALL_MODELS = IMAGE_MODELS | TEXT_NN_MODELS | TFIDF_MODELS
@@ -201,7 +202,8 @@ def run_fold_torch(model_name: str, pool_x, y, classes, tr_idx, va_idx, te_idx,
 
     # 이미지 채널 수는 배열 형태에서 추론(train.py 와 동일 규칙).
     in_channels = 3 if (is_image and pool_x.ndim == 4 and pool_x.shape[-1] == 3) else 1
-    model = T.build_model(model_name, len(classes), in_channels=in_channels).to(device)
+    model = T.build_model(model_name, len(classes), in_channels=in_channels,
+                          patch=args.patch).to(device)
 
     model, best_val_f1, best_epoch = T.fit(
         model, train_loader, val_loader, classes, class_weights, device,
@@ -275,6 +277,7 @@ def main() -> None:
     parser.add_argument("--side", type=int, default=48)
     parser.add_argument("--channels", default="gray", choices=["gray", "rgb"])
     parser.add_argument("--rgb-encoders", default="raw_byte,char_class,local_entropy")
+    parser.add_argument("--patch", default="8x8", help="ViT 패치 '높이x너비'(--model vit 전용)")
     parser.add_argument("--max-len", type=int, default=48 * 48)
     parser.add_argument("--max-features", type=int, default=20000, help="TF-IDF 특징 수")
     parser.add_argument("--folds", type=int, default=5)
@@ -355,7 +358,9 @@ def main() -> None:
     if is_image:
         import data_image
         ch_tag = data_image._channel_suffix(args.channels, encoders)
-    tag = f"{args.track}_{args.model}_{args.text}{ch_tag}"
+    # train.py 와 동일한 태그 규칙(패치 기하가 다르면 다른 실험 → 파일이 겹치면 안 됨).
+    patch_tag = f"_p{args.patch}" if args.model == "vit" else ""
+    tag = f"{args.track}_{args.model}_{args.text}{ch_tag}{patch_tag}"
 
     payload = {
         "model": args.model,

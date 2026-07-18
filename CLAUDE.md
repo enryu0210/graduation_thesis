@@ -21,9 +21,20 @@
 - ⚠️ 새 `data/raw/<dataset>/` 는 자동 무시 안 됨 → `.gitignore` 에 수동 추가(대용량 커밋 사고 방지). 재현은 다운로드 스크립트로 보장.
 - ⚠️ RGB npz 파일명 약어 `_ENCODER_ABBR` 는 build_image_dataset.py 와 data_image.py 두 곳에 중복 → 인코더 추가 시 동시 갱신(저장/로드 파일명 일치).
 
+## 모델 / 학습
+- 이미지 모델(같은 npz 입력): `cnn`(제안, 93,988p) · `vit`(단일 ViT, 2.7M) · `hybrid`(CNN stem+Transformer, 0.58M) — `src/models/cnn.py`, `vit.py`.
+  텍스트 모델: `charcnn` · `bilstm`(`text_models.py`), 별도 sklearn 베이스라인 `baseline_tfidf.py`.
+- ⚠️ 새 이미지 모델 추가 시 `IMAGE_MODELS` 를 **2곳** 갱신: `train.py`, `cross_validate.py`(트랙의 "5곳"과는 별개).
+- ⚠️ 산출물 tag 는 **실험을 가르는 하이퍼파라미터를 전부 반영**해야 함. 안 그러면 서로 덮어씀(커밋 5eede2f 사고: RGB 조합이 전부 `_rgb` 로 저장돼 상호 덮어쓰기).
+  현행 규칙: 채널 `_rgb-rb-cc-bd` (`data_image._channel_suffix`) + ViT 패치 `_p1x48` + 균형화 `_bal`.
+- 통계 검증은 `src/eval/cross_validate.py`(5-fold, train/val/test 를 풀로 합쳐 재분할). fold 배정이 (라벨, seed)에만 의존 → 설정 간 paired 비교 성립, `label_fingerprint` 로 정렬 검증.
+  ⚠️ 단일 split 은 실행 간 ±0.11pp 흔들림(cuDNN 비결정성) → 조합 우열 주장은 반드시 CV 로 판정.
+
 ## 실행 환경 (Windows)
 - 한글 콘솔(cp949)에서 파이썬 비-ASCII 출력이 깨짐 → Bash 로 파이썬 실행 시 `PYTHONIOENCODING=utf-8` 프리픽스 사용(또는 스크립트가 stdout 재설정).
 - matplotlib 그림 라벨/범례/제목은 ASCII 만(DejaVu Sans 에 Hangul 없음 → □ 로 깨짐+경고). 한글은 콘솔·JSON 에만.
-- torch 학습은 GPU 필요(외부 실행). 로컬 CPU 는 `--smoke` 또는 sklearn 베이스라인(`baseline_tfidf.py`)만 실행.
+- **로컬 GPU 사용 가능**(RTX 4080 SUPER, 17GB / torch cu124, RAM 34GB). 전면 학습을 로컬에서 실행함.
+  ⚠️ GPU 는 1대뿐 → 학습 작업은 **순차 실행**(동시 실행 시 재현성 악화). 학습 중 다른 검증이 필요하면 `CUDA_VISIBLE_DEVICES=` 로 CPU 강제.
+- ⚠️ 백그라운드 파이썬은 stdout 버퍼링으로 진행 로그가 안 보임 → 진행 추적은 산출 JSON 존재 여부로 하거나 `python -u` 사용.
 - 클래스 불균형 트랙 학습: `train.py --balance`(train 만 언더샘플링, val/test 실분포 유지).
 - 모든 모델 평가는 `src/eval/metrics.py` 로 일원화(계산 방식 차이 배제). 지표: Acc·Macro-F1·MCC·PR-AUC·ROC-AUC + attack_focused(benign-evasion/FPR). 불균형 보안 데이터 헤드라인은 MCC·PR-AUC·benign-evasion(문헌 근거 docs/07).
