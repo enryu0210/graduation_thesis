@@ -360,7 +360,9 @@ def main() -> None:
         ch_tag = data_image._channel_suffix(args.channels, encoders)
     # train.py 와 동일한 태그 규칙(패치 기하가 다르면 다른 실험 → 파일이 겹치면 안 됨).
     patch_tag = f"_p{args.patch}" if args.model == "vit" else ""
-    tag = f"{args.track}_{args.model}_{args.text}{ch_tag}{patch_tag}"
+    # lr 접미사도 train.py 와 동일 규칙(기본값이면 생략) — ViT 는 lr 이 결과를 크게 가른다.
+    lr_tag = "" if args.lr == T.DEFAULT_LR else f"_lr{args.lr:g}"
+    tag = f"{args.track}_{args.model}_{args.text}{ch_tag}{patch_tag}{lr_tag}"
 
     payload = {
         "model": args.model,

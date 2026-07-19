@@ -51,6 +51,10 @@ CKPT_DIR = PROJECT_ROOT / "experiments" / "checkpoints"
 # 이미지를 쓰는 모델과 바이트 시퀀스를 쓰는 모델을 구분한다.
 # vit/hybrid 는 제안 CNN 과 **완전히 같은 이미지 입력**을 받는 비교 arm 이다(vit.py 참조).
 IMAGE_MODELS = {"cnn", "vit", "hybrid"}
+
+# 기본 학습률. 산출물 tag 에서 "기본값이면 접미사 생략" 판정에 쓰므로 상수로 둔다
+# (cross_validate.py 와 동일한 값이어야 파일명 규칙이 어긋나지 않는다).
+DEFAULT_LR = 1e-3
 TEXT_MODELS = {"charcnn", "bilstm"}
 
 
@@ -256,7 +260,7 @@ def main() -> None:
                         help="바이트 시퀀스 길이(텍스트 모델 전용). 기본=이미지 용량(48x48)과 동일")
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--batch-size", type=int, default=128)
-    parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--lr", type=float, default=DEFAULT_LR)
     parser.add_argument("--patience", type=int, default=5, help="조기 종료 인내 에폭")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--limit", type=int, default=None, help="학습 샘플 수 제한(스모크용)")
@@ -329,7 +333,10 @@ def main() -> None:
         # ⚠️ vit 은 패치 기하가 바뀌면 완전히 다른 실험이다. tag 에 안 넣으면 8x8 결과를
         #    1x48 결과가 덮어쓴다(RGB ablation 에서 실제로 겪은 사고 — 커밋 5eede2f).
         patch_tag = f"_p{args.patch}" if args.model == "vit" else ""
-        tag = (f"{args.track}_{args.model}_{args.text}{ch_tag}{patch_tag}"
+        # ⚠️ lr 도 실험을 가르는 하이퍼파라미터다(ViT 는 CNN 용 기본 lr=1e-3 에서 발산 —
+        #    docs/08 §9). 기본값일 때는 접미사를 생략해 기존 산출물과 파일명 호환을 유지한다.
+        lr_tag = "" if args.lr == DEFAULT_LR else f"_lr{args.lr:g}"
+        tag = (f"{args.track}_{args.model}_{args.text}{ch_tag}{patch_tag}{lr_tag}"
                + ("_bal" if args.balance else ""))
         M.save_report(result, RESULTS_DIR / f"{tag}.json")
         # 샘플 단위 예측 저장(모델 간 '탐지 불일치' 분석용 — detection_analysis.py 가 소비)
