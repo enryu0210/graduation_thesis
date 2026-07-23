@@ -66,7 +66,11 @@ CKPT_DIR = PROJECT_ROOT / "experiments" / "checkpoints"
 TFIDF_MODELS = {"tfidf_logreg": "logreg", "tfidf_rf": "rf"}
 TORCH_IMAGE_MODELS = {"cnn"}          # 변형 텍스트 → 이미지로 예측
 TORCH_SEQ_MODELS = {"charcnn", "bilstm"}  # 변형 텍스트 → 바이트 시퀀스로 예측
-ALL_MODELS = list(TFIDF_MODELS) + sorted(TORCH_IMAGE_MODELS | TORCH_SEQ_MODELS)
+# 하이브리드 캐스케이드(제안 CNN 1차 + char-CNN 2차, src/models/cascade.py).
+# 단독 모델들과 "같은 공격·같은 파이프라인"으로 비교하려고 여기서도 대상에 포함한다.
+CASCADE_MODELS = {"cascade": "charcnn", "cascade-bilstm": "bilstm"}
+ALL_MODELS = (list(TFIDF_MODELS) + sorted(TORCH_IMAGE_MODELS | TORCH_SEQ_MODELS)
+              + sorted(CASCADE_MODELS))
 
 
 # ---------------------------------------------------------------------------
@@ -93,9 +97,13 @@ def build_tfidf_predict(track: str, clf_name: str, max_features: int):
     return predict, classes
 
 
-def build_torch_predict(track: str, model_name: str, side: int, max_len: int,
-                        balanced: bool, device):
-    """미리 학습된 torch 체크포인트를 로드해 (predict, classes) 를 반환한다.
+def build_torch_proba(track: str, model_name: str, side: int, max_len: int,
+                      balanced: bool, device):
+    """미리 학습된 torch 체크포인트를 로드해 (proba, classes) 를 반환한다.
+
+    proba: list[str] -> np.ndarray (N, K) softmax 확률.
+    argmax 만 필요한 기존 경로(build_torch_predict)와, 확신도가 필요한 캐스케이드 경로가
+    **같은 로딩·전처리 코드**를 공유하도록 확률 반환을 원본 함수로 둔다(분기 지점 단일화).
 
     체크포인트는 Phase 4 train.py 규칙으로 저장된 것을 그대로 쓴다:
         experiments/checkpoints/{track}_{model}_raw[_bal].pt
@@ -134,10 +142,12 @@ def build_torch_predict(track: str, model_name: str, side: int, max_len: int,
     # 작은 배치로 예측한다. conv 계열(cnn/charcnn)은 메모리가 가벼워 큰 배치가 안전·빠르다.
     default_batch = 128 if model_name == "bilstm" else 1024
 
-    def predict(texts, batch: int = default_batch):
-        """변형 텍스트를 이미지/바이트행렬로 그 자리에서 바꿔 배치 예측한다."""
+    def proba(texts, batch: int = default_batch):
+        """변형 텍스트를 이미지/바이트행렬로 그 자리에서 바꿔 배치 확률 추론한다."""
         texts = list(texts)
-        preds = []
+        if not texts:
+            return np.zeros((0, len(classes)), dtype=np.float32)
+        out = []
         with torch.no_grad():
             for i in range(0, len(texts), batch):
                 chunk = texts[i:i + batch]
@@ -149,10 +159,74 @@ def build_torch_predict(track: str, model_name: str, side: int, max_len: int,
                     # 텍스트 → (B, max_len) 바이트 인덱스 시퀀스
                     X = encode_byte_matrix(chunk, max_len)
                     x = torch.from_numpy(X).to(device)
-                logits = net(x)
-                preds.append(logits.argmax(dim=1).cpu().numpy())
-        return np.concatenate(preds)
+                out.append(torch.softmax(net(x), dim=1).cpu().numpy())
+        return np.concatenate(out)
 
+    return proba, classes
+
+
+def build_torch_predict(track: str, model_name: str, side: int, max_len: int,
+                        balanced: bool, device):
+    """단일 torch 모델을 `predict(list[str]) -> 클래스인덱스` 콜러블로 감싼다."""
+    proba, classes = build_torch_proba(track, model_name, side, max_len, balanced, device)
+
+    def predict(texts):
+        return proba(texts).argmax(axis=1)
+
+    return predict, classes
+
+
+def load_cascade_tau(track: str, stage2: str, text: str, balanced: bool) -> float:
+    """cascade.py 가 val 에서 확정해 저장한 운영 임계값 τ 를 읽어온다.
+
+    왜 파일에서 읽나: τ 를 여기서 다시 고르면 **회피 실험 데이터로 τ 를 튜닝**하는 셈이라
+    공정성이 깨진다. 캐스케이드의 τ 는 clean val 에서 한 번 정해진 값이어야 하고,
+    공격 실험은 그 고정된 운영점을 그대로 시험해야 한다.
+
+    찾는 파일은 cascade.py 의 기본 설정(1차 gray · 기본 lr · match-teacher) 산출물이다.
+    다른 설정의 운영점을 시험하려면 `--tau` 로 직접 넘긴다(회피 경로는 gray 이미지 전용).
+    """
+    s2 = "" if stage2 == "charcnn" else f"-{stage2}"
+    path = RESULTS_DIR / f"{track}_cascade{s2}_{text}{'_bal' if balanced else ''}.json"
+    if not path.exists():
+        raise FileNotFoundError(
+            f"캐스케이드 리포트가 없습니다: {path}\n"
+            f"  → 먼저 실행하세요: python src/models/cascade.py --track {track} "
+            f"--stage2 {stage2}{' --balance' if balanced else ''}\n"
+            f"  (또는 --tau 로 임계값을 직접 지정)"
+        )
+    with open(path, encoding="utf-8") as f:
+        return float(json.load(f)["selected_tau"])
+
+
+def build_cascade_predict(track: str, stage2: str, side: int, max_len: int,
+                          balanced: bool, device, tau: float):
+    """하이브리드 캐스케이드를 `predict(list[str]) -> 클래스인덱스` 콜러블로 감싼다.
+
+    1차(제안 CNN)가 전부 판정하고, 확신도 < τ 인 샘플만 2차(char-CNN)로 넘긴다.
+    2차는 **에스컬레이션된 부분집합에만** 실행해 실제 배포 동작과 비용 구조를 그대로 재현한다.
+    """
+    proba1, classes = build_torch_proba(track, "cnn", side, max_len, balanced, device)
+    proba2, classes2 = build_torch_proba(track, stage2, side, max_len, balanced, device)
+    if classes != classes2:
+        raise ValueError(f"두 단계의 클래스 순서가 다릅니다: {classes} vs {classes2}")
+
+    def predict(texts):
+        texts = list(texts)
+        p1 = proba1(texts)
+        pred = p1.argmax(axis=1)
+        escalate = np.where(p1.max(axis=1) < tau)[0]
+        if len(escalate):
+            p2 = proba2([texts[i] for i in escalate])
+            pred[escalate] = p2.argmax(axis=1)
+        # 호출마다 에스컬레이션 비율을 기록한다.
+        # 왜: 캐스케이드의 비용은 '얼마나 2차로 넘어가느냐'에 비례한다. 회피 변형이 1차
+        # 확신도를 흔들면 에스컬레이션이 늘어 **지연이 증가**하는데(비용 기반 공격 표면),
+        # 이는 정확도 지표로는 절대 안 보이는 하이브리드 고유의 리스크다.
+        predict.escalation_log.append(float(len(escalate) / max(len(texts), 1)))
+        return pred
+
+    predict.escalation_log = []
     return predict, classes
 
 
@@ -175,6 +249,28 @@ def any_misclass(pred: np.ndarray, mask: np.ndarray, y_true: np.ndarray) -> floa
     if mask.sum() == 0:
         return float("nan")
     return float((pred[mask] != y_true[mask]).mean())
+
+
+def attach_escalation_rates(predict, single_rows, stacked_rows) -> bool:
+    """캐스케이드일 때, 각 실험 행에 그때의 에스컬레이션 비율(2차 호출 비중)을 붙인다.
+
+    왜 필요한가: 하이브리드의 비용은 '얼마나 2차로 넘어갔는가'로 결정된다. 회피 변형이
+    1차 확신도를 흔들면 에스컬레이션이 늘어 **정확도는 그대로인데 지연만 커지는** 실패가
+    가능하다(비용 기반 공격 표면). 정확도 지표만으로는 안 보이므로 함께 기록한다.
+
+    호출 순서가 곧 로그 순서다(main 의 실행 순서에 의존):
+        [0] clean 기준 예측 → [1 : 1+len(single)] 단일 기법 → 그 뒤 예산 k=1..budget.
+    캐스케이드가 아니면(로그 속성 없음) 아무것도 하지 않고 False 를 반환한다.
+    """
+    log = getattr(predict, "escalation_log", None)
+    if not log:
+        return False
+    for row, rate in zip(single_rows, log[1:1 + len(single_rows)]):
+        row["escalation_rate"] = rate
+    stacked_rows[0]["escalation_rate"] = log[0]  # stacked 의 k=0 행은 clean 기준점
+    for row, rate in zip(stacked_rows[1:], log[1 + len(single_rows):]):
+        row["escalation_rate"] = rate
+    return True
 
 
 def run_single(predict, te_txt, te_lab, y_true, base_pred, normal_idx, seed):
@@ -277,6 +373,9 @@ def main() -> None:
                    help="바이트 시퀀스 길이(charcnn/bilstm 전용). 기본=이미지 용량(48x48)과 동일")
     p.add_argument("--unbalanced", action="store_true",
                    help="torch 체크포인트를 '_bal' 없이(불균형 학습본) 로드. 기본은 balanced(_bal)")
+    p.add_argument("--tau", type=float, default=None,
+                   help="캐스케이드 임계값 직접 지정(cascade 전용). 기본은 cascade.py 가 "
+                        "val 에서 확정해 저장한 값을 사용")
     p.add_argument("--seed", type=int, default=42)
     args = p.parse_args()
 
@@ -288,6 +387,16 @@ def main() -> None:
         predict, classes = build_tfidf_predict(args.track, TFIDF_MODELS[args.model],
                                                args.max_features)
         device_note = "cpu(tfidf)"
+    elif args.model in CASCADE_MODELS:
+        device = get_device()
+        stage2 = CASCADE_MODELS[args.model]
+        balanced = not args.unbalanced
+        tau = args.tau if args.tau is not None else load_cascade_tau(
+            args.track, stage2, "raw", balanced)
+        predict, classes = build_cascade_predict(
+            args.track, stage2, args.side, args.max_len, balanced, device, tau)
+        device_note = f"{device} / cascade(cnn->{stage2}, tau={tau:.4f})" + \
+                      ("" if args.unbalanced else " / bal")
     else:
         device = get_device()
         predict, classes = build_torch_predict(
@@ -321,6 +430,12 @@ def main() -> None:
     print("  [예산 곡선 — benign-evasion / any-misclass]")
     for r in stacked:
         print(f"    k={r['budget_k']}  BE={r['asr_mutated']:.4f}  AM={r['anymis_mutated']:.4f}")
+
+    # 캐스케이드 전용 — 변형이 '비용'에 주는 영향(에스컬레이션 비율 증가 = 지연 증가).
+    if attach_escalation_rates(predict, single, stacked):
+        print("  [캐스케이드 비용 — 에스컬레이션 비율(2차 호출 비중, 낮을수록 빠름)]")
+        for r in stacked:
+            print(f"    k={r['budget_k']}  escalation={r.get('escalation_rate', float('nan')):.4f}")
 
     # 저장
     tag = f"{args.track}_{args.model}"

@@ -19,6 +19,7 @@
 - ⚠️ 새 트랙 추가 시 `--track` choices 를 5곳에서 함께 갱신: preprocess.py(TRACKS/REQUIRED_FILES), build_image_dataset.py, baseline_tfidf.py, diagnose_payload_bias.py, train.py.
 - ⚠️ 비-CSV 트랙(예: `ustc_flow_binary`)은 preprocess/build_image_dataset(CSV 경로)를 안 거침 → `--track` choices 를 train.py 한 곳만 갱신(위 "5곳"은 CSV 트랙 한정).
 - ⚠️ 새 `data/raw/<dataset>/` 는 자동 무시 안 됨 → `.gitignore` 에 수동 추가(대용량 커밋 사고 방지). 재현은 다운로드 스크립트로 보장.
+- ⚠️ `.gitignore` 는 **인라인 주석 불가**(줄 전체가 패턴). `experiments/checkpoints/  # 주석` 형태라 규칙이 무효였고 `.pt` 가 노출돼 있었음(2026-07 수정). 규칙 추가 후 `git check-ignore -v <경로>` 로 반드시 확인.
 - ⚠️ RGB npz 파일명 약어 `_ENCODER_ABBR` 는 build_image_dataset.py 와 data_image.py 두 곳에 중복 → 인코더 추가 시 동시 갱신(저장/로드 파일명 일치).
 
 ## 모델 / 학습
@@ -46,3 +47,12 @@
 - 장시간 작업(CV 등)은 완료 감지를 `until [ -f <산출 JSON> ]; do sleep 20; done` 로 걸 것(래퍼 종료와 무관하게 동작).
 - 클래스 불균형 트랙 학습: `train.py --balance`(train 만 언더샘플링, val/test 실분포 유지).
 - 모든 모델 평가는 `src/eval/metrics.py` 로 일원화(계산 방식 차이 배제). 지표: Acc·Macro-F1·MCC·PR-AUC·ROC-AUC + attack_focused(benign-evasion/FPR). 불균형 보안 데이터 헤드라인은 MCC·PR-AUC·benign-evasion(문헌 근거 docs/07).
+
+## 캐스케이드 (Phase 10, docs/09)
+- ⚠️ **`hybrid`(모델, docs/08 ViT 계열 = CNN stem+Transformer)와 `cascade`(배치 구조)는 다른 것** — 이름 섞지 말 것.
+- `src/models/cascade.py`: 1차=제안 CNN(전량) → 확신도<τ 인 소수만 2차=char-CNN. **학습 없음**(기존 `_bal` 체크포인트 재사용). τ→0 은 CNN 단독, τ→1 은 char-CNN 단독으로 정확히 수렴.
+- τ 는 **val 에서 확정 후 test 에 1회 적용**(test 로 고르면 누수). `--select match-teacher|budget`.
+- 회피 실험 편입: `run_evasion.py --model cascade` — τ 는 산출 JSON 에서 읽음(공격 데이터로 재튜닝 금지). 회피 경로는 gray 이미지 전용(`payload_to_image`).
+- 체크포인트/산출물 tag 는 train.py 규칙 재사용(`data_image._channel_suffix` + lr) + 캐스케이드 고유 축(2차 모델·τ 선택 규칙) 추가.
+- ⚠️ 캐스케이드가 줄이는 건 **추론 지연**뿐. 두 모델을 다 학습하므로 **학습 비용은 합산** — 근거는 처리량(docs/04 §5: 81,964 vs 6,010 /s)이지 학습 지표(s/epoch)가 아님.
+- ⚠️ 캐스케이드 고유 리스크: 회피 변형이 1차 확신도를 낮추면 에스컬레이션↑ → **정확도 그대로인데 지연만 폭증**(비용 기반 공격). `run_evasion` 이 조건별 `escalation_rate` 를 함께 기록.
