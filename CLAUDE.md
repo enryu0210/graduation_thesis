@@ -5,6 +5,8 @@
 - 실측 지표 → `experiments/results/*.json`(⚠️ 전체 .gitignore, 재생성으로 확보 — 커밋 대상 아님), 그림 → `docs/figures/`(추적·커밋 대상).
 - 커밋/푸시 대상 브랜치는 `phase1-data-acquisition`(전 Phase 가 여기 쌓임, main 아님).
 - git 커밋 메시지(한글 여러 줄)는 파일로 써서 `git commit -F <file>` 사용. Bash 도구에서 PowerShell here-string(`@'...'@`)은 메시지가 깨짐.
+- ⚠️ 노트북·데스크톱 양쪽에서 작업 → **착수 전 `git fetch` 필수**. 원격에 Phase 가 쌓여 있으면 문서 번호·모델 이름이 이미 선점됨(실제 사고: `docs/08` 과 모델명 `hybrid` 충돌 → push 거부 후 리베이스·개명 재작업).
+- 커밋 전 `python -m pytest tests/ -q` 실행(~3초, GPU 불필요).
 
 ## 데이터 파이프라인
 - `data/processed`, `data/images` 는 .gitignore(대용량). 재생성으로 확보:
@@ -26,6 +28,8 @@
 - 이미지 모델(같은 npz 입력): `cnn`(제안, 93,988p) · `vit`(단일 ViT, 2.7M) · `hybrid`(CNN stem+Transformer, 0.58M) — `src/models/cnn.py`, `vit.py`.
   텍스트 모델: `charcnn` · `bilstm`(`text_models.py`), 별도 sklearn 베이스라인 `baseline_tfidf.py`.
 - ⚠️ 새 이미지 모델 추가 시 `IMAGE_MODELS` 를 **2곳** 갱신: `train.py`, `cross_validate.py`(트랙의 "5곳"과는 별개).
+- ⚠️ `train.py` 를 `--smoke` 없이 돌리면 **추적 대상 그림**(`docs/figures/models/cm_*.png`)을 덮어씀 → 로컬 코드 검증은 반드시 `--smoke`(저장 생략).
+- 체크포인트가 필요한 스크립트(cascade 등)의 로컬 스모크: 스크래치에서 소량 학습한 임시 `.pt` 를 `experiments/checkpoints/` 에 만들고 검증 후 삭제.
 - ⚠️ 산출물 tag 는 **실험을 가르는 하이퍼파라미터를 전부 반영**해야 함. 안 그러면 서로 덮어씀(커밋 5eede2f 사고: RGB 조합이 전부 `_rgb` 로 저장돼 상호 덮어쓰기).
   현행 규칙: 채널 `_rgb-rb-cc-bd` (`data_image._channel_suffix`) + ViT 패치 `_p1x48` + 학습률 `_lr0.0003` + 균형화 `_bal`.
   `_lr` 은 기본값(`train.DEFAULT_LR`=1e-3)이면 생략 → 기존 산출물과 파일명 호환. 규칙은 train.py·cross_validate.py **2곳** 동시 갱신.
@@ -38,13 +42,16 @@
 ## 실행 환경 (Windows)
 - 한글 콘솔(cp949)에서 파이썬 비-ASCII 출력이 깨짐 → Bash 로 파이썬 실행 시 `PYTHONIOENCODING=utf-8` 프리픽스 사용(또는 스크립트가 stdout 재설정).
 - matplotlib 그림 라벨/범례/제목은 ASCII 만(DejaVu Sans 에 Hangul 없음 → □ 로 깨짐+경고). 한글은 콘솔·JSON 에만.
-- **로컬 GPU 사용 가능**(RTX 4080 SUPER, 17GB / torch cu124, RAM 34GB). 전면 학습을 로컬에서 실행함.
+- **GPU 는 데스크톱 한정**(RTX 4080 SUPER, 17GB / torch cu124, RAM 34GB) — 전면 학습은 거기서 실행.
+  노트북은 Intel Arc iGPU + torch CPU 빌드라 학습 불가 → 착수 시 `torch.cuda.is_available()` 로 어느 머신인지 먼저 확인.
   ⚠️ GPU 는 1대뿐 → 학습 작업은 **순차 실행**(동시 실행 시 재현성 악화). 학습 중 다른 검증이 필요하면 `CUDA_VISIBLE_DEVICES=` 로 CPU 강제.
 - ⚠️ 백그라운드 파이썬은 stdout 버퍼링으로 진행 로그가 안 보임 → 진행 추적은 산출 JSON 존재 여부로 하거나 `python -u` 사용.
 - ⚠️ **백그라운드 작업이 "killed" 로 보고돼도 파이썬 자식 프로세스는 살아 있을 수 있음**(셸 래퍼만 종료됨).
   로그·산출물만 보고 "죽었다" 판단하면 재실행 시 GPU 동시 실행이 발생해 순차 실행 규칙이 깨짐(2026-07-19 실제 사고, docs/08 §9.6).
   → 재실행 전 반드시 생존 확인: `Get-CimInstance Win32_Process -Filter "Name='python.exe'"` 또는 `nvidia-smi` 로 GPU 점유 확인.
 - 장시간 작업(CV 등)은 완료 감지를 `until [ -f <산출 JSON> ]; do sleep 20; done` 로 걸 것(래퍼 종료와 무관하게 동작).
+- ⚠️ Bash 도구에서 `git show <ref>:<path>` 는 `:` 가 `;` 로 변환돼 실패 → `git diff <a> <b> -- <path>` 사용.
+- `nvidia-smi` 는 PATH 에 없음 → GPU 확인은 `torch.cuda.is_available()` 또는 PowerShell `Get-CimInstance Win32_VideoController`.
 - 클래스 불균형 트랙 학습: `train.py --balance`(train 만 언더샘플링, val/test 실분포 유지).
 - 모든 모델 평가는 `src/eval/metrics.py` 로 일원화(계산 방식 차이 배제). 지표: Acc·Macro-F1·MCC·PR-AUC·ROC-AUC + attack_focused(benign-evasion/FPR). 불균형 보안 데이터 헤드라인은 MCC·PR-AUC·benign-evasion(문헌 근거 docs/07).
 
