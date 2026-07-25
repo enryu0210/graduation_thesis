@@ -268,11 +268,15 @@ def oracle_point(p1: np.ndarray, p2: np.ndarray, y_true: np.ndarray,
 # ---------------------------------------------------------------------------
 @torch.no_grad()
 def measure_latency(net, x: torch.Tensor, device, batch: int,
-                    warmup: int = 3, repeats: int = 10) -> float:
-    """샘플당 순전파 지연(ms)을 측정한다.
+                    warmup: int = 5, repeats: int = 20, rounds: int = 5) -> float:
+    """샘플당 순전파 지연(ms)을 측정한다. **여러 라운드의 중앙값**을 반환한다.
 
     - warmup: 첫 호출에는 CUDA 커널 로딩·메모리 할당 비용이 섞여 과대측정되므로 버린다.
     - GPU 는 비동기 실행이라 synchronize() 없이 재면 시간이 0 에 가깝게 나온다.
+    - ⚠️ 왜 중앙값인가: 단발 측정은 GPU 클럭 부스트 상태·다른 프로세스 간섭에 따라
+      실행마다 크게 흔들린다(실측: char-CNN 이 같은 조건에서 0.0555~0.0904 ms, 약 60% 변동).
+      이 Phase 의 헤드라인이 "같은 정확도를 몇 분의 1 비용으로"라 지연이 곧 결론이므로,
+      라운드별 측정치의 중앙값을 써서 이상치 하나가 speedup 을 부풀리지 못하게 막는다.
     - 전처리(텍스트→이미지/바이트) 비용은 제외한 **모델 순전파 기준**이다(두 모델 모두
       동일 기준이라 비교는 공정하며, 전처리는 µs 수준으로 결론을 바꾸지 않는다).
     """
@@ -282,13 +286,16 @@ def measure_latency(net, x: torch.Tensor, device, batch: int,
     if device.type == "cuda":
         torch.cuda.synchronize()
 
-    t0 = time.perf_counter()
-    for _ in range(repeats):
-        net(sample)
-    if device.type == "cuda":
-        torch.cuda.synchronize()
-    elapsed = time.perf_counter() - t0
-    return elapsed / (repeats * len(sample)) * 1000.0
+    per_round = []
+    for _ in range(rounds):
+        t0 = time.perf_counter()
+        for _ in range(repeats):
+            net(sample)
+        if device.type == "cuda":
+            torch.cuda.synchronize()
+        elapsed = time.perf_counter() - t0
+        per_round.append(elapsed / (repeats * len(sample)) * 1000.0)
+    return float(np.median(per_round))
 
 
 # ---------------------------------------------------------------------------

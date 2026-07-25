@@ -383,11 +383,13 @@ def main() -> None:
     t0 = time.perf_counter()
 
     # 대상 모델을 predict 콜러블로 감싼다(모델 종류를 이 지점에서만 분기).
+    # is_cascade 는 저장 tag(운영점 τ 축)에서도 쓰이므로 분기 밖에서 한 번만 정한다.
+    is_cascade = args.model in CASCADE_MODELS
     if args.model in TFIDF_MODELS:
         predict, classes = build_tfidf_predict(args.track, TFIDF_MODELS[args.model],
                                                args.max_features)
         device_note = "cpu(tfidf)"
-    elif args.model in CASCADE_MODELS:
+    elif is_cascade:
         device = get_device()
         stage2 = CASCADE_MODELS[args.model]
         balanced = not args.unbalanced
@@ -438,14 +440,21 @@ def main() -> None:
             print(f"    k={r['budget_k']}  escalation={r.get('escalation_rate', float('nan')):.4f}")
 
     # 저장
-    tag = f"{args.track}_{args.model}"
+    # ⚠️ tag 는 실험을 가르는 축을 전부 담아야 한다(커밋 5eede2f 의 RGB ablation 덮어쓰기 사고).
+    #    캐스케이드는 **운영점 τ 가 곧 다른 실험**이다 — 같은 모델이라도 τ 가 다르면
+    #    정확도·에스컬레이션이 전혀 달라지므로, τ 를 직접 지정한 실행은 별도 파일로 남긴다.
+    #    train.py 의 lr 규칙과 같은 관습: 기본 운영점(cascade.py 가 val 에서 확정한 τ)이면 생략.
+    tau_tag = f"_tau{args.tau:g}" if (is_cascade and args.tau is not None) else ""
+    tag = f"{args.track}_{args.model}{tau_tag}"
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    meta = {"track": args.track, "model": args.model, "classes": classes}
+    if is_cascade:
+        meta["tau"] = tau  # 어느 운영점의 결과인지 파일 안에서도 확인 가능하게
     with open(RESULTS_DIR / f"evasion_{tag}_single.json", "w", encoding="utf-8") as f:
-        json.dump({"track": args.track, "model": args.model, "classes": classes,
-                   "results": single}, f, ensure_ascii=False, indent=2)
+        json.dump({**meta, "results": single}, f, ensure_ascii=False, indent=2)
     with open(RESULTS_DIR / f"evasion_{tag}_stacked.json", "w", encoding="utf-8") as f:
-        json.dump({"track": args.track, "model": args.model, "budget": args.budget,
-                   "classes": classes, "results": stacked}, f, ensure_ascii=False, indent=2)
+        json.dump({**meta, "budget": args.budget, "results": stacked},
+                  f, ensure_ascii=False, indent=2)
 
     clean_ref = stacked[0]["asr_mutated"]  # k=0 기준(전체 공격 clean benign-evasion)
     fig_single(single, FIG_DIR / f"evasion_single_{tag}.png",

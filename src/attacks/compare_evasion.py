@@ -42,17 +42,44 @@ MODEL_STYLE = [
     ("tfidf_rf",     "TF-IDF + RandomForest",  "#2c3e50", "v--"),
 ]
 
+# 캐스케이드(Phase 10)는 τ 마다 **다른 운영점**이라 모델명 하나로 고정할 수 없다.
+# 그래서 산출 파일을 glob 으로 찾아 라벨을 파일 안의 τ 로 만든다(τ 하드코딩 금지 —
+# 운영점을 새로 재면 그림이 자동으로 따라오게).
+CASCADE_COLORS = ["#27ae60", "#16a085", "#f39c12"]
+
 
 def load_stacked(track: str, model: str):
     """모델별 stacked 결과를 (k리스트, benign-evasion, any-misclass) 로 로드한다."""
     path = RESULTS_DIR / f"evasion_{track}_{model}_stacked.json"
     if not path.exists():
         return None
-    rows = json.loads(path.read_text(encoding="utf-8"))["results"]
+    return _parse_stacked(path)[0]
+
+
+def _parse_stacked(path: Path):
+    """stacked JSON 하나를 ((k, be, am), meta) 로 읽는다."""
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    rows = doc["results"]
     ks = [r["budget_k"] for r in rows]
     be = [r["asr_mutated"] for r in rows]
     am = [r["anymis_mutated"] for r in rows]
-    return ks, be, am
+    return (ks, be, am), doc
+
+
+def discover_cascade_runs(track: str):
+    """캐스케이드 회피 결과를 찾아 (라벨, 색, 스타일, 곡선) 목록으로 만든다.
+
+    라벨에 τ 를 넣는 이유: 캐스케이드는 τ 하나로 "CNN 급 ↔ char-CNN 급" 사이를 오간다.
+    운영점을 표기하지 않으면 같은 이름의 곡선 두 개가 왜 다른지 그림에서 알 수 없다.
+    """
+    runs = []
+    for i, path in enumerate(sorted(RESULTS_DIR.glob(f"evasion_{track}_cascade*_stacked.json"))):
+        curve, doc = _parse_stacked(path)
+        tau = doc.get("tau")
+        stage2 = "bilstm" if doc.get("model", "").endswith("bilstm") else "char-CNN"
+        label = f"cascade -> {stage2}" + (f" (tau={tau:.4f})" if tau is not None else "")
+        runs.append((label, CASCADE_COLORS[i % len(CASCADE_COLORS)], "*-", curve))
+    return runs
 
 
 def main() -> None:
@@ -77,6 +104,12 @@ def main() -> None:
         ax_am.plot(ks, am, style, color=color, lw=2, ms=6, label=label)
         found.append((label, be[-1], am[-1]))
 
+    # 캐스케이드 운영점들을 같은 축에 얹는다(Phase 10 을 RQ2 비교에 편입).
+    for label, color, style, (ks, be, am) in discover_cascade_runs(args.track):
+        ax_be.plot(ks, be, style, color=color, lw=2, ms=9, label=label)
+        ax_am.plot(ks, am, style, color=color, lw=2, ms=9, label=label)
+        found.append((label, be[-1], am[-1]))
+
     # (좌) 주 지표 — 전부 ~0 임을 보이되, 0 근방 미세차를 보이도록 y 상한을 작게.
     ax_be.set_title("Primary: benign-evasion (attack -> Normal = WAF bypass)", fontsize=11)
     ax_be.set_xlabel("stacked mutation budget k")
@@ -92,7 +125,9 @@ def main() -> None:
     ax_am.set_ylim(-0.02, 1.02)
     ax_am.legend(loc="upper left", fontsize=9)
 
-    fig.suptitle(f"RQ2 evasion vulnerability across 5 models ({args.track})", fontsize=13)
+    # 곡선 수는 캐스케이드 운영점 개수에 따라 달라지므로 제목도 실제 개수로 쓴다.
+    fig.suptitle(f"RQ2 evasion vulnerability across {len(found)} detectors ({args.track})",
+                 fontsize=13)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     out = FIG_DIR / f"evasion_compare_{args.track}.png"
     out.parent.mkdir(parents=True, exist_ok=True)
