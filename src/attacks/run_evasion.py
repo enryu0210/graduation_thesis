@@ -47,7 +47,7 @@ import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-for extra in ("src/models", "src/eval", "src/attacks", "src/imaging"):
+for extra in ("src/models", "src/eval", "src/attacks", "src/imaging", "src/data"):
     sys.path.insert(0, str(PROJECT_ROOT / extra))
 
 from data_text import (  # noqa: E402
@@ -55,7 +55,12 @@ from data_text import (  # noqa: E402
 )
 from baseline_tfidf import build_classifier  # noqa: E402
 from metrics import _find_normal_index  # noqa: E402
-from payload_to_image import payload_to_image  # noqa: E402
+from payload_to_image import payload_to_image, payload_to_rgb_image  # noqa: E402
+from preprocess import normalize_text  # noqa: E402  (입력 정규화 방어 — 전처리와 같은 함수를 쓴다)
+import data_image  # noqa: E402  (채널 접미사 규칙 재사용)
+from tagging import (  # noqa: E402
+    DEFAULT_AUG_RATIO, DEFENSE_MODES, build_tag, defense_suffix,
+)
 import problem_space as PS  # noqa: E402
 
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
@@ -76,14 +81,28 @@ ALL_MODELS = (list(TFIDF_MODELS) + sorted(TORCH_IMAGE_MODELS | TORCH_SEQ_MODELS)
 # ---------------------------------------------------------------------------
 # 대상 모델 → 예측 콜러블 만들기 (predict: list[str] -> np.ndarray[int])
 # ---------------------------------------------------------------------------
-def build_tfidf_predict(track: str, clf_name: str, max_features: int):
+def apply_input_defense(texts, text_mode: str):
+    """입력 정규화 방어(Phase 11 방어 B): 예측 **직전** 에 URL/HTML 디코딩을 적용한다.
+
+    왜 여기인가: 공격자는 raw 트래픽에 변형을 가하고(docs/05 §3), 방어자는 탐지 전에 정규화한다.
+    즉 '변형 → 정규화 → 탐지' 순서가 실제 배포 구조다. 전처리와 **같은 함수**(preprocess.normalize_text)
+    를 쓰므로 학습(text_decoded 컬럼)과 추론의 정규화가 어긋날 수 없다.
+    text_mode='raw' 면 아무것도 하지 않는다(기존 동작 그대로).
+    """
+    if text_mode != "decoded":
+        return list(texts)
+    return [normalize_text(t) for t in texts]
+
+
+def build_tfidf_predict(track: str, clf_name: str, max_features: int, text: str = "raw"):
     """clean train 으로 TF-IDF+분류기를 학습해 (predict, classes) 를 반환한다.
 
     TF-IDF 는 gradient 가 필요 없고 학습이 가벼워, 체크포인트 대신 매 실행마다 clean train 으로
     즉석 학습한다(재현성: 같은 데이터·시드라 결과 동일). 불균형은 class_weight='balanced' 로
     보정하므로 별도 언더샘플링이 필요 없다(docs/05 §11-C).
+    text='decoded' 면 정규화된 컬럼으로 학습하고 추론 입력도 같은 규칙으로 정규화한다(방어 B).
     """
-    tr_txt, tr_lab = load_text_split(track, "train", "raw")
+    tr_txt, tr_lab = load_text_split(track, "train", text)
     y_train, classes = build_label_encoding(tr_lab)
     vec = TfidfVectorizer(analyzer="char_wb", ngram_range=(2, 4),
                           max_features=max_features, lowercase=False)
@@ -92,13 +111,16 @@ def build_tfidf_predict(track: str, clf_name: str, max_features: int):
     clf.fit(Xtr, y_train)
 
     def predict(texts):
-        return clf.predict(vec.transform(list(texts)))
+        return clf.predict(vec.transform(apply_input_defense(texts, text)))
 
     return predict, classes
 
 
 def build_torch_proba(track: str, model_name: str, side: int, max_len: int,
-                      balanced: bool, device):
+                      balanced: bool, device, text: str = "raw",
+                      channels: str = "gray", encoders: tuple[str, ...] | None = None,
+                      defense: str = "none", mutation_split: str | None = None,
+                      aug_ratio: float | None = None):
     """미리 학습된 torch 체크포인트를 로드해 (proba, classes) 를 반환한다.
 
     proba: list[str] -> np.ndarray (N, K) softmax 확률.
@@ -116,26 +138,36 @@ def build_torch_proba(track: str, model_name: str, side: int, max_len: int,
     """
     import torch
 
-    _, tr_lab = load_text_split(track, "train", "raw")
+    _, tr_lab = load_text_split(track, "train", text)
     _, classes = build_label_encoding(tr_lab)
 
-    if model_name in TORCH_IMAGE_MODELS:
+    is_image = model_name in TORCH_IMAGE_MODELS
+    in_channels = 3 if (is_image and channels == "rgb") else 1
+    if is_image:
         import cnn as cnn_mod
-        net = cnn_mod.build_model(len(classes))
+        net = cnn_mod.build_model(len(classes), in_channels=in_channels)
     else:
         import text_models
         net = text_models.build_model(model_name, len(classes))
 
-    ckpt = CKPT_DIR / (f"{track}_{model_name}_raw" + ("_bal" if balanced else "") + ".pt")
+    # 체크포인트 이름은 train.py 와 **같은 규칙**(tagging.build_tag)으로 만든다.
+    # 채널·방어 축이 빠지면 엉뚱한 가중치를 조용히 로드하게 된다.
+    ckpt_tag = build_tag(track, model_name, text,
+                         channels=channels if is_image else "gray",
+                         encoders=encoders if is_image else None,
+                         balance=balanced, defense=defense,
+                         mutation_split=mutation_split, aug_ratio=aug_ratio)
+    ckpt = CKPT_DIR / f"{ckpt_tag}.pt"
     if not ckpt.exists():
-        raise FileNotFoundError(
-            f"체크포인트가 없습니다: {ckpt}\n"
-            f"먼저 학습하세요: python src/models/train.py --model {model_name} "
-            f"--track {track}{' --balance' if balanced else ''}"
-        )
+        retrain = (f"python src/models/train.py --model {model_name} --track {track}"
+                   f"{' --balance' if balanced else ''}"
+                   f"{f' --text {text}' if text != 'raw' else ''}"
+                   f"{f' --channels {channels}' if channels != 'gray' else ''}"
+                   f"{f' --defense {defense}' if defense != 'none' else ''}"
+                   f"{f' --mutation-split {mutation_split} --aug-ratio {aug_ratio:g}' if defense == 'advtrain' else ''}")
+        raise FileNotFoundError(f"체크포인트가 없습니다: {ckpt}\n먼저 학습하세요: {retrain}")
     net.load_state_dict(torch.load(ckpt, map_location=device))
     net.to(device).eval()
-    is_image = model_name in TORCH_IMAGE_MODELS
 
     # 배치 크기: BiLSTM 은 긴 시퀀스(max_len=2304)를 순환 처리해 활성값 메모리가
     # 배치×길이에 비례해 폭증한다(1024 배치에서 30GiB+ OOM 발생). 그래서 bilstm 만
@@ -143,15 +175,24 @@ def build_torch_proba(track: str, model_name: str, side: int, max_len: int,
     default_batch = 128 if model_name == "bilstm" else 1024
 
     def proba(texts, batch: int = default_batch):
-        """변형 텍스트를 이미지/바이트행렬로 그 자리에서 바꿔 배치 확률 추론한다."""
-        texts = list(texts)
+        """변형 텍스트를 이미지/바이트행렬로 그 자리에서 바꿔 배치 확률 추론한다.
+
+        text='decoded' 면 변환 **전에** 정규화를 적용한다(= 입력 정규화 방어의 실제 배포 순서).
+        """
+        texts = apply_input_defense(texts, text)
         if not texts:
             return np.zeros((0, len(classes)), dtype=np.float32)
         out = []
         with torch.no_grad():
             for i in range(0, len(texts), batch):
                 chunk = texts[i:i + batch]
-                if is_image:
+                if is_image and in_channels == 3:
+                    # 텍스트 → (side,side,3) uint8 → (B,3,side,side) float(0~1)
+                    # 채널 인코더 조합은 학습 때와 같아야 한다(tag 로 강제됨).
+                    imgs = np.stack([payload_to_rgb_image(t, side, tuple(encoders)) for t in chunk])
+                    x = torch.from_numpy(imgs.astype(np.float32) / 255.0)
+                    x = x.permute(0, 3, 1, 2).contiguous().to(device)
+                elif is_image:
                     # 텍스트 → (side,side) uint8 이미지 → (B,1,side,side) float(0~1)
                     imgs = np.stack([payload_to_image(t, side) for t in chunk])
                     x = torch.from_numpy(imgs.astype(np.float32) / 255.0).unsqueeze(1).to(device)
@@ -166,9 +207,13 @@ def build_torch_proba(track: str, model_name: str, side: int, max_len: int,
 
 
 def build_torch_predict(track: str, model_name: str, side: int, max_len: int,
-                        balanced: bool, device):
-    """단일 torch 모델을 `predict(list[str]) -> 클래스인덱스` 콜러블로 감싼다."""
-    proba, classes = build_torch_proba(track, model_name, side, max_len, balanced, device)
+                        balanced: bool, device, **kwargs):
+    """단일 torch 모델을 `predict(list[str]) -> 클래스인덱스` 콜러블로 감싼다.
+
+    kwargs(text/channels/encoders/defense/...)는 build_torch_proba 로 그대로 넘어간다 —
+    분기 지점을 늘리지 않기 위해 여기서는 해석하지 않는다.
+    """
+    proba, classes = build_torch_proba(track, model_name, side, max_len, balanced, device, **kwargs)
 
     def predict(texts):
         return proba(texts).argmax(axis=1)
@@ -377,9 +422,32 @@ def main() -> None:
                    help="캐스케이드 임계값 직접 지정(cascade 전용). 기본은 cascade.py 가 "
                         "val 에서 확정해 저장한 값을 사용")
     p.add_argument("--seed", type=int, default=42)
+    # ── Phase 11 (RQ3) — 방어 arm 을 같은 공격으로 재평가하기 위한 옵션 ────────
+    p.add_argument("--text", default="raw", choices=["raw", "decoded"],
+                   help="decoded = 입력 정규화 방어(방어 B). 변형 페이로드를 예측 직전에 "
+                        "URL/HTML 디코딩한 뒤 탐지한다(학습도 --text decoded 본이어야 함)")
+    p.add_argument("--channels", default="gray", choices=["gray", "rgb"],
+                   help="이미지 모델 채널(cnn 전용). rgb 는 같은 조합으로 학습된 체크포인트가 필요")
+    p.add_argument("--rgb-encoders", default="raw_byte,char_class,local_entropy",
+                   help="rgb 채널 인코더 R,G,B(학습 때와 동일해야 함)")
+    p.add_argument("--defense", default="none", choices=list(DEFENSE_MODES),
+                   help="공격 대상이 어떤 방어 모델인지(체크포인트 선택 + 산출물 tag). "
+                        "advtrain 은 --mutation-split/--aug-ratio 로 어떤 방어본인지 지정")
+    p.add_argument("--mutation-split", default="S0", choices=["S0", "SA"],
+                   help="advtrain 체크포인트의 변형 분할(학습 때 쓴 값과 일치해야 함)")
+    p.add_argument("--aug-ratio", type=float, default=DEFAULT_AUG_RATIO,
+                   help="advtrain 체크포인트의 증강 비율(학습 때 쓴 값과 일치해야 함)")
     args = p.parse_args()
 
-    print(f"=== RQ2 회피 ASR: track={args.track} model={args.model} ===")
+    if args.model in CASCADE_MODELS and (args.text != "raw" or args.channels != "gray"
+                                         or args.defense != "none"):
+        # 캐스케이드는 운영점 τ 가 clean val 에서 확정된 gray/raw 구성에 묶여 있다.
+        # 방어본으로 1차를 갈아끼우면 τ 를 다시 골라야 하는데, 그건 Phase 11 범위 밖이다(docs/10 §10).
+        p.error("cascade 는 아직 방어/채널 옵션과 함께 쓸 수 없습니다(τ 재선택 필요 — docs/10 §10).")
+
+    encoders = tuple(name.strip() for name in args.rgb_encoders.split(","))
+    print(f"=== RQ2 회피 ASR: track={args.track} model={args.model} "
+          f"text={args.text} channels={args.channels} defense={args.defense} ===")
     t0 = time.perf_counter()
 
     # 대상 모델을 predict 콜러블로 감싼다(모델 종류를 이 지점에서만 분기).
@@ -387,7 +455,7 @@ def main() -> None:
     is_cascade = args.model in CASCADE_MODELS
     if args.model in TFIDF_MODELS:
         predict, classes = build_tfidf_predict(args.track, TFIDF_MODELS[args.model],
-                                               args.max_features)
+                                               args.max_features, text=args.text)
         device_note = "cpu(tfidf)"
     elif is_cascade:
         device = get_device()
@@ -404,6 +472,9 @@ def main() -> None:
         predict, classes = build_torch_predict(
             args.track, args.model, args.side, args.max_len,
             balanced=not args.unbalanced, device=device,
+            text=args.text, channels=args.channels, encoders=encoders,
+            defense=args.defense, mutation_split=args.mutation_split,
+            aug_ratio=args.aug_ratio,
         )
         device_note = str(device) + ("" if args.unbalanced else " / bal")
 
@@ -411,6 +482,8 @@ def main() -> None:
     print(f"  대상 준비 완료({time.perf_counter()-t0:.1f}s) "
           f"[{device_note}] classes={classes} normal_idx={normal_idx}")
 
+    # ⚠️ 공격 입력은 항상 raw 다. 정규화 방어(--text decoded)는 '탐지 직전'에 적용되지
+    #    '공격자가 정규화된 페이로드를 보낸다'는 뜻이 아니다(공격→정규화→탐지 순서).
     te_txt, te_lab = load_text_split(args.track, "test", "raw")
     te_lab = list(te_lab)
     # 진짜 클래스 인덱스(보조 지표 any-misclass 계산에 필요). classes 순서에 맞춘다.
@@ -444,10 +517,20 @@ def main() -> None:
     #    캐스케이드는 **운영점 τ 가 곧 다른 실험**이다 — 같은 모델이라도 τ 가 다르면
     #    정확도·에스컬레이션이 전혀 달라지므로, τ 를 직접 지정한 실행은 별도 파일로 남긴다.
     #    train.py 의 lr 규칙과 같은 관습: 기본 운영점(cascade.py 가 val 에서 확정한 τ)이면 생략.
+    #    같은 이유로 Phase 11 의 방어 축(입력 정규화·채널·증강 방어본)도 tag 에 들어간다 —
+    #    방어 arm 의 결과가 기준선 결과를 덮어쓰면 비교 자체가 불가능해진다.
+    #    기본값(raw/gray/none)이면 접미사가 전부 비어 **기존 산출물 파일명과 그대로 호환**된다.
     tau_tag = f"_tau{args.tau:g}" if (is_cascade and args.tau is not None) else ""
-    tag = f"{args.track}_{args.model}{tau_tag}"
+    text_tag = "" if args.text == "raw" else f"_{args.text}"
+    ch_tag = data_image._channel_suffix(args.channels, encoders) if args.model == "cnn" else ""
+    def_tag = defense_suffix(args.defense, args.mutation_split, args.aug_ratio)
+    tag = f"{args.track}_{args.model}{text_tag}{ch_tag}{def_tag}{tau_tag}"
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    meta = {"track": args.track, "model": args.model, "classes": classes}
+    meta = {"track": args.track, "model": args.model, "classes": classes,
+            "text": args.text, "channels": args.channels,
+            "defense": {"mode": args.defense,
+                        "mutation_split": args.mutation_split if args.defense == "advtrain" else None,
+                        "aug_ratio": args.aug_ratio if args.defense == "advtrain" else None}}
     if is_cascade:
         meta["tau"] = tau  # 어느 운영점의 결과인지 파일 안에서도 확인 가능하게
     with open(RESULTS_DIR / f"evasion_{tag}_single.json", "w", encoding="utf-8") as f:

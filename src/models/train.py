@@ -34,6 +34,10 @@ import numpy as np
 # 이웃 모듈 import 경로 설정
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "eval"))
+# 적대적 증강(Phase 11)은 학습 시점에 '텍스트 → 이미지' 변환을 직접 호출하므로
+# 이미지화 모듈과 방어 모듈 경로도 열어둔다(npz 에는 원문이 없다 — docs/10 §7.1).
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "imaging"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "defense"))
 
 import torch
 import torch.nn as nn
@@ -42,6 +46,11 @@ from torch.utils.data import DataLoader, TensorDataset
 import metrics as M  # noqa: E402
 import data_image  # noqa: E402
 import data_text  # noqa: E402
+import augment as AUG  # noqa: E402
+from payload_to_image import payload_to_image, payload_to_rgb_image  # noqa: E402
+from tagging import (  # noqa: E402
+    DEFAULT_AUG_BUDGET, DEFAULT_AUG_RATIO, DEFAULT_LR, DEFENSE_MODES, build_tag,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
@@ -51,11 +60,11 @@ CKPT_DIR = PROJECT_ROOT / "experiments" / "checkpoints"
 # 이미지를 쓰는 모델과 바이트 시퀀스를 쓰는 모델을 구분한다.
 # vit/hybrid 는 제안 CNN 과 **완전히 같은 이미지 입력**을 받는 비교 arm 이다(vit.py 참조).
 IMAGE_MODELS = {"cnn", "vit", "hybrid"}
-
-# 기본 학습률. 산출물 tag 에서 "기본값이면 접미사 생략" 판정에 쓰므로 상수로 둔다
-# (cross_validate.py 와 동일한 값이어야 파일명 규칙이 어긋나지 않는다).
-DEFAULT_LR = 1e-3
 TEXT_MODELS = {"charcnn", "bilstm"}
+
+# DEFAULT_LR 등 tag 관련 상수는 tagging.py 가 단일 진실 소스다(위 import).
+# 여기서 재노출하는 이유: cascade.py / cross_validate.py 가 `train.DEFAULT_LR` 로 참조 중이라
+# 기존 import 경로를 깨지 않기 위함.
 
 
 def set_seed(seed: int = 42) -> None:
@@ -98,23 +107,88 @@ def balance_train_indices(y_train: np.ndarray, seed: int) -> np.ndarray:
     return keep
 
 
+def texts_to_images(texts: list[str], side: int, channels: str,
+                    encoders: tuple[str, str, str] | None) -> np.ndarray:
+    """문자열 리스트 → (N,side,side[,3]) uint8 이미지 배열.
+
+    build_image_dataset.py 가 .npz 를 만들 때 쓰는 것과 **완전히 같은 변환 함수**를 호출한다.
+    ⚠️ 이 동일성이 깨지면 Phase 11 의 모든 수치가 무효다(원본은 npz, 증강본만 이 경로로
+    만들면 두 경로의 미세한 차이가 '증강본 여부'와 상관돼 새 shortcut 이 된다 — docs/10 §7.1).
+    그래서 증강 학습에서는 train split **전체**를 이 경로로 통일하고,
+    tests/test_defense.py 가 npz 와 바이트 단위 일치를 검증한다.
+    """
+    if channels == "gray":
+        return np.stack([payload_to_image(t, side=side) for t in texts])
+    enc = tuple(encoders) if encoders else None
+    return np.stack([payload_to_rgb_image(t, side=side, encoders=enc) for t in texts])
+
+
+def _augment_split(texts: list[str], y: np.ndarray, classes: list[str],
+                   mutation_split: str, ratio: float, budget: int, seed: int):
+    """정수 라벨을 클래스명으로 되돌려 augment.augment_texts 를 호출하는 얇은 어댑터."""
+    labels_str = [classes[int(c)] for c in y]
+    return AUG.augment_texts(texts, labels_str, mutation_split=mutation_split,
+                             ratio=ratio, budget=budget, seed=seed)
+
+
 def build_datasets(model: str, track: str, text: str, side: int, max_len: int,
                    limit: int | None, balance: bool = False, seed: int = 42,
-                   channels: str = "gray", encoders: tuple[str, str, str] | None = None):
-    """모델 종류에 맞춰 (train/val/test TensorDataset, classes, class_weights, in_channels) 를 만든다.
+                   channels: str = "gray", encoders: tuple[str, str, str] | None = None,
+                   defense: str = "none", mutation_split: str = "S0",
+                   aug_ratio: float = DEFAULT_AUG_RATIO, aug_budget: int = DEFAULT_AUG_BUDGET):
+    """모델 종류에 맞춰 (train/val/test TensorDataset, classes, class_weights, in_channels, aug_info) 를 만든다.
 
     - 이미지 모델: data/images 의 .npz → gray (N,1,H,W) / rgb (N,3,H,W) float
     - 텍스트 모델: data/processed 의 CSV → (N,L) 바이트 인덱스 시퀀스
     두 경로 모두 train 라벨로 클래스 수/가중치를 정한다.
+
+    defense="advtrain" 이면 train/val 을 **CSV 원문에서** 만들고 의미보존 변형을 치환 주입한다:
+      - train: 방어 학습 데이터
+      - val  : 조기 종료 기준을 arm 의 목적함수에 맞추기 위해 같은 규칙으로 섞는다(docs/10 §7.3).
+               ⚠️ held-out 계열은 train 에도 val 에도 들어가지 않는다(조기 종료를 통한 간접 누수 차단).
+      - test : **절대 건드리지 않는다**(clean 평가). 회피 평가는 run_evasion.py 담당.
+    defense="norm" 은 학습 데이터를 바꾸지 않는다 — `--text decoded` 로 입력 표현만 정규화한다.
     """
+    advtrain = defense == "advtrain"
+    aug_info: dict = {"train": None, "val": None}
+    # 증강 순서: limit → balance → 치환. 균형화 이후에 바꿔야 클래스 비율이 보존된다(docs/10 §7.2).
+
     if model in IMAGE_MODELS:
-        tr_x, tr_y, classes = data_image.load_split(track, "train", text, side, channels, encoders)
-        va_x, va_y, _ = data_image.load_split(track, "val", text, side, channels, encoders)
+        va_x, va_y, classes = data_image.load_split(track, "val", text, side, channels, encoders)
         te_x, te_y, _ = data_image.load_split(track, "test", text, side, channels, encoders)
-        tr_x, tr_y = _limit(tr_x, limit), _limit(tr_y, limit)
-        if balance:
-            keep = balance_train_indices(tr_y, seed)
-            tr_x, tr_y = tr_x[keep], tr_y[keep]
+
+        if advtrain:
+            tr_txt, tr_lab = data_text.load_text_split(track, "train", text)
+            # npz 의 클래스 순서로 인코딩한다(양쪽 다 sorted(unique) 규칙이라 동일해야 함).
+            tr_y = data_text.encode_labels_with(tr_lab, classes)
+            if limit:
+                tr_txt, tr_y = tr_txt[:limit], tr_y[:limit]
+            if balance:
+                keep = balance_train_indices(tr_y, seed)
+                tr_txt = [tr_txt[i] for i in keep]
+                tr_y = tr_y[keep]
+            tr_txt, aug_info["train"] = _augment_split(
+                tr_txt, tr_y, classes, mutation_split, aug_ratio, aug_budget, seed)
+            tr_x = texts_to_images(tr_txt, side, channels, encoders)
+
+            # val 도 같은 규칙으로 섞는다. 시드를 다르게 줘 train 과 같은 변형 조합이
+            # 그대로 재현되지 않게 한다(조기 종료가 train 변형에 과적합되는 것을 막음).
+            va_txt, va_lab = data_text.load_text_split(track, "val", text)
+            va_y_csv = data_text.encode_labels_with(va_lab, classes)
+            if not np.array_equal(va_y_csv, va_y):
+                # CSV 행 순서와 npz 행 순서가 어긋나면 이미지-라벨이 밀린다. 조용히 틀리느니 죽는다.
+                raise RuntimeError(
+                    "val 라벨이 CSV 와 npz 에서 불일치합니다 — 이미지 데이터셋을 다시 빌드하세요"
+                    f"(build_image_dataset.py --track {track}).")
+            va_txt, aug_info["val"] = _augment_split(
+                va_txt, va_y, classes, mutation_split, aug_ratio, aug_budget, seed + 1)
+            va_x = texts_to_images(va_txt, side, channels, encoders)
+        else:
+            tr_x, tr_y, _ = data_image.load_split(track, "train", text, side, channels, encoders)
+            tr_x, tr_y = _limit(tr_x, limit), _limit(tr_y, limit)
+            if balance:
+                keep = balance_train_indices(tr_y, seed)
+                tr_x, tr_y = tr_x[keep], tr_y[keep]
 
         train_ds = data_image.make_torch_dataset(tr_x, tr_y)
         val_ds = data_image.make_torch_dataset(va_x, va_y)
@@ -138,6 +212,12 @@ def build_datasets(model: str, track: str, text: str, side: int, max_len: int,
             tr_txt = [tr_txt[i] for i in keep]  # tr_txt 는 리스트라 컴프리헨션으로 인덱싱
             y_train = y_train[keep]
 
+        if advtrain:
+            tr_txt, aug_info["train"] = _augment_split(
+                tr_txt, y_train, classes, mutation_split, aug_ratio, aug_budget, seed)
+            va_txt, aug_info["val"] = _augment_split(
+                va_txt, y_val, classes, mutation_split, aug_ratio, aug_budget, seed + 1)
+
         # 문자열 → (N,L) 바이트 시퀀스
         Xtr = data_text.encode_byte_matrix(tr_txt, max_len)
         Xva = data_text.encode_byte_matrix(va_txt, max_len)
@@ -150,7 +230,7 @@ def build_datasets(model: str, track: str, text: str, side: int, max_len: int,
         raise ValueError(f"알 수 없는 모델: {model}")
 
     class_weights = data_image.compute_class_weights(y_train, len(classes))
-    return train_ds, val_ds, test_ds, classes, class_weights, in_channels
+    return train_ds, val_ds, test_ds, classes, class_weights, in_channels, aug_info
 
 
 def build_model(model: str, num_classes: int, in_channels: int = 1,
@@ -265,7 +345,25 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--limit", type=int, default=None, help="학습 샘플 수 제한(스모크용)")
     parser.add_argument("--smoke", action="store_true", help="빠른 동작 확인 모드(작게 실행)")
+    # ── Phase 11 (RQ3) 방어 옵션 — docs/10 ────────────────────────────────
+    parser.add_argument("--defense", default="none", choices=list(DEFENSE_MODES),
+                        help="방어 방식: none=기준선, advtrain=의미보존 변형 치환 증강 학습, "
+                             "norm=입력 정규화(디코딩; --text decoded 와 함께 써야 함)")
+    parser.add_argument("--mutation-split", default="S0", choices=sorted(AUG.MUTATION_SPLITS),
+                        help="증강에 쓸 변형 계열(advtrain 전용). S0=전 계열(seen, 낙관 상한), "
+                             "SA=인코딩 계열 제외(held-out — 미지 변형 일반화 검증)")
+    parser.add_argument("--aug-ratio", type=float, default=DEFAULT_AUG_RATIO,
+                        help="공격 클래스에서 변형본으로 치환할 비율(0~1). 추가가 아니라 치환이라 "
+                             "train 크기·클래스 비율은 불변")
+    parser.add_argument("--aug-budget", type=int, default=DEFAULT_AUG_BUDGET,
+                        help="한 샘플에 겹쳐 적용할 변형 개수 상한(학습용). 평가는 k=5 까지 간다")
     args = parser.parse_args()
+
+    # 방어 옵션 정합성 검사 — 조용히 엉뚱한 실험을 돌리는 것보다 즉시 죽는 편이 낫다.
+    if args.defense == "norm" and args.text != "decoded":
+        parser.error("--defense norm 은 입력 정규화 방어이므로 --text decoded 와 함께 써야 합니다.")
+    if args.defense == "advtrain" and args.track == "ustc_flow_binary":
+        parser.error("--defense advtrain 은 페이로드 문자열 변형 기반이라 흐름 트랙에는 쓸 수 없습니다.")
 
     if args.smoke:
         # 코드가 안 깨지는지만 확인: 아주 작게, 1~2에폭.
@@ -279,12 +377,23 @@ def main() -> None:
     # rgb 채널 인코더 파싱(gray 모드에서는 무시됨)
     encoders = tuple(name.strip() for name in args.rgb_encoders.split(","))
 
-    train_ds, val_ds, test_ds, classes, class_weights, in_channels = build_datasets(
+    train_ds, val_ds, test_ds, classes, class_weights, in_channels, aug_info = build_datasets(
         args.model, args.track, args.text, args.side, args.max_len, args.limit,
         balance=args.balance, seed=args.seed, channels=args.channels, encoders=encoders,
+        defense=args.defense, mutation_split=args.mutation_split,
+        aug_ratio=args.aug_ratio, aug_budget=args.aug_budget,
     )
     if args.balance:
         print(f"  [balance] train 클래스 균형 언더샘플링 적용 → train={len(train_ds):,}")
+    if args.defense == "advtrain":
+        tr_info, va_info = aug_info["train"], aug_info["val"]
+        print(f"  [defense] advtrain split={args.mutation_split} ratio={args.aug_ratio:g} "
+              f"budget={args.aug_budget} → train 치환 {tr_info['n_replaced']:,}건 / "
+              f"val 치환 {va_info['n_replaced']:,}건")
+        print(f"    학습에 쓰는 변형({len(tr_info['techniques'])}종): {tr_info['techniques']}")
+        print(f"    평가 전용 held-out({len(tr_info['held_out'])}종): {tr_info['held_out']}")
+    elif args.defense == "norm":
+        print("  [defense] norm — 입력 정규화(디코딩)본으로 학습. 학습 데이터 자체는 변형하지 않음")
     print(f"  train={len(train_ds):,} val={len(val_ds):,} test={len(test_ds):,} "
           f"classes={classes}")
     print(f"  class_weights={np.round(class_weights, 3).tolist()}")
@@ -322,22 +431,34 @@ def main() -> None:
         "rgb_encoders": list(encoders) if (args.model in IMAGE_MODELS and args.channels == "rgb") else None,
         "patch": args.patch if args.model == "vit" else None,
     }
+    # 방어 블록 — 파일명만으로는 복원되지 않는 정보(실제 치환 건수·계열 목록·조기종료 기준)를 남긴다.
+    result["defense"] = {
+        "mode": args.defense,
+        "mutation_split": args.mutation_split if args.defense == "advtrain" else None,
+        "aug_ratio": args.aug_ratio if args.defense == "advtrain" else None,
+        "aug_budget": args.aug_budget if args.defense == "advtrain" else None,
+        "seen_techniques": aug_info["train"]["techniques"] if aug_info["train"] else None,
+        "held_out_techniques": aug_info["train"]["held_out"] if aug_info["train"] else None,
+        "n_replaced_train": aug_info["train"]["n_replaced"] if aug_info["train"] else 0,
+        "n_replaced_val": aug_info["val"]["n_replaced"] if aug_info["val"] else 0,
+        # 조기 종료 기준을 arm 별 목적함수에 맞춘 근거는 docs/10 §7.3(ViT lr 함정과 동형).
+        "early_stop_criterion": ("mixed_val_macro_f1" if args.defense == "advtrain"
+                                 else "clean_val_macro_f1"),
+    }
 
     if not args.smoke:
-        # 균형화·채널 모드를 tag 에 반영해 산출물(gray/rgb, balanced/unbalanced)이 서로 안 덮어쓰게 한다.
-        # ⚠️ rgb ablation(같은 트랙, 다른 R/G/B 조합)이 서로 덮어쓰지 않도록, npz 로드측과 동일한
-        #    채널 접미사 규칙(data_image._channel_suffix: gray="", 기본rgb="_rgb", 커스텀="_rgb-rb-ss-le")을
-        #    그대로 재사용한다(약어 맵 단일 진실 소스 유지 — build_image_dataset 와도 일치).
-        ch_tag = (data_image._channel_suffix(args.channels, encoders)
-                  if args.model in IMAGE_MODELS else "")
-        # ⚠️ vit 은 패치 기하가 바뀌면 완전히 다른 실험이다. tag 에 안 넣으면 8x8 결과를
-        #    1x48 결과가 덮어쓴다(RGB ablation 에서 실제로 겪은 사고 — 커밋 5eede2f).
-        patch_tag = f"_p{args.patch}" if args.model == "vit" else ""
-        # ⚠️ lr 도 실험을 가르는 하이퍼파라미터다(ViT 는 CNN 용 기본 lr=1e-3 에서 발산 —
-        #    docs/08 §9). 기본값일 때는 접미사를 생략해 기존 산출물과 파일명 호환을 유지한다.
-        lr_tag = "" if args.lr == DEFAULT_LR else f"_lr{args.lr:g}"
-        tag = (f"{args.track}_{args.model}_{args.text}{ch_tag}{patch_tag}{lr_tag}"
-               + ("_bal" if args.balance else ""))
+        # tag 규칙은 tagging.build_tag 단일 진실 소스를 쓴다(train/cross_validate/cascade/
+        # run_evasion 4곳에 사본이 생기는 것을 막기 위함 — docs/10 §8).
+        # 채널·패치·lr·방어·균형화가 모두 "실험을 가르는 축"이라 하나라도 빠지면 서로 덮어쓴다.
+        is_image = args.model in IMAGE_MODELS
+        tag = build_tag(
+            args.track, args.model, args.text,
+            channels=args.channels if is_image else "gray",
+            encoders=encoders if is_image else None,
+            patch=args.patch if args.model == "vit" else None,
+            lr=args.lr, balance=args.balance,
+            defense=args.defense, mutation_split=args.mutation_split, aug_ratio=args.aug_ratio,
+        )
         M.save_report(result, RESULTS_DIR / f"{tag}.json")
         # 샘플 단위 예측 저장(모델 간 '탐지 불일치' 분석용 — detection_analysis.py 가 소비)
         M.save_predictions(y_true, y_pred, classes, RESULTS_DIR / f"pred_{tag}.npz", y_score=y_score)

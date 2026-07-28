@@ -354,15 +354,18 @@ def main() -> None:
                                           "std": float(np.std(ev, ddof=1)),
                                           "per_fold": [float(v) for v in ev]}
 
-    ch_tag = ""
-    if is_image:
-        import data_image
-        ch_tag = data_image._channel_suffix(args.channels, encoders)
-    # train.py 와 동일한 태그 규칙(패치 기하가 다르면 다른 실험 → 파일이 겹치면 안 됨).
-    patch_tag = f"_p{args.patch}" if args.model == "vit" else ""
-    # lr 접미사도 train.py 와 동일 규칙(기본값이면 생략) — ViT 는 lr 이 결과를 크게 가른다.
-    lr_tag = "" if args.lr == T.DEFAULT_LR else f"_lr{args.lr:g}"
-    tag = f"{args.track}_{args.model}_{args.text}{ch_tag}{patch_tag}{lr_tag}"
+    # tag 규칙은 tagging.build_tag 단일 진실 소스를 쓴다(train.py 와 자동으로 일치).
+    # ⚠️ Phase 11 방어 arm 의 CV 는 아직 미지원이다 — cross_validate 는 npz 풀에서 fold 를
+    #    나누는데, 증강은 원문 텍스트가 필요해 풀 구성 자체가 달라진다(docs/10 §7.4, §10).
+    #    지원 전까지는 방어 arm 판정을 단일 split 효과 크기로만 한다(docs/10 §6).
+    from tagging import build_tag
+    tag = build_tag(
+        args.track, args.model, args.text,
+        channels=args.channels if is_image else "gray",
+        encoders=encoders if is_image else None,
+        patch=args.patch if args.model == "vit" else None,
+        lr=args.lr,
+    )
 
     payload = {
         "model": args.model,

@@ -15,6 +15,7 @@ for extra in (
     PROJECT_ROOT / "src" / "models",
     PROJECT_ROOT / "src" / "eval",
     PROJECT_ROOT / "src" / "attacks",
+    PROJECT_ROOT / "src" / "defense",
 ):
     path_str = str(extra)
     if path_str not in sys.path:

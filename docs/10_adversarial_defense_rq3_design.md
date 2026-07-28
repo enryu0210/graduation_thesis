@@ -126,11 +126,20 @@ C 는 구현 비용 대비 정보량이 낮아 후순위 — A 가 효과 없을
 
 | 모델 | 채널 | clean MCC | any-misclass(k=5) | 이 모델을 넣는 이유 |
 |---|---|---|---|---|
-| **제안 CNN** | RGB(`_rgb`) | 0.9725 | **0.594**(최상위 동요) | 방어 이득이 가장 클 후보 = 주 대상 |
+| **제안 CNN** | RGB(`_rgb`) | 0.9725 | **미측정**(gray 는 0.594) | 방어 이득이 가장 클 후보 = 주 대상 |
 | **char-CNN** | — | 0.9940 | **0.224**(최저) | 이미 강건한 모델도 더 좋아지나, 아니면 천장인가 |
 
 char-CNN 을 빼면 *"이미지 표현만 방어가 필요하다"* 는 해석을 배제할 수 없다. 표현방식 축을
 남기려면 둘 다 필요하다. BiLSTM·TF-IDF 는 확장(§10).
+
+> ⚠️ **초안 정정(2026-07-28, 구현 중 발견)**: 초안은 제안 CNN 행에 "RGB / any-misclass 0.594"를
+> 함께 적었으나, **0.594 는 gray CNN 의 수치**다(docs/05 §13.2). 당시 `run_evasion.py` 의 이미지
+> 경로가 `payload_to_image`(gray) 전용이라 **RGB 는 회피 측정 자체가 존재하지 않았다**
+> (docs/09 §9.5 도 "회피 경로는 gray 전용"으로 기록).
+> → 조치: `run_evasion.py` 에 `--channels rgb` 를 구현했고(§7.4), **RGB 기준선 회피 측정 1회**를
+> 실행 목록에 추가한다(학습 불필요 — 기존 `_rgb_bal` 체크포인트 재사용). H3-1 의 "10pp 감소"는
+> **그 RGB 기준선** 대비로 판정한다. gray 의 0.594 를 RGB 기준선으로 쓰면 서로 다른 모델을
+> 비교하는 것이 된다.
 
 **arm 목록(모델당)**
 
@@ -206,16 +215,28 @@ MCC 가 올라가도 **"탐지력 향상"으로 포장하지 않는다.** 이 Ph
 
 ### 7.4 파일 배치 (기존 재사용 원칙)
 
-| 파일 | 책임 |
-|---|---|
-| `src/defense/augment.py` (신규) | 계열 분할 상수(E/C/W/S) · 치환식 증강 데이터셋 생성. `mutations.py` 재사용, 순수 함수 |
-| `src/models/train.py` (확장) | `--defense {none,advtrain,norm}`, `--aug-ratio`, `--mutation-split {S0,SA}`, `--aug-budget` 추가. 학습 루프·평가·조기종료는 그대로 |
-| `src/attacks/run_evasion.py` (확장) | **`--text {raw,decoded}` 추가** — 현재 raw 고정이라 정규화 방어(B)를 평가할 수 없다. 변형 후 `preprocess.normalize_text` 를 통과시키는 경로 |
-| `src/eval/cross_validate.py` (확장) | 5pp 미만 구간 판정용으로 동일 인자 전달 |
-| `tests/test_defense.py` (신규) | 계열 분할 배타성 · 치환 후 클래스 비율 불변 · **npz↔온더플라이 이미지 동일성**(§7.1) · held-out 변형이 train/val 에 안 섞임 |
+| 파일 | 책임 | 상태 |
+|---|---|---|
+| `src/models/tagging.py` (신규) | **tag 규칙 단일 진실 소스**(채널·패치·lr·방어·균형화). 아래 "왜 새로 팠나" 참조 | ✅ |
+| `src/defense/augment.py` (신규) | 계열 분할 상수(E/C/W/S) · 치환식 증강. `mutations.py` 재사용, 순수 함수 | ✅ |
+| `src/models/train.py` (확장) | `--defense {none,advtrain,norm}`, `--mutation-split {S0,SA}`, `--aug-ratio`, `--aug-budget`. 학습 루프·평가는 그대로 | ✅ |
+| `src/attacks/run_evasion.py` (확장) | `--text {raw,decoded}`(정규화 방어) · **`--channels rgb`**(§5 정정) · 방어 체크포인트 조회 · tag 확장 | ✅ |
+| `src/eval/cross_validate.py` (확장) | tag 를 `build_tag` 로 일원화. **방어 arm CV 는 미지원**(아래 참조) | ⚠️ 부분 |
+| `tests/test_defense.py` (신규) | 계열 분할 배타성 · 치환 후 크기/비율 불변 · held-out 누수 · **npz↔온더플라이 동일성** · tag 하위호환 | ✅ 14건 |
 
 **train.py 에 얹는 이유**: 데이터로더·조기종료·`metrics.py`·CV 스크립트를 전부 재사용하려면
 별도 학습 스크립트를 만들면 안 된다(계산 방식 차이 배제 원칙, docs/04 §3).
+
+**`tagging.py` 를 새로 판 이유**: 방어 축이 들어오면 tag 규칙 사본이 **4곳**
+(train / cross_validate / cascade / run_evasion)이 된다. 이 프로젝트는 규칙 사본 불일치로
+산출물이 서로 덮어쓰는 사고를 이미 두 번 겪었다(5eede2f, docs/09 §9.7). 세 번째를 막으려고
+규칙 자체를 한 파일로 옮겼다. 기존 파일명과의 호환은 테스트로 고정했다
+(`test_tag_backward_compatible_for_existing_experiments`).
+
+**⚠️ 방어 arm 의 CV 미지원(의도된 범위 제한)**: `cross_validate.py` 는 npz 풀에서 fold 를
+나누는데, 증강은 **원문 텍스트**가 필요해 풀 구성 자체가 달라진다. §6 의 판정 기준(10pp/5pp)이
+단일 split 노이즈(±0.11pp)보다 두 자릿수 크므로 **대부분의 경우 CV 없이 판정된다.**
+5~10pp 구간에 걸리면 그때 구현한다(§10 열린 결정).
 
 ---
 
@@ -265,11 +286,23 @@ python src/models/train.py --model cnn     --track payload_4class_csicnorm --bal
 python src/models/train.py --model charcnn --track payload_4class_csicnorm --balance \
     --text decoded --defense norm
 
-# --- 회피 재평가(같은 공격·같은 파이프라인, 모델만 교체) ---
-python src/attacks/run_evasion.py --model cnn --track payload_4class_csicnorm --defense ...   # arm 별
-python src/attacks/run_evasion.py --model cnn --track payload_4class_csicnorm --text decoded  # norm arm
+# --- 회피 재평가(같은 공격·같은 파이프라인, 대상 모델만 교체) ---
+# ⚠️ 0순위: RGB 기준선 회피 측정(§5 정정) — 학습 불필요, 기존 _rgb_bal 체크포인트 재사용.
+#    H3-1 의 "10pp 감소"는 이 값 대비로 판정한다.
+python src/attacks/run_evasion.py --model cnn --track payload_4class_csicnorm --channels rgb
+# 방어 arm (학습 때와 같은 축을 그대로 넘겨야 그 체크포인트를 찾는다)
+python src/attacks/run_evasion.py --model cnn --track payload_4class_csicnorm --channels rgb \
+    --defense advtrain --mutation-split SA --aug-ratio 0.5
+python src/attacks/run_evasion.py --model charcnn --track payload_4class_csicnorm \
+    --defense advtrain --mutation-split SA --aug-ratio 0.5
+# 정규화 방어: 공격은 raw 로 하고 '탐지 직전' 에 디코딩한다(공격→정규화→탐지 순서)
+python src/attacks/run_evasion.py --model cnn --track payload_4class_csicnorm \
+    --channels rgb --text decoded --defense norm
 python src/attacks/compare_evasion.py --track payload_4class_csicnorm
 ```
+
+⚠️ 산출물 tag 는 기본값(raw/gray/none)일 때 접미사가 전부 비어 **기존 파일명과 그대로 호환**된다.
+즉 위 방어 arm 실행은 Phase 5/10 의 기존 회피 결과를 덮어쓰지 않는다.
 
 ⚠️ GPU 는 1대뿐 → **순차 실행**. 백그라운드 작업이 "killed" 로 보여도 파이썬 자식은 살아 있을 수
 있으므로 재실행 전 `Get-CimInstance Win32_Process -Filter "Name='python.exe'"` 로 확인(docs/08 §9.6).
@@ -297,7 +330,29 @@ python src/attacks/compare_evasion.py --track payload_4class_csicnorm
 
 ---
 
-## 11. 요약 — 이 문서가 확정한 것
+## 11. 구현 상태 (2026-07-28, 노트북 CPU)
+
+**구현 완료 — GPU 전면 학습만 남았다.** 테스트 80건 통과(기존 66 + 신규 14).
+
+**CPU 스모크로 실제 확인한 것**
+
+| 경로 | 확인 내용 |
+|---|---|
+| `cnn --defense advtrain --mutation-split SA` | 학습 10종/held-out 4종 분리, train·val 치환 건수 로그 |
+| `charcnn --defense advtrain --mutation-split S0` | 텍스트 모델 경로, S0 는 14종 전부·held-out 0종 |
+| `charcnn --text decoded --defense norm` | 정규화본 학습 경로 |
+| 인자 정합성 3종 | `norm`+`raw` 거부 / `advtrain`+흐름트랙 거부 / 없는 방어명 거부 |
+| `run_evasion` RGB 경로 | (B,3,48,48) 변환·softmax 정상, 방어 체크포인트 tag 조회 일치 |
+| `run_evasion` 정규화 방어 | `%27%20OR%201%3D1` 과 `' OR 1=1` 의 예측 확률이 **완전히 동일** = 디코딩이 변환 전에 적용됨. 대조군(raw)은 두 입력을 다르게 봄 |
+| npz ↔ 온더플라이 | gray·rgb기본·rgb커스텀 3조합 **바이트 단위 일치**(§7.1 생명선) |
+
+임시 체크포인트는 검증 후 삭제했다(잔여 0). 추적 대상 그림은 `--smoke` 로 전부 저장 생략.
+
+**아직 안 한 것**: GPU 전면 학습 10회 + RGB 기준선 회피 측정 1회(§9), 방어 arm CV(§7.4).
+
+---
+
+## 12. 요약 — 이 문서가 확정한 것
 
 1. **RQ3 주 지표를 any-misclass 로 재정의**하고(바닥 효과 근거는 사전 실측), benign-evasion·FPR·
    clean MCC 는 보조/비용 축으로 함께 보고한다.
