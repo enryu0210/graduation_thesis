@@ -200,8 +200,12 @@ python src/attacks/run_evasion.py --attack fgsm --model cnn --eps 0.01,0.03,0.05
   `payload_4class_csicnorm` 트랙 확보(04문서 §7.1). 단, clean 점수는 여전히 포화(표면토큰 본질)
   → 회피가 쉽게 나오는 건 데이터가 아니라 과제 특성이며, 그 자체가 RQ2 의 논지.
 - [ ] feature-space 결과를 논문 본문에 넣을지/부록으로 뺄지(invertibility 한계 때문).
-- [ ] 회피에 성공한 변형 페이로드 집합을 **Phase 6(adversarial training) 학습 소스**로
-  그대로 넘기는 인터페이스 확정(산출물 포맷 미리 맞춰두기).
+- [x] 회피에 성공한 변형 페이로드 집합을 **adversarial training 학습 소스**로 그대로 넘기는
+  인터페이스 확정 → **docs/10(Phase 11, RQ3)** 에서 확정. 변형본을 파일로 넘기지 않고
+  `mutations.py` 를 학습 시점에 재호출하는 **치환식 온더플라이 증강**으로 정했다
+  (docs/10 §7.2). 산출물 포맷을 맞출 필요 자체가 사라짐.
+- [ ] **RQ3 의 주 지표 이동** — 본 문서 §13.2 의 "benign-evasion 5모델 전부 ~0" 실측 때문에
+  원 RQ3 는 바닥 효과에 걸린다. 주 지표를 any-misclass 로 옮기는 근거·판정 기준은 docs/10 §1.
 - [ ] (운영) 브랜치 정리 — 여전히 `phase1-data-acquisition`에 전 Phase가 쌓여 있음.
 
 ---
