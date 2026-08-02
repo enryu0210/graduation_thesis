@@ -1,5 +1,5 @@
 """
-Phase 4 — 이미지 데이터셋(.npz) 로딩 유틸 (제안 CNN 입력)
+Phase 4 — 이미지 데이터셋(.npz) 로딩 유틸 (RGB CNN 입력)
 
 목적:
     Phase 3 이 만든 data/images/{track}_{split}_{text}_{side}.npz 를 읽어

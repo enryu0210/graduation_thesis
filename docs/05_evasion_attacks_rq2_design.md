@@ -18,7 +18,7 @@ RQ2: *"이미지 기반 탐지 모델은 실제 공격자가 WAF를 우회할 �
 | 결정 | 확정 | 근거 |
 |---|---|---|
 | 공격 대상 트랙 | **`payload_4class_csicnorm` / raw / side=48** | Normal 을 CSIC 실트래픽으로 교체한 트랙(04문서 §7.1). benign-evasion(공격→Normal) 정의가 현실성을 가지려면 Normal 이 실제 HTTP 트래픽이어야 함. RQ1 도 이 트랙에서 재학습해 공격 대상 모델로 사용 |
-| 공격 대상 모델 | **5종 전부**(제안 CNN + TF-IDF·charCNN·BiLSTM·RF) | 이미지 CNN만 공격하면 "이미지가 약한지 텍스트가 약한지" 비교 불가. RQ2의 진짜 질문은 **표현방식별 상대적 취약성** |
+| 공격 대상 모델 | **5종 전부**(RGB CNN + TF-IDF·charCNN·BiLSTM·RF) | 이미지 CNN만 공격하면 "이미지가 약한지 텍스트가 약한지" 비교 불가. RQ2의 진짜 질문은 **표현방식별 상대적 취약성** |
 | 공격 대상 샘플 | **test 셋의 공격 3종만**(SQLi 8,592 / XSS 6,113 / CmdI 7,202) | Normal은 회피 대상이 아님(정상→정상은 공격이 아님) |
 | 전처리 경로 | **raw(디코딩 미적용) 고정** | RQ1 주 실험이 raw. 아래 3절 참조 — 인코딩 공격의 성패가 여기서 갈림 |
 
@@ -34,7 +34,7 @@ RQ2: *"이미지 기반 탐지 모델은 실제 공격자가 WAF를 우회할 �
   → **똑같은 변형 페이로드 집합**을 5개 모델 각각에 통과시켜 ASR을 비교한다.
   이게 공정 비교의 핵심: 모델마다 다른 공격을 쓰면 취약성 비교가 왜곡된다.
 - **Feature-space 공격 = 화이트박스**
-  FGSM/PGD는 모델의 gradient가 필요하므로 **제안 CNN(미분 가능)에만** 깨끗하게 적용된다.
+  FGSM/PGD는 모델의 gradient가 필요하므로 **RGB CNN(미분 가능)에만** 깨끗하게 적용된다.
   TF-IDF/트리 계열은 gradient가 없어 대상에서 제외(한계로 서술).
 
 ### 2.2 "회피 성공"의 정의 (다중 클래스라 반드시 정의해야 함) ⚠️
@@ -111,7 +111,7 @@ Phase 5는 **raw 트랙(공격에 유리한 최악 조건)**을 주 실험으로
 
 ---
 
-## 5. Feature-space 공격 (보조/비교) — 제안 CNN 한정
+## 5. Feature-space 공격 (보조/비교) — RGB CNN 한정
 
 - **FGSM / PGD**로 48×48 이미지 픽셀을 직접 교란(ε 스윕). ART 라이브러리 사용.
 - **결정적 한계(반드시 서술)**: 이렇게 만든 "적대적 이미지"는 임의의 실수 픽셀값을 가지므로
@@ -142,7 +142,7 @@ Phase 5는 **raw 트랙(공격에 유리한 최악 조건)**을 주 실험으로
 |---|---|
 | `mutations.py` | 클래스별 **의미보존 변형 규칙**(4장). 순수 문자열 함수, 부작용 없음 |
 | `problem_space.py` | 변형 적용(단일/조합) + GA 탐색 오케스트레이션 |
-| `feature_space.py` | FGSM/PGD (제안 CNN 대상, ART 래핑) |
+| `feature_space.py` | FGSM/PGD (RGB CNN 대상, ART 래핑) |
 | `run_evasion.py` | 대상 모델 로드 → 공격 → ASR/지표 리포트 저장(CLI) |
 
 ### 6.2 산출물 규약 (Phase 4 명명 관습 계승)
@@ -183,7 +183,7 @@ python src/attacks/run_evasion.py --attack stacked --budget 5
 # 3) GA 상한 (표집 500/클래스, 대상 모델 지정)
 python src/attacks/run_evasion.py --attack ga --model cnn --samples 500
 
-# 4) feature-space (제안 CNN 한정, ε 스윕)
+# 4) feature-space (RGB CNN 한정, ε 스윕)
 python src/attacks/run_evasion.py --attack fgsm --model cnn --eps 0.01,0.03,0.05
 
 # 스모크(코드 점검용): --smoke --limit 200
@@ -215,7 +215,7 @@ python src/attacks/run_evasion.py --attack fgsm --model cnn --eps 0.01,0.03,0.05
 1. 공격 대상 = **payload_4class/raw/side=48**, **5개 모델 전부**, **공격 3종 test 샘플**.
 2. "회피 성공"은 **Benign-evasion(→Normal 예측)**을 주 지표로, any-misclass를 보조로.
 3. **Problem-space(의미보존 규칙)**를 주 실험(블랙박스·모델 무관), **feature-space(FGSM/PGD)**는
-   제안 CNN 한정 보조 — invertibility 한계 명시.
+   RGB CNN 한정 보조 — invertibility 한계 명시.
 4. 공격은 **Phase 3/4 실제 파이프라인을 그대로 통과**시키고, 지표 모듈을 재사용한다.
 5. 핵심 가설: **표면 토큰 의존 모델이 더 취약** → RQ1 clean 순위가 뒤집히는지 검증.
 
@@ -328,7 +328,7 @@ python src/attacks/compare_evasion.py --track payload_4class_csicnorm
 
 | 모델 | 입력 | clean macro-F1(참고) | benign-evasion (k=0→k=5) | any-misclass (k=5) |
 |---|---|---|---|---|
-| 제안 CNN | 48×48 이미지 | 0.967 | 0.0010 → 0.0022 | **0.594** |
+| gray CNN | 48×48 이미지 | 0.967 | 0.0010 → 0.0022 | **0.594** |
 | char-CNN | 바이트 시퀀스 | 0.995 | 0.0004 → 0.0001 | **0.224** |
 | BiLSTM | 바이트 시퀀스 | 0.984 | 0.0008 → 0.0006 | 0.466 |
 | TF-IDF+LogReg | 문자열 | 0.993 | 0.0000 → 0.0000 | 0.576 |
@@ -343,13 +343,13 @@ python src/attacks/compare_evasion.py --track payload_4class_csicnorm
 
 표면 변형이 탐지기를 흔드는 정도(k=5)는 표현방식마다 크게 다르다:
 
-**제안 CNN(0.594) ≳ TF-IDF LogReg(0.576) > BiLSTM(0.466) > TF-IDF RF(0.332) > char-CNN(0.224)**
+**gray CNN(0.594) ≳ TF-IDF LogReg(0.576) > BiLSTM(0.466) > TF-IDF RF(0.332) > char-CNN(0.224)**
 
 - **가설 H1(§7)은 이 데이터에서 성립하지 않는다(오히려 반대).** H1 은 *"표면 토큰 의존
   모델(TF-IDF/charCNN)이 더 취약 → 이미지 CNN 이 상대적으로 강건할 수 있다"* 였다. 실측은
   **제안 이미지 CNN 이 any-misclass 로는 가장 크게 흔들린다**(0.594, LogReg 보다도 높음). 즉
   "이미지 표현이 회피에 더 강하다"는 **이 데이터에서 지지되지 않는다.**
-- 단, **이 '동요'는 보안적 실패가 아니다**: 제안 CNN 도 benign-evasion 은 ~0 이라, 변형된 공격이
+- 단, **이 '동요'는 보안적 실패가 아니다**: RGB CNN 도 benign-evasion 은 ~0 이라, 변형된 공격이
   Normal 이 아니라 **다른 공격 클래스로** 흩어질 뿐 탐지 자체는 유지된다(대부분 XSS 로 붕괴).
 - **char-CNN 이 clean 최고이면서 회피 최저 동요**(0.995 / 0.224)로 이 회피군에는 가장 견고.
   학습형 바이트 임베딩이 TF-IDF 의 생(raw) char n-gram 표면 매칭보다 인코딩 교란에 덜 민감했다.
@@ -362,7 +362,7 @@ python src/attacks/compare_evasion.py --track payload_4class_csicnorm
   모델 강건성보다 **과제/데이터 특성**(Normal=실트래픽이 전 표현공간에서 잘 분리됨)을 더 반영한다.
 - **표면 변형만으로는 이 트랙에서 WAF 우회가 안 된다**가 강건한 실측 사실. 따라서 "정말 뚫리는가"는
   **Normal 을 모방하도록 방향을 잡는 더 강한 공격**이 필요 → 다음 단계: (a) GA 탐색(§4.5-③,
-  benign 방향 목적함수), (b) feature-space FGSM/PGD(§5, 제안 CNN 한정, invertibility 한계 명시).
+  benign 방향 목적함수), (b) feature-space FGSM/PGD(§5, RGB CNN 한정, invertibility 한계 명시).
 - 논문 서술 축: "표면 변형에 대한 benign-evasion 강건성은 표현방식 무관하게 확보되나,
   any-misclass 동요는 표현방식별로 최대 2.6배 차이(0.224~0.594) — 제안 이미지 CNN 이 오히려 최상위."
 

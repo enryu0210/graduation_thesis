@@ -1,17 +1,17 @@
 """
-Phase 9 — 하이브리드 캐스케이드 탐지기 (제안 CNN 1차 필터 + char-CNN 2차 판정)
+Phase 9 — 하이브리드 캐스케이드 탐지기 (RGB CNN 1차 필터 + char-CNN 2차 판정)
 
 왜 '융합'이 아니라 '캐스케이드'인가 — 설계의 핵심 근거:
     RQ1 실측(docs/04 §5)은 두 사실을 동시에 보여줬다.
-      · 제안 CNN : clean Macro-F1 최하위(payload_4class 0.9496 / csicnorm 0.967)지만
+      · RGB CNN : clean Macro-F1 최하위(payload_4class 0.9496 / csicnorm 0.967)지만
                    학습 4.0s/epoch 로 char-CNN(29.6s) 대비 7배 이상 저렴하다.
       · char-CNN : 최고 정확도(0.995)지만 길이 2304 시퀀스를 3개 커널로 훑어 비용이 크다.
     이 둘을 흔한 방식대로 **특징 융합(two-branch: 이미지 CNN + char-CNN → concat → FC)** 하면
     모든 입력이 두 브랜치를 **다 통과**하므로 비용이 C_cnn + C_charcnn 이 된다.
-    → 정확도는 오르지만 "제안 CNN 의 속도 장점"은 사라진다(오히려 char-CNN 단독보다 느림).
+    → 정확도는 오르지만 "RGB CNN 의 속도 장점"은 사라진다(오히려 char-CNN 단독보다 느림).
 
     그래서 여기서는 **선택적 실행(cascade)** 을 택한다:
-        1차: 모든 트래픽을 값싼 제안 CNN 이 판정한다.
+        1차: 모든 트래픽을 값싼 RGB CNN 이 판정한다.
         2차: 1차 확신도(max softmax)가 임계값 τ 미만인 **소수 샘플만** char-CNN 이 재판정한다.
     평균 비용 = C_cnn + (에스컬레이션 비율 r) × C_charcnn 이므로, r 이 작으면
     "정확도는 char-CNN 급, 지연은 CNN 급"이 성립한다. τ 를 움직이면 정확도-지연 곡선(Pareto)이
@@ -60,13 +60,16 @@ import metrics as M  # noqa: E402
 import data_image  # noqa: E402
 import data_text  # noqa: E402
 from train import DEFAULT_LR  # noqa: E402  (체크포인트 tag 의 lr 규칙을 train.py 와 공유)
+from tagging import (  # noqa: E402  (tag 규칙 단일 진실 소스 — 사본을 만들지 않는다)
+    DEFAULT_AUG_RATIO, DEFENSE_MODES, build_tag, defense_suffix,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 FIG_DIR = PROJECT_ROOT / "docs" / "figures" / "models"
 CKPT_DIR = PROJECT_ROOT / "experiments" / "checkpoints"
 
-# 2차(정밀) 판정기 후보. 1차는 제안 CNN 으로 고정한다(제안 모델이 주인공이어야 하므로).
+# 2차(정밀) 판정기 후보. 1차는 RGB CNN 으로 고정한다(캐스케이드가 제안 모델이고, 그 1차 부품).
 STAGE2_MODELS = ("charcnn", "bilstm")
 
 # BiLSTM 은 긴 시퀀스(2304)를 순환 처리해 활성값 메모리가 배치×길이로 폭증한다.
@@ -79,23 +82,30 @@ _DEFAULT_BATCH = 512
 # 체크포인트 로드 / 확률 추론
 # ---------------------------------------------------------------------------
 def checkpoint_tag(track: str, model: str, text: str, balance: bool,
-                   channels: str = "gray", encoders=None, lr: float = DEFAULT_LR) -> str:
-    """train.py 의 저장 태그 규칙을 재현한다(파일명 불일치 방지).
+                   channels: str = "gray", encoders=None, lr: float = DEFAULT_LR,
+                   defense: str = "none", mutation_split: str | None = None,
+                   aug_ratio: float | None = None) -> str:
+    """train.py 의 저장 태그 규칙을 그대로 따른다(파일명 불일치 방지).
 
-    train.py 규칙: {track}_{model}_{text}{채널}{패치}{lr}[_bal]
-    - 채널 접미사는 `data_image._channel_suffix` 를 **그대로 재사용**한다. 직접 '_rgb' 를
-      만들면 RGB ablation 조합(`_rgb-rb-cc-bd` 등)을 못 찾는다(단일 진실 소스 유지).
-    - lr 은 기본값이면 생략(train.py 와 동일) — ViT 용 비기본 lr 체크포인트도 가리킬 수 있게 둔다.
-    - 패치 접미사는 vit 전용이라 여기서는 해당 없음(1차는 cnn, 2차는 텍스트 모델).
+    ⚠️ 규칙을 여기서 다시 구현하지 않고 `tagging.build_tag` 에 위임한다. 예전에는 이 함수가
+    규칙 사본을 들고 있었는데, 방어 축이 추가되면서 사본이 어긋나면 **서로 다른 실험이 같은
+    파일을 덮어쓰는** 실패 모드가 재발한다(커밋 5eede2f, docs/09 §9.7). tagging.py 가 단일
+    진실 소스다.
+
+    채널 접미사는 1차(cnn)에만 붙는다 — 2차는 텍스트 모델이라 채널 축이 없다.
     """
-    ch_tag = data_image._channel_suffix(channels, encoders) if model == "cnn" else ""
-    lr_tag = "" if lr == DEFAULT_LR else f"_lr{lr:g}"
-    return f"{track}_{model}_{text}{ch_tag}{lr_tag}" + ("_bal" if balance else "")
+    return build_tag(track, model, text,
+                     channels=channels if model == "cnn" else "gray",
+                     encoders=encoders if model == "cnn" else None,
+                     lr=lr, balance=balance, defense=defense,
+                     mutation_split=mutation_split, aug_ratio=aug_ratio)
 
 
 def load_net(model: str, num_classes: int, track: str, text: str, balance: bool,
              device, channels: str = "gray", in_channels: int = 1,
-             encoders=None, lr: float = DEFAULT_LR):
+             encoders=None, lr: float = DEFAULT_LR,
+             defense: str = "none", mutation_split: str | None = None,
+             aug_ratio: float | None = None):
     """학습된 체크포인트를 로드해 eval 모드 모델을 반환한다.
 
     체크포인트가 없으면 '어떤 명령으로 만들면 되는지'까지 알려주는 에러를 낸다
@@ -108,15 +118,20 @@ def load_net(model: str, num_classes: int, track: str, text: str, balance: bool,
         import text_models
         net = text_models.build_model(model, num_classes)
 
-    path = CKPT_DIR / f"{checkpoint_tag(track, model, text, balance, channels, encoders, lr)}.pt"
+    path = CKPT_DIR / f"{checkpoint_tag(track, model, text, balance, channels, encoders, lr, defense, mutation_split, aug_ratio)}.pt"
     if not path.exists():
         rgb_hint = ""
         if model == "cnn" and channels == "rgb":
             rgb_hint = f" --channels rgb --rgb-encoders {','.join(encoders or ())}"
+        def_hint = ""
+        if defense != "none":
+            def_hint = f" --defense {defense}"
+            if defense == "advtrain":
+                def_hint += f" --mutation-split {mutation_split} --aug-ratio {aug_ratio:g}"
         raise FileNotFoundError(
             f"체크포인트가 없습니다: {path}\n"
             f"  → 먼저 학습하세요: python src/models/train.py --model {model} "
-            f"--track {track}{' --balance' if balance else ''}{rgb_hint}"
+            f"--track {track}{' --balance' if balance else ''}{rgb_hint}{def_hint}"
             f"{'' if lr == DEFAULT_LR else f' --lr {lr:g}'}"
         )
     net.load_state_dict(torch.load(path, map_location=device))
@@ -172,7 +187,7 @@ def cascade_apply(p1: np.ndarray, p2: np.ndarray, tau: float):
     """1차 확률 p1, 2차 확률 p2 를 임계값 τ 로 합친다.
 
     규칙: 1차 확신도(max softmax) < τ 인 샘플만 2차 결과로 대체한다.
-    τ=0 → 아무도 넘기지 않음(제안 CNN 단독), τ>1 → 전부 넘김(char-CNN 단독).
+    τ=0 → 아무도 넘기지 않음(RGB CNN 단독), τ>1 → 전부 넘김(char-CNN 단독).
 
     반환: (예측, 결합 확률, 에스컬레이션 마스크)
     ※ 여기서는 평가를 위해 p2 를 전 샘플에 대해 미리 계산해 두지만, 실제 배포에서는
@@ -362,12 +377,12 @@ def main() -> None:
         pass
 
     p = argparse.ArgumentParser(
-        description="하이브리드 캐스케이드(제안 CNN 1차 + char-CNN 2차) 평가")
+        description="하이브리드 캐스케이드(RGB CNN 1차 + char-CNN 2차) 평가")
     p.add_argument("--track", default="payload_4class_csicnorm",
                    choices=["payload_4class", "payload_4class_csicnorm", "csic_binary",
                             "ustc_flow_binary"])
     p.add_argument("--stage2", default="charcnn", choices=STAGE2_MODELS,
-                   help="2차 정밀 판정기(1차는 제안 CNN 고정)")
+                   help="2차 정밀 판정기(1차는 RGB CNN 고정)")
     p.add_argument("--text", default="raw", choices=["raw", "decoded"])
     p.add_argument("--balance", action="store_true",
                    help="'_bal' 체크포인트(균형 학습본)를 로드. csicnorm 트랙 기본 권장")
@@ -387,7 +402,27 @@ def main() -> None:
     p.add_argument("--n-taus", type=int, default=41, help="τ 격자 개수(분위수 기반)")
     p.add_argument("--limit", type=int, default=None, help="샘플 수 제한(스모크용)")
     p.add_argument("--smoke", action="store_true", help="빠른 동작 확인(작게, 저장 생략)")
+    # 방어 축(Phase 11). 캐스케이드가 제안 모델이 되면서, 방어 학습본으로 구성한 캐스케이드도
+    # 평가 대상이 됐다(docs/10 §0.1). 1차·2차 **양쪽 모두** 같은 방어 축의 체크포인트를 쓴다 —
+    # 시스템 전체를 방어한 구성이어야 "제안 시스템의 강건성"을 말할 수 있기 때문이다.
+    p.add_argument("--defense", default="none", choices=list(DEFENSE_MODES),
+                   help="1·2차 체크포인트를 어떤 방어 학습본으로 쓸지. τ 는 그 구성의 val 에서 다시 고른다")
+    p.add_argument("--mutation-split", default=None, choices=["S0", "SA"],
+                   help="advtrain 체크포인트의 변형 분할(학습 때 쓴 값과 일치해야 함)")
+    p.add_argument("--aug-ratio", type=float, default=None,
+                   help=f"advtrain 체크포인트의 증강 비율(기본 {DEFAULT_AUG_RATIO})")
     args = p.parse_args()
+
+    # 방어 축 정합성 — 어긋난 채로 돌면 엉뚱한 체크포인트를 조용히 집어 결과가 오염된다.
+    if args.defense == "advtrain":
+        if args.mutation_split is None:
+            p.error("--defense advtrain 은 --mutation-split {S0,SA} 가 필요합니다(실험을 가르는 축)")
+        if args.aug_ratio is None:
+            args.aug_ratio = DEFAULT_AUG_RATIO
+    elif args.mutation_split is not None or args.aug_ratio is not None:
+        p.error("--mutation-split/--aug-ratio 는 --defense advtrain 일 때만 의미가 있습니다")
+    if args.defense == "norm" and args.text != "decoded":
+        p.error("--defense norm 은 --text decoded 와 함께 써야 합니다(정규화본으로 학습된 체크포인트)")
 
     if args.smoke:
         args.limit = args.limit or 500
@@ -409,8 +444,11 @@ def main() -> None:
 
     # 2) 두 모델 로드
     net1 = load_net("cnn", len(classes), args.track, args.text, args.balance,
-                    device, args.channels, in_channels, encoders, args.lr)
-    net2 = load_net(args.stage2, len(classes), args.track, args.text, args.balance, device)
+                    device, args.channels, in_channels, encoders, args.lr,
+                    args.defense, args.mutation_split, args.aug_ratio)
+    net2 = load_net(args.stage2, len(classes), args.track, args.text, args.balance, device,
+                    defense=args.defense, mutation_split=args.mutation_split,
+                    aug_ratio=args.aug_ratio)
     b1 = _DEFAULT_BATCH
     b2 = _BATCH_BY_MODEL.get(args.stage2, _DEFAULT_BATCH)
 
@@ -475,6 +513,11 @@ def main() -> None:
         "side": args.side, "channels": args.channels, "max_len": args.max_len,
         "balance": args.balance, "device": str(device), "limit": args.limit,
         "select": args.select, "budget": args.budget, "n_taus": int(len(taus)),
+        # 방어 구성을 기록해 둔다. run_evasion 이 이 파일에서 τ 를 읽을 때, 어떤 구성의
+        # 운영점인지 확인할 수 있어야 한다(엉뚱한 τ 를 재사용하는 사고 방지).
+        "defense": {"mode": args.defense,
+                    "mutation_split": args.mutation_split if args.defense == "advtrain" else None,
+                    "aug_ratio": args.aug_ratio if args.defense == "advtrain" else None},
     }
 
     # 8) 콘솔 요약
@@ -499,13 +542,15 @@ def main() -> None:
     # 9) 저장 — train.py 명명 관습 계승(모델명 자리에 'cascade')
     # ⚠️ 실험을 가르는 설정을 tag 에 전부 반영한다. 안 그러면 서로 덮어쓴다
     #    (커밋 5eede2f 사고: RGB 조합이 전부 '_rgb' 로 저장돼 상호 덮어쓰기).
-    #    캐스케이드에서 실험을 가르는 축: 2차 모델 · 1차 채널 · lr · τ 선택 규칙 · 균형화.
+    #    캐스케이드에서 실험을 가르는 축: 2차 모델 · 1차 채널 · lr · τ 선택 규칙 · 균형화 · 방어.
+    #    방어 축이 빠지면 방어 캐스케이드가 기존(방어 없음) 결과를 덮어쓴다 — docs/10 §0.1.
     bal = "_bal" if args.balance else ""
     s2 = "" if args.stage2 == "charcnn" else f"-{args.stage2}"  # 기본 조합은 접미사 없이
     ch_tag = data_image._channel_suffix(args.channels, encoders)
     lr_tag = "" if args.lr == DEFAULT_LR else f"_lr{args.lr:g}"
     sel_tag = "" if args.select == "match-teacher" else f"_b{args.budget:g}"
-    tag = f"{args.track}_cascade{s2}_{args.text}{ch_tag}{lr_tag}{sel_tag}{bal}"
+    def_tag = defense_suffix(args.defense, args.mutation_split, args.aug_ratio)
+    tag = f"{args.track}_cascade{s2}_{args.text}{ch_tag}{lr_tag}{sel_tag}{def_tag}{bal}"
     M.save_report(result, RESULTS_DIR / f"{tag}.json")
     M.save_predictions(y_te, pred_te, classes, RESULTS_DIR / f"pred_{tag}.npz", y_score=prob_te)
     M.save_confusion_matrix(y_te, pred_te, classes, FIG_DIR / f"cm_{tag}.png",

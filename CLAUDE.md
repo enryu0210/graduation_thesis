@@ -55,11 +55,19 @@
 - 클래스 불균형 트랙 학습: `train.py --balance`(train 만 언더샘플링, val/test 실분포 유지).
 - 모든 모델 평가는 `src/eval/metrics.py` 로 일원화(계산 방식 차이 배제). 지표: Acc·Macro-F1·MCC·PR-AUC·ROC-AUC + attack_focused(benign-evasion/FPR). 불균형 보안 데이터 헤드라인은 MCC·PR-AUC·benign-evasion(문헌 근거 docs/07).
 
-## 캐스케이드 (Phase 10, docs/09)
+## 모델 용어 (2026-08-02 변경 — 혼동 사고 후 확정)
+- **제안 모델 = 캐스케이드**(1차 RGB CNN + 2차 char-CNN). 논문이 주장하는 대상은 이것.
+- ⚠️ 단일 CNN 은 제안 지위를 내려놓고 **지표 비교 기준**이 됐다. `제안 CNN` 이라는 이름은 **쓰지 말 것** — 그 말이 (ㄱ)제안 모델과 (ㄴ)캐스케이드 1차 부품 두 뜻으로 읽혀 실제로 혼동이 났다(docs/10 §0.1).
+  - `RGB CNN` = 48×48×3 단일 CNN(기본 비교 기준) · `gray CNN` = 1채널 판본 · `얕은 CNN` = 채널 무관 아키텍처 지칭.
+  - ⚠️ 과거 문서의 회피 수치 0.594/0.5944/0.0022 는 **gray 실측**이다. RGB 기준선은 **0.5981**(2026-08-02 측정).
+
+## 캐스케이드 (Phase 10, docs/09 · Phase 11 확장 docs/10 §5.1)
 - ⚠️ **`hybrid`(모델, docs/08 ViT 계열 = CNN stem+Transformer)와 `cascade`(배치 구조)는 다른 것** — 이름 섞지 말 것.
-- `src/models/cascade.py`: 1차=제안 CNN(전량) → 확신도<τ 인 소수만 2차=char-CNN. **학습 없음**(기존 `_bal` 체크포인트 재사용). τ→0 은 CNN 단독, τ→1 은 char-CNN 단독으로 정확히 수렴.
+- `src/models/cascade.py`: 1차=RGB CNN(전량) → 확신도<τ 인 소수만 2차=char-CNN. **학습 없음**(기존 `_bal` 체크포인트 재사용). τ→0 은 CNN 단독, τ→1 은 char-CNN 단독으로 정확히 수렴.
 - τ 는 **val 에서 확정 후 test 에 1회 적용**(test 로 고르면 누수). `--select match-teacher|budget`.
-- 회피 실험 편입: `run_evasion.py --model cascade` — τ 는 산출 JSON 에서 읽음(공격 데이터로 재튜닝 금지). 회피 경로는 gray 이미지 전용(`payload_to_image`).
-- 체크포인트/산출물 tag 는 train.py 규칙 재사용(`data_image._channel_suffix` + lr) + 캐스케이드 고유 축(2차 모델·τ 선택 규칙) 추가.
+- 회피 실험 편입: `run_evasion.py --model cascade` — τ 는 산출 JSON 에서 읽음(공격 데이터로 재튜닝 금지).
+- 방어 구성(Phase 11): `cascade.py --defense advtrain --mutation-split {S0,SA} --aug-ratio ρ` → **1·2차 양쪽** 방어본을 조립하고 τ 를 그 구성의 val 에서 **재선택**한다(확신도 분포가 달라 기존 τ 재사용 불가).
+- 체크포인트/산출물 tag 는 `tagging.build_tag` 단일 진실 소스 + 캐스케이드 고유 축(2차 모델·τ 선택 규칙·방어) 추가. ⚠️ cascade.py 가 규칙 사본을 들고 있었으나 tagging.py 로 통합됨(2026-08-02).
+- ⚠️ **"막아둔 조합"이 tag 버그를 가린다**: `run_evasion` 이 캐스케이드+채널을 `p.error` 로 막고 있던 동안, 저장 tag 의 채널 축이 `model=="cnn"` 조건에 묶여 있는 걸 아무도 못 봤다. 차단을 푼 즉시 RGB 결과가 gray 결과를 덮어씀(2026-08-02, docs/10 §5.1). → **축은 그 조합을 쓸 수 있게 되기 전에 tag 에 넣어둘 것.** 차단을 풀 때는 저장 경로의 tag 부터 점검.
 - ⚠️ 캐스케이드가 줄이는 건 **추론 지연**뿐. 두 모델을 다 학습하므로 **학습 비용은 합산** — 근거는 처리량(docs/04 §5: 81,964 vs 6,010 /s)이지 학습 지표(s/epoch)가 아님.
 - ⚠️ 캐스케이드 고유 리스크: 회피 변형이 1차 확신도를 낮추면 에스컬레이션↑ → **정확도 그대로인데 지연만 폭증**(비용 기반 공격). `run_evasion` 이 조건별 `escalation_rate` 를 함께 기록.

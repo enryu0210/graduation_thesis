@@ -1,19 +1,19 @@
-# Phase 9 — Vision Transformer 도입 구상 (제안 CNN 대체/비교 arm)
+# Phase 9 — Vision Transformer 도입 구상 (RGB CNN 대체/비교 arm)
 
 > 이 문서는 사람이 읽는 **설계·의사결정 기록**이다. 모델 구현은 **완료**(`src/models/vit.py`),
 > 학습 실측은 **미실시**. 실측 수치는 `experiments/results/*_vit_*.json` / `*_hybrid_*.json`,
 > 그림은 `docs/figures/models/` 에 남긴다.
-> 착수 배경: 2026-07-18 "비전 트랜스포머를 제안 CNN 처럼 사용하도록 구상" 요청.
+> 착수 배경: 2026-07-18 "비전 트랜스포머를 RGB CNN 처럼 사용하도록 구상" 요청.
 
 ---
 
-## 0. 전제 — 입력은 제안 CNN 과 **완전히 동일**하다 ⭐
+## 0. 전제 — 입력은 RGB CNN 과 **완전히 동일**하다 ⭐
 
 이 arm 의 목적은 **"이미지화 파이프라인은 그대로 두고 분류기만 CNN ↔ ViT 로 교체"** 하는 것이다.
 
 | | 입력 파일 | 채널 |
 |---|---|---|
-| 제안 CNN (기존) | `data/images/payload_4class_*_48*.npz` | gray 1ch / RGB 3ch |
+| 얕은 CNN (기존) | `data/images/payload_4class_*_48*.npz` | gray 1ch / RGB 3ch |
 | **ViT (본 문서)** | **동일** | **동일** |
 | **하이브리드 (본 문서)** | **동일** | **동일** |
 
@@ -102,7 +102,7 @@ ViT 도입은 (b) 의 정공법이면서, 아래 §3 의 패치 기하 실험을
   CNN 을 이기기는 어렵지만, 하이브리드는 이길 가능성이 있다.
 - C 는 **우리 논문의 유일한 확실한 우위(처리량)** 를 스스로 무너뜨린다 → 하지 않는다.
 
-> 참고: 제안 CNN 은 **93,988** 파라미터다. hybrid 는 6배, vit 은 29배 크다.
+> 참고: 얕은 CNN 은 **93,988** 파라미터다. hybrid 는 6배, vit 은 29배 크다.
 > **성능이 비슷하다면 CNN 이 우수하다**는 해석을 논문에서 빠뜨리지 말 것.
 
 ---
@@ -128,7 +128,7 @@ ViT 도입은 (b) 의 정공법이면서, 아래 §3 의 패치 기하 실험을
 
 1. **데이터 규모 부족**: ViT 는 귀납편향이 약해 통상 수백만 장 이상을 요구한다. 우리 풀은 20만 장이고
    클래스가 4개뿐이라, 단일 ViT(A)가 CNN 에 **질 가능성이 높다**. → B(하이브리드)를 병행하는 이유.
-2. **처리량 붕괴 = 현재 유일한 우위 상실**: docs/04 §5 에서 제안 CNN 의 실질 기여는
+2. **처리량 붕괴 = 현재 유일한 우위 상실**: docs/04 §5 에서 RGB CNN 의 실질 기여는
    "char-CNN 대비 13.6배 빠른 추론(81,964 samples/s)" 이다. ViT-tiny 급은 이보다 **5~10배 느릴 것으로
    예상**(실측 필요). 정확도도 못 이기고 속도도 잃으면 이 arm 은 논문에서 **음성 결과**로만 남는다.
    → 그래서 §3 의 "패치 기하 지식 기여"를 주 목적으로 삼는 것이다(정확도와 무관하게 남는 결과).
@@ -145,7 +145,7 @@ ViT 도입은 (b) 의 정공법이면서, 아래 §3 의 패치 기하 실험을
 ## 7. 실행 계획 (구현 시)
 
 ```bash
-# 1순위) CNN ↔ ViT 교체 비교 — gray / RGB 각각, 입력은 제안 CNN 과 동일
+# 1순위) CNN ↔ ViT 교체 비교 — gray / RGB 각각, 입력은 얕은 CNN 과 동일
 python src/models/train.py --model vit    --channels gray
 python src/models/train.py --model vit    --channels rgb --rgb-encoders raw_byte,char_class,byte_delta
 python src/models/train.py --model hybrid --channels gray
@@ -249,7 +249,7 @@ CV 결과의 상위 조합 2종(`_rgb` 0.9762 / `_rgb-rb-cc-bd` 0.9761)이 std �
 - **철회된 주장**: 한때 "수렴 속도(best epoch)가 연속성 서열과 일치한다"고 봤으나,
   lr=3e-4 에서는 12<23<30 이지만 lr=1e-4 에서는 16<20<25 로 8x8·48x1 이 뒤바뀐다. **재현되지 않아 폐기.**
 
-### 9.4 hybrid vs 제안 CNN — 5-fold CV paired t-test ⭐
+### 9.4 hybrid vs RGB CNN — 5-fold CV paired t-test ⭐
 
 | 설정 | MCC 평균 | std | fold 별 |
 |---|---|---|---|
@@ -259,7 +259,7 @@ CV 결과의 상위 조합 2종(`_rgb` 0.9762 / `_rgb-rb-cc-bd` 0.9761)이 std �
 **paired t-test: 평균차 +0.12pp, p(raw)=0.6234, p(adj)=1.0000 → 유의차 없음.**
 
 → 단일 split 의 `hybrid 0.9802 > cnn 0.9775 (+0.27pp)` 는 **노이즈였다.**
-→ **결론: 제안 CNN 유지.** 동률을 내는 데 파라미터 6.1배·처리량 1/3.5 를 지불할 이유가 없다(§4).
+→ **결론: RGB CNN 유지.** 동률을 내는 데 파라미터 6.1배·처리량 1/3.5 를 지불할 이유가 없다(§4).
    교수 요구 (b) 관점에서 **"시도했으나 채택하지 않음"이 정직한 보고**다.
 
 곁가지: hybrid 의 fold 간 변동폭이 CNN 보다 작다(std 0.0012 vs 0.0051). 성능은 같아도 안정적이나,

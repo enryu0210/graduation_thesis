@@ -1,7 +1,7 @@
 """
-Phase 4 — 제안 모델: 얕은 CNN (페이로드 이미지 분류)
+Phase 4 — 얕은 CNN (캐스케이드 1차 = RGB CNN, 단독으로는 지표 비교 기준) (페이로드 이미지 분류)
 
-설계 문서 5장 "제안 모델" 구현:
+설계 문서 5장 1차 모델 구현:
     Conv(32) → Conv(64) → Conv(128), 각 블록에 BatchNorm + ReLU + MaxPool,
     마지막에 Global Average Pooling(GAP) → FC → Softmax(K-class).
 
@@ -12,7 +12,7 @@ Phase 4 — 제안 모델: 얕은 CNN (페이로드 이미지 분류)
       코드 수정 없이 대응(ablation 용이).
     - BatchNorm: 바이트값 분포가 클래스마다 달라 학습 안정화에 유리.
 
-torch 는 이 파일에서만 import 한다(제안 CNN 전용 모듈).
+torch 는 이 파일에서만 import 한다(RGB CNN 전용 모듈).
 """
 
 from __future__ import annotations

@@ -8,7 +8,7 @@ Phase 4 — 베이스라인 ②③: char-level CNN, BiLSTM (RQ1 텍스트 딥러
 
 비교의 공정성:
     입력은 data_text.encode_byte_matrix 가 만든 (N, max_len) 바이트 인덱스 시퀀스로,
-    제안 CNN 의 이미지 트랙과 "같은 바이트/같은 truncation·padding 규칙"을 공유한다.
+    RGB CNN 의 이미지 트랙과 "같은 바이트/같은 truncation·padding 규칙"을 공유한다.
     즉 "같은 원재료(바이트)를 2D 이미지로 보느냐 1D 시퀀스로 보느냐"만 다르게 해
     이미지화 자체의 효과를 분리해서 본다.
 

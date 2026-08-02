@@ -3,7 +3,7 @@ Phase 4 — 베이스라인 ①: TF-IDF (문자 n-gram) + 전통 ML (RQ1 비교�
 
 목적:
     설계 6.1(RQ1)의 "전통 ML 베이스라인: TF-IDF/n-gram + RandomForest 등"을 구현한다.
-    이미지 기반 제안 CNN 과 "같은 test 셋 / 같은 지표(metrics.py)"로 비교해,
+    이미지 기반 RGB CNN 과 "같은 test 셋 / 같은 지표(metrics.py)"로 비교해,
     이미지화가 텍스트 특징공학 대비 실익이 있는지 판단할 근거를 만든다.
 
 왜 문자(char) n-gram 인가:

@@ -87,7 +87,11 @@
 
 ## 5. 모델 아키텍처
 
-- **제안 모델**: 얕은 CNN (Conv 32→64→128, BatchNorm, ReLU, MaxPool × 3, GAP, FC+Softmax, 4-class)
+- **제안 모델**: **캐스케이드 탐지기** (1차 = RGB CNN 전량 → 확신도 < τ 인 소수만 2차 = char-CNN).
+  τ 하나로 "속도 우선 ↔ 정확도 우선"을 잇는 연속 스펙트럼을 만든다. 설계·실측은 docs/09 참조.
+  - 1차 = **RGB CNN**: 얕은 CNN (Conv 32→64→128, BatchNorm, ReLU, MaxPool × 3, GAP, FC+Softmax,
+    4-class), 입력은 48×48×3 이미지. 단독으로도 **지표 비교 기준**으로 계속 보고한다.
+  - 2차 = **char-CNN**: 텍스트 베이스라인 중 정확도 최고(docs/04 §5.1).
 - **비교 베이스라인**
   - 전통 ML: TF-IDF/n-gram + XGBoost, RandomForest
   - 텍스트 딥러닝: character-level CNN, BiLSTM
@@ -143,7 +147,7 @@
 |---|---|
 | 1–2 | 관련연구 정리, 데이터셋 확보 |
 | 3–4 | 전처리·이미지 변환 파이프라인 구현 |
-| 5–6 | 제안 CNN + 베이스라인 구현/학습 |
+| 5–6 | RGB CNN + 베이스라인 구현/학습 |
 | 7–8 | RQ1 실험 및 분석 |
 | 9–10 | 회피 공격(problem-space) 구현 |
 | 11 | RQ2 실험 |

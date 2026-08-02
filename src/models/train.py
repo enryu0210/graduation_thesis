@@ -1,8 +1,8 @@
 """
-Phase 4 — 공용 학습·평가 스크립트 (제안 CNN + 텍스트 베이스라인)
+Phase 4 — 공용 학습·평가 스크립트 (RGB CNN + 텍스트 베이스라인)
 
 목적:
-    제안 CNN(이미지)과 char-CNN/BiLSTM(바이트 시퀀스)을 "같은 학습 루프 / 같은 지표"로
+    RGB CNN(이미지)과 char-CNN/BiLSTM(바이트 시퀀스)을 "같은 학습 루프 / 같은 지표"로
     학습·평가한다. 모델·입력 형태만 다를 뿐 옵티마이저·조기종료·클래스 가중치·평가 방식은
     공유해야 RQ1 비교가 공정하다.
 
@@ -15,7 +15,7 @@ Phase 4 — 공용 학습·평가 스크립트 (제안 CNN + 텍스트 베이스
     - 평가: 최종 test 셋 지표를 metrics.py 로 계산·저장(다른 베이스라인과 동일 포맷).
 
 사용법 (Colab/GPU 권장):
-    python src/models/train.py --model cnn                       # 제안 CNN
+    python src/models/train.py --model cnn                       # RGB CNN
     python src/models/train.py --model charcnn                   # char-CNN 베이스라인
     python src/models/train.py --model bilstm                    # BiLSTM 베이스라인
     python src/models/train.py --model cnn --epochs 1 --limit 500 --smoke   # 스모크 테스트
@@ -58,7 +58,7 @@ FIG_DIR = PROJECT_ROOT / "docs" / "figures" / "models"
 CKPT_DIR = PROJECT_ROOT / "experiments" / "checkpoints"
 
 # 이미지를 쓰는 모델과 바이트 시퀀스를 쓰는 모델을 구분한다.
-# vit/hybrid 는 제안 CNN 과 **완전히 같은 이미지 입력**을 받는 비교 arm 이다(vit.py 참조).
+# vit/hybrid 는 RGB CNN 과 **완전히 같은 이미지 입력**을 받는 비교 arm 이다(vit.py 참조).
 IMAGE_MODELS = {"cnn", "vit", "hybrid"}
 TEXT_MODELS = {"charcnn", "bilstm"}
 
@@ -317,7 +317,7 @@ def main() -> None:
     except (AttributeError, ValueError):
         pass
 
-    parser = argparse.ArgumentParser(description="RQ1 학습·평가 (제안 CNN + 텍스트 베이스라인)")
+    parser = argparse.ArgumentParser(description="RQ1 학습·평가 (RGB CNN + 텍스트 베이스라인)")
     parser.add_argument("--model", required=True, choices=sorted(IMAGE_MODELS | TEXT_MODELS))
     parser.add_argument("--track", default="payload_4class",
                         choices=["payload_4class", "payload_4class_csicnorm", "csic_binary",

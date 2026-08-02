@@ -71,7 +71,7 @@ CKPT_DIR = PROJECT_ROOT / "experiments" / "checkpoints"
 TFIDF_MODELS = {"tfidf_logreg": "logreg", "tfidf_rf": "rf"}
 TORCH_IMAGE_MODELS = {"cnn"}          # 변형 텍스트 → 이미지로 예측
 TORCH_SEQ_MODELS = {"charcnn", "bilstm"}  # 변형 텍스트 → 바이트 시퀀스로 예측
-# 하이브리드 캐스케이드(제안 CNN 1차 + char-CNN 2차, src/models/cascade.py).
+# 하이브리드 캐스케이드(RGB CNN 1차 + char-CNN 2차, src/models/cascade.py).
 # 단독 모델들과 "같은 공격·같은 파이프라인"으로 비교하려고 여기서도 대상에 포함한다.
 CASCADE_MODELS = {"cascade": "charcnn", "cascade-bilstm": "bilstm"}
 ALL_MODELS = (list(TFIDF_MODELS) + sorted(TORCH_IMAGE_MODELS | TORCH_SEQ_MODELS)
@@ -221,23 +221,36 @@ def build_torch_predict(track: str, model_name: str, side: int, max_len: int,
     return predict, classes
 
 
-def load_cascade_tau(track: str, stage2: str, text: str, balanced: bool) -> float:
+def load_cascade_tau(track: str, stage2: str, text: str, balanced: bool,
+                     channels: str = "gray", encoders: tuple[str, ...] | None = None,
+                     defense: str = "none", mutation_split: str | None = None,
+                     aug_ratio: float | None = None) -> float:
     """cascade.py 가 val 에서 확정해 저장한 운영 임계값 τ 를 읽어온다.
 
     왜 파일에서 읽나: τ 를 여기서 다시 고르면 **회피 실험 데이터로 τ 를 튜닝**하는 셈이라
     공정성이 깨진다. 캐스케이드의 τ 는 clean val 에서 한 번 정해진 값이어야 하고,
     공격 실험은 그 고정된 운영점을 그대로 시험해야 한다.
 
-    찾는 파일은 cascade.py 의 기본 설정(1차 gray · 기본 lr · match-teacher) 산출물이다.
-    다른 설정의 운영점을 시험하려면 `--tau` 로 직접 넘긴다(회피 경로는 gray 이미지 전용).
+    ⚠️ 찾는 파일의 이름은 **캐스케이드 구성과 정확히 같은 축**으로 만들어야 한다. 예전에는
+    채널·방어 축이 빠져 있어 gray 구성의 τ 를 RGB 구성에 쓸 수 있었다(그래서 그 조합 자체를
+    막아뒀다). 이제 cascade.py 가 축을 전부 tag 에 넣으므로 여기서도 같은 규칙으로 찾는다.
+    다른 운영점을 시험하려면 `--tau` 로 직접 넘긴다.
     """
     s2 = "" if stage2 == "charcnn" else f"-{stage2}"
-    path = RESULTS_DIR / f"{track}_cascade{s2}_{text}{'_bal' if balanced else ''}.json"
+    ch_tag = data_image._channel_suffix(channels, encoders)
+    def_tag = defense_suffix(defense, mutation_split, aug_ratio)
+    path = (RESULTS_DIR /
+            f"{track}_cascade{s2}_{text}{ch_tag}{def_tag}{'_bal' if balanced else ''}.json")
     if not path.exists():
+        rebuild = (f"python src/models/cascade.py --track {track} --stage2 {stage2}"
+                   f"{' --balance' if balanced else ''}"
+                   f"{f' --channels {channels}' if channels != 'gray' else ''}"
+                   f"{f' --text {text}' if text != 'raw' else ''}"
+                   f"{f' --defense {defense}' if defense != 'none' else ''}"
+                   f"{f' --mutation-split {mutation_split} --aug-ratio {aug_ratio:g}' if defense == 'advtrain' else ''}")
         raise FileNotFoundError(
             f"캐스케이드 리포트가 없습니다: {path}\n"
-            f"  → 먼저 실행하세요: python src/models/cascade.py --track {track} "
-            f"--stage2 {stage2}{' --balance' if balanced else ''}\n"
+            f"  → 먼저 실행하세요: {rebuild}\n"
             f"  (또는 --tau 로 임계값을 직접 지정)"
         )
     with open(path, encoding="utf-8") as f:
@@ -245,14 +258,26 @@ def load_cascade_tau(track: str, stage2: str, text: str, balanced: bool) -> floa
 
 
 def build_cascade_predict(track: str, stage2: str, side: int, max_len: int,
-                          balanced: bool, device, tau: float):
+                          balanced: bool, device, tau: float, text: str = "raw",
+                          channels: str = "gray", encoders: tuple[str, ...] | None = None,
+                          defense: str = "none", mutation_split: str | None = None,
+                          aug_ratio: float | None = None):
     """하이브리드 캐스케이드를 `predict(list[str]) -> 클래스인덱스` 콜러블로 감싼다.
 
-    1차(제안 CNN)가 전부 판정하고, 확신도 < τ 인 샘플만 2차(char-CNN)로 넘긴다.
+    1차(RGB CNN)가 전부 판정하고, 확신도 < τ 인 샘플만 2차(char-CNN)로 넘긴다.
     2차는 **에스컬레이션된 부분집합에만** 실행해 실제 배포 동작과 비용 구조를 그대로 재현한다.
+
+    채널·방어 축은 두 단계에 **같은 값**으로 넘긴다(2차는 텍스트 모델이라 채널 축이 없어
+    build_torch_proba 안에서 무시된다). cascade.py 가 τ 를 고를 때의 구성과 일치해야
+    운영점이 의미를 갖는다.
     """
-    proba1, classes = build_torch_proba(track, "cnn", side, max_len, balanced, device)
-    proba2, classes2 = build_torch_proba(track, stage2, side, max_len, balanced, device)
+    proba1, classes = build_torch_proba(track, "cnn", side, max_len, balanced, device,
+                                        text=text, channels=channels, encoders=encoders,
+                                        defense=defense, mutation_split=mutation_split,
+                                        aug_ratio=aug_ratio)
+    proba2, classes2 = build_torch_proba(track, stage2, side, max_len, balanced, device,
+                                         text=text, defense=defense,
+                                         mutation_split=mutation_split, aug_ratio=aug_ratio)
     if classes != classes2:
         raise ValueError(f"두 단계의 클래스 순서가 다릅니다: {classes} vs {classes2}")
 
@@ -439,11 +464,9 @@ def main() -> None:
                    help="advtrain 체크포인트의 증강 비율(학습 때 쓴 값과 일치해야 함)")
     args = p.parse_args()
 
-    if args.model in CASCADE_MODELS and (args.text != "raw" or args.channels != "gray"
-                                         or args.defense != "none"):
-        # 캐스케이드는 운영점 τ 가 clean val 에서 확정된 gray/raw 구성에 묶여 있다.
-        # 방어본으로 1차를 갈아끼우면 τ 를 다시 골라야 하는데, 그건 Phase 11 범위 밖이다(docs/10 §10).
-        p.error("cascade 는 아직 방어/채널 옵션과 함께 쓸 수 없습니다(τ 재선택 필요 — docs/10 §10).")
+    # 캐스케이드는 운영점 τ 가 **그 구성의 clean val** 에서 확정돼 있어야 한다. 이제 cascade.py 가
+    # 채널·방어 축을 tag 에 넣고 τ 를 따로 고르므로(docs/10 §0.1), 구성별 τ 를 정확히 찾아 쓸 수 있다.
+    # 여기서 τ 를 다시 고르지 않는다는 원칙은 그대로다 — 공격 데이터로 운영점을 튜닝하면 누수다.
 
     encoders = tuple(name.strip() for name in args.rgb_encoders.split(","))
     print(f"=== RQ2 회피 ASR: track={args.track} model={args.model} "
@@ -462,10 +485,14 @@ def main() -> None:
         stage2 = CASCADE_MODELS[args.model]
         balanced = not args.unbalanced
         tau = args.tau if args.tau is not None else load_cascade_tau(
-            args.track, stage2, "raw", balanced)
+            args.track, stage2, args.text, balanced, args.channels, encoders,
+            args.defense, args.mutation_split, args.aug_ratio)
         predict, classes = build_cascade_predict(
-            args.track, stage2, args.side, args.max_len, balanced, device, tau)
-        device_note = f"{device} / cascade(cnn->{stage2}, tau={tau:.4f})" + \
+            args.track, stage2, args.side, args.max_len, balanced, device, tau,
+            text=args.text, channels=args.channels, encoders=encoders,
+            defense=args.defense, mutation_split=args.mutation_split,
+            aug_ratio=args.aug_ratio)
+        device_note = f"{device} / cascade(cnn->{stage2}, tau={tau:.4f}, {args.channels})" + \
                       ("" if args.unbalanced else " / bal")
     else:
         device = get_device()
@@ -522,7 +549,12 @@ def main() -> None:
     #    기본값(raw/gray/none)이면 접미사가 전부 비어 **기존 산출물 파일명과 그대로 호환**된다.
     tau_tag = f"_tau{args.tau:g}" if (is_cascade and args.tau is not None) else ""
     text_tag = "" if args.text == "raw" else f"_{args.text}"
-    ch_tag = data_image._channel_suffix(args.channels, encoders) if args.model == "cnn" else ""
+    # ⚠️ 채널 축은 **캐스케이드에도** 붙여야 한다. 1차가 CNN 이므로 gray/RGB 는 서로 다른 실험이다.
+    #    예전에는 `args.model == "cnn"` 일 때만 붙였는데, 당시엔 캐스케이드+채널 조합 자체가
+    #    막혀 있어 드러나지 않았다. 차단을 푼 순간 RGB 캐스케이드 결과가 gray 결과를 덮어썼다
+    #    (2026-08-02 실제 사고 — docs/10 §0.1 작업 중 발견).
+    ch_tag = (data_image._channel_suffix(args.channels, encoders)
+              if (args.model == "cnn" or is_cascade) else "")
     def_tag = defense_suffix(args.defense, args.mutation_split, args.aug_ratio)
     tag = f"{args.track}_{args.model}{text_tag}{ch_tag}{def_tag}{tau_tag}"
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
