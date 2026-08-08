@@ -5,7 +5,10 @@
 
 ## 규칙
 
-- **HTML 이 원본, PDF 는 산출물**이다. 내용 수정은 반드시 `.html` 을 고치고 PDF 를 다시 굽는다.
+- **HTML 이 원본, PDF·DOCX 는 산출물**이다. 내용 수정은 `.html` 을 고치고 둘 다 다시 굽는다.
+  - ⚠️ 단 **DOCX 에서 직접 손본 경우는 예외**다. 그 순간 원본이 갈라지므로, 고친 내용을
+    HTML 에 되돌려 넣거나 "이번 판은 DOCX 가 최신"임을 아래 목록 표에 적어 둔다.
+    적어두지 않으면 다음에 HTML 에서 다시 구울 때 **손본 것이 조용히 사라진다.**
 - 수치는 반드시 `docs/0N_*.md` 나 `experiments/results/*.json` 에 근거를 둔다. 새 수치를 여기서 만들지 않는다.
 - 그림은 `../figures/` 를 **상대 경로**로 참조한다(절대 경로 금지 — 기기마다 드라이브 문자가 다름).
 - PDF 도 커밋한다. 기기 간 이동 수단이 커밋뿐이라, 커밋하지 않으면 다른 기기에서 다시 구워야 한다.
@@ -26,8 +29,22 @@ WIN=$(cd "$(git rev-parse --show-toplevel)/docs/reports" && pwd -W)
 
 ⚠️ Chrome 실행 파일 위치는 기기마다 다를 수 있다. 없으면 Edge(`msedge.exe`)도 같은 옵션으로 동작한다.
 
+## DOCX 재생성 (직접 고칠 때)
+
+pandoc 이 없으므로 `html_to_docx.py`(python-docx + bs4, 둘 다 설치돼 있음)로 굽는다.
+
+```bash
+python docs/reports/html_to_docx.py docs/reports/progress_2026-08-08.html
+# → 같은 이름의 .docx
+```
+
+⚠️ 이 변환기는 **범용이 아니다.** 보고서가 실제로 쓰는 태그·클래스만 안다
+(`h2/h3 · p · ul/ol · table · figure · div.lead/.warn/.note/.flow/.qa · .pagebreak`).
+HTML 에 새 구조를 추가하면 `html_to_docx.py` 의 dispatch 에도 함께 넣어야 조용히 누락되지 않는다.
+검증은 표 개수·그림 개수를 HTML 과 대조하는 것이 가장 빠르다.
+
 ## 목록
 
-| 파일 | 내용 | 기준일 |
-|---|---|---|
-| `progress_2026-08-08.{html,pdf}` | 캐스케이드 전환 이후(Phase 10~12) 진행 보고 + 여쭐 것 8건. 근거: docs/09·10·11·12 | 2026-08-08 |
+| 파일 | 내용 | 기준일 | 최신 원본 |
+|---|---|---|---|
+| `progress_2026-08-08.{html,pdf,docx}` | 캐스케이드 전환 이후(Phase 10~12) 진행 보고 + 여쭐 것 8건. 근거: docs/09·10·11·12 | 2026-08-08 | HTML |
