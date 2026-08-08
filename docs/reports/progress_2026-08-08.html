@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>졸업논문 진행 보고 — 웹 공격 페이로드 이미지화 기반 캐스케이드 탐지</title>
+<style>
+  /* A4 인쇄 기준. 이 파일은 Chrome --headless --print-to-pdf 로 PDF 화된다. */
+  @page { size: A4; margin: 17mm 15mm 15mm 15mm; }
+
+  html { font-size: 10.2pt; }
+  body {
+    font-family: "Malgun Gothic", "맑은 고딕", "Noto Sans KR", sans-serif;
+    line-height: 1.55; color: #1a1a1a; margin: 0;
+  }
+
+  /* ── 표지 ── */
+  .cover { border-bottom: 3px solid #1f3a5f; padding-bottom: 10px; margin-bottom: 18px; }
+  .cover .kicker { font-size: 9pt; color: #5a6b80; letter-spacing: .04em; }
+  .cover h1 { font-size: 17pt; margin: 6px 0 4px; color: #1f3a5f; line-height: 1.35; }
+  .cover .sub { font-size: 10pt; color: #444; margin-bottom: 8px; }
+  .cover .meta { font-size: 8.8pt; color: #666; }
+
+  h2 {
+    font-size: 12.5pt; color: #1f3a5f; margin: 22px 0 8px;
+    border-left: 5px solid #1f3a5f; padding-left: 9px;
+    page-break-after: avoid;
+  }
+  h3 { font-size: 10.8pt; margin: 15px 0 5px; color: #26456e; page-break-after: avoid; }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0 6px 0; padding-left: 20px; }
+  li { margin: 3px 0; }
+
+  table { border-collapse: collapse; width: 100%; margin: 9px 0 11px; font-size: 8.9pt; page-break-inside: avoid; }
+  th, td { border: 1px solid #c8d0da; padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { background: #eaeff5; color: #1f3a5f; font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.hl td { background: #fff6e0; font-weight: 600; }
+  caption { caption-side: bottom; font-size: 8.2pt; color: #667; text-align: left; padding-top: 4px; }
+
+  .lead {
+    background: #f4f7fb; border: 1px solid #d3dded; border-left: 5px solid #1f3a5f;
+    padding: 10px 13px; margin: 12px 0; font-size: 9.6pt;
+  }
+  .warn {
+    background: #fdf4f4; border: 1px solid #e8cccc; border-left: 5px solid #a83232;
+    padding: 9px 12px; margin: 10px 0; font-size: 9.2pt;
+  }
+  .note { font-size: 8.6pt; color: #555; margin: 5px 0 10px; }
+
+  code { font-family: Consolas, "D2Coding", monospace; font-size: 0.9em; background: #f0f2f5; padding: 1px 3px; }
+  .pos { color: #1a6b3c; font-weight: 600; }
+  .neg { color: #a83232; font-weight: 600; }
+  .muted { color: #777; }
+
+  figure { margin: 12px 0; page-break-inside: avoid; }
+  figure img { width: 100%; border: 1px solid #dde3ea; }
+  figcaption { font-size: 8.3pt; color: #556; margin-top: 4px; }
+
+  /* 캐스케이드 구조 도식 — 이미지 없이 CSS 로만 그린다(폰트 깨짐·경로 의존 없음) */
+  .flow { display: flex; align-items: stretch; gap: 8px; margin: 10px 0; font-size: 8.8pt; }
+  .flow .box { border: 1.5px solid #1f3a5f; border-radius: 4px; padding: 7px 9px; flex: 1; background: #f7f9fc; }
+  .flow .box b { color: #1f3a5f; }
+  .flow .arrow { align-self: center; color: #1f3a5f; font-size: 14pt; font-weight: bold; }
+  .flow .box.alt { border-color: #a06a1f; background: #fdf8ef; }
+  .flow .box.alt b { color: #a06a1f; }
+
+  .pagebreak { page-break-before: always; }
+  .qa { border-top: 1px solid #d8dee6; padding-top: 8px; margin-top: 12px; page-break-inside: avoid; }
+  .qa .qid { display: inline-block; background: #1f3a5f; color: #fff; font-size: 8.4pt;
+             padding: 1px 7px; border-radius: 3px; margin-right: 6px; }
+  .qa .qtitle { font-weight: 600; font-size: 10pt; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="kicker">학부 졸업논문 · 중간 진행 보고</div>
+  <h1>웹 공격 페이로드 이미지화 기반 캐스케이드 탐지 및 적대적 강건성 연구</h1>
+  <div class="sub">제안 모델을 <b>단일 CNN → 캐스케이드</b>로 전환한 이후의 설계·실측 정리 (Phase 10 ~ 12)</div>
+  <div class="meta">보고일 2026-08-08 · 보고 범위 2026-07-25 ~ 2026-08-06 · 근거 문서 docs/09 · 10 · 11 · 12 및 마스터 설계 문서</div>
+</div>
+
+<div class="lead">
+  <b>세 줄 요약</b>
+  <ol style="margin:6px 0 0; padding-left: 18px;">
+    <li>이미지화 CNN <b>단독</b>으로는 텍스트 모델을 이길 수 없음을 통계적으로 확정했습니다
+        (char-CNN MCC 0.9944 vs RGB CNN 0.9762, 5-fold CV + Holm 보정 adj <i>p</i> = 0.0010~0.0247).
+        대신 처리량이 <b>13.6배</b> 우위였습니다.</li>
+    <li>그래서 제안 모델을 <b>캐스케이드</b>(1차 RGB CNN → 확신도 미달분만 2차 char-CNN)로 바꿨습니다.
+        트래픽의 <b>8.0%만</b> 2차로 올려 char-CNN급 정확도를 유지하면서 지연을 <b>5.07배</b> 낮췄고,
+        <b>추가 학습은 0</b>입니다.</li>
+    <li>구조를 바꾸자 단일 모델에서는 보이지 않던 축이 두 개 드러났습니다 —
+        <b>지연을 표적으로 하는 비용 기반 공격</b>(에스컬레이션 2.17배)과,
+        <b>방어의 대가가 정확도가 아니라 지연으로 지불된다</b>는 현상(esc 34.97% → 69.52%)입니다.</li>
+  </ol>
+</div>
+
+<h2>1. 왜 제안 모델을 캐스케이드로 바꿨는가</h2>
+
+<p>지난 미팅에서 지적하신 “신규성이 약하다”에 대해, 먼저 <b>단일 이미지 CNN의 한계를 실측으로 확정</b>하는 것부터 했습니다.
+결론은 <span class="neg">음성</span>이었습니다.</p>
+
+<table>
+  <caption>표 1. 단일 모델 비교 (트랙 <code>payload_4class_csicnorm</code>, Normal = CSIC 2010 실트래픽)</caption>
+  <thead><tr>
+    <th>모델</th><th class="num">clean Macro-F1</th><th class="num">MCC</th>
+    <th class="num">추론 처리량</th><th>Pareto 상 위치</th>
+  </tr></thead>
+  <tbody>
+    <tr><td>gray CNN (1채널)</td><td class="num">0.9676</td><td class="num">0.9418</td><td class="num">92,466 /s</td><td>정확도 하위 · 비용 최저</td></tr>
+    <tr><td>RGB CNN (48×48×3)</td><td class="num">0.9804</td><td class="num">0.9725</td><td class="num">81,964 /s</td><td>RGB로 격차를 좁혔으나 여전히 열세</td></tr>
+    <tr class="hl"><td>char-CNN (텍스트)</td><td class="num">0.9954</td><td class="num">0.9940</td><td class="num">6,010 /s</td><td><b>정확도 최상위 · 13.6배 느림</b></td></tr>
+  </tbody>
+</table>
+
+<ul>
+  <li><b>열세는 통계적으로 유의합니다.</b> 5-fold CV + paired t-test + Holm 보정에서
+      char-CNN MCC 0.9944±0.0004 vs RGB CNN 0.9762±0.0025, adj <i>p</i> = 0.0010~0.0247.</li>
+  <li><b>교수님께서 제안하신 RGB 채널 확장은 효과가 확인됐습니다.</b> gray→RGB로 MCC 0.9493 → 0.9762
+      (<span class="pos">+2.69pp</span>, adj <i>p</i> = 0.0037~0.0201). 다만 <b>어떤 채널 조합이 더 낫다고는 말할 수 없습니다</b>
+      — 6쌍 전부 adj <i>p</i> ≥ 0.88이라 조합 간 우열은 판정 불가입니다.</li>
+  <li>즉 이미지화의 실질적 강점은 <b>탐지 우월성이 아니라 비용</b>이었습니다.</li>
+</ul>
+
+<p>이 관찰이 방향 전환의 근거입니다. Pareto front 위에 떨어져 있는 <b>두 점(싼 CNN · 정확한 char-CNN)을
+τ 하나로 잇는 연속 곡선</b>으로 바꾸는 것이 이번에 만든 제안 모델입니다.</p>
+
+<div class="warn">
+<b>연구 정직성에 대한 조치(HARKing 방지)</b> — 원래 RQ1은 “이미지 기반 CNN이 텍스트 모델과 유사하거나 더 나은 성능을 보이는가”였고
+그 답은 <b>“아니오”</b>였습니다. 결과를 보고 질문을 비용 축으로 바꾸면 사후가설이 되므로,
+① 원 RQ1 문구와 그 답이 ‘아니오’였음을 <b>그대로 보고</b>하고, ② 캐스케이드(RQ5)는 <b>그 음성 결과에서 파생된 질문</b>임을 명시하며,
+③ 이후 실험의 판정 기준은 <b>실측 전에 문서로 고정</b>했습니다. 선행 8편 중 유의성 검정을 한 논문이 0편인 상황이라,
+이 서술은 오히려 방법론적 강점이 됩니다.
+</div>
+
+<h3>용어 정리 (혼동 사고 후 확정)</h3>
+<table>
+  <thead><tr><th style="width:22%">용어</th><th>의미</th></tr></thead>
+  <tbody>
+    <tr><td><b>캐스케이드</b></td><td>논문의 <b>제안 모델</b>. 1차 RGB CNN + 2차 char-CNN의 <b>배치 구조</b>(아키텍처가 아님)</td></tr>
+    <tr><td>RGB CNN</td><td>48×48×3 단일 CNN. 제안 지위를 내려놓고 <b>지표 비교 기준</b>이 됨</td></tr>
+    <tr><td>gray CNN</td><td>1채널 판본</td></tr>
+    <tr><td class="muted">“제안 CNN”</td><td class="muted">⚠️ <b>사용 금지</b> — (ㄱ)제안 모델과 (ㄴ)캐스케이드 1차 부품 두 뜻으로 읽혀 실제 혼동이 발생</td></tr>
+  </tbody>
+</table>
+
+<h2 class="pagebreak">2. 제안 모델 — 확신도 게이트 캐스케이드</h2>
+
+<div class="flow">
+  <div class="box"><b>입력 페이로드</b><br>HTTP 요청 문자열</div>
+  <div class="arrow">→</div>
+  <div class="box"><b>1차 : RGB CNN</b><br>전량 통과 · 93,988 파라미터<br>0.0066 ms/sample</div>
+  <div class="arrow">→</div>
+  <div class="box"><b>게이트</b><br>confidence = max softmax<br>≥ τ 이면 <b>1차 판정 채택</b></div>
+  <div class="arrow">→</div>
+  <div class="box alt"><b>2차 : char-CNN</b><br>확신도 &lt; τ 인 <b>소수만</b><br>0.0561 ms/sample</div>
+</div>
+
+<p>비용식은 다음과 같습니다 (<i>r</i> = 에스컬레이션 비율, 2차 호출 비중).</p>
+<p style="text-align:center; font-size:11pt; margin:10px 0;">
+<code>C_cascade = C_cnn + r · C_charcnn = 0.0066 + r × 0.0561 [ms/sample]</code>
+</p>
+
+<h3>2.1 왜 ‘특징 융합’이 아니라 ‘캐스케이드’인가 — 가장 중요한 설계 결정</h3>
+<p>“하이브리드”라고 하면 보통 두 브랜치의 특징을 concat하는 <b>융합형</b>을 떠올립니다. 그러나 융합형은
+<b>모든 입력이 두 브랜치를 전부 통과</b>하므로 비용이 <code>C_cnn + C_charcnn</code>이 되어
+<b>char-CNN 단독보다도 느립니다</b>(실측 0.0627 ms vs 0.0561 ms). 애초 목표였던 속도 이점이 사라지므로 채택하지 않았습니다.
+선택적 실행(cascade)만이 “정확도는 char-CNN급, 지연은 CNN급”을 가능하게 합니다.</p>
+
+<h3>2.2 이 구조의 이론적 성질</h3>
+<ul>
+  <li><b>τ → 0</b>이면 아무도 넘기지 않으므로 <b>정확히 RGB CNN 단독</b>,
+      <b>τ → 1</b>이면 전부 넘기므로 <b>정확히 char-CNN 단독</b>으로 수렴합니다.
+      즉 두 단독 모델은 이 구조의 <b>특수해</b>이고, 캐스케이드는 그 사이의 <b>연속 스펙트럼</b>입니다.
+      이 성질은 단위 테스트로 고정해 뒀습니다(<code>tests/test_cascade.py</code>, τ=0 → esc 0.0000/F1 0.9676, τ=1.01 → esc 1.0000/F1 0.9954로 실측 확인).</li>
+  <li><b>추가 학습이 없습니다.</b> Phase 4·5에서 이미 학습해 둔 체크포인트 2개를 조합할 뿐입니다.
+      덕분에 “같은 모델을 배치 방식만 바꿨다”는 인과가 깨끗하게 성립합니다.</li>
+</ul>
+
+<h3>2.3 공정성을 지키기 위해 박아둔 세 가지 못</h3>
+<table>
+  <thead><tr><th style="width:26%">원칙</th><th>내용</th></tr></thead>
+  <tbody>
+    <tr><td><b>τ는 val에서만</b></td>
+        <td>test로 τ를 고르면 임계값이 test에 과적합됩니다(정보 누수). <b>val 스윕으로 확정한 뒤 test에 1회만</b> 적용합니다.
+            회피 실험에서도 τ는 파일에서 읽어 오며, <b>공격 데이터로 재튜닝하지 않습니다.</b></td></tr>
+    <tr><td><b>기준선 4종 병기</b></td>
+        <td>① 1차 단독(곡선 좌단) ② 2차 단독(우단) ③ <b>융합형 비용선</b>(안 쓴 대안이 실제로 더 비쌈을 증명)
+            ④ <b>oracle 라우팅</b>(1차가 틀린 것만 정확히 승급 = 어떤 게이트도 넘을 수 없는 상한)</td></tr>
+    <tr><td><b>지연 측정 프로토콜</b></td>
+        <td>초기 단발 측정은 실행 간 <b>60%</b>나 흔들려 speedup이 9.30배로 부풀려졌습니다(재측정 7.05배).
+            → <b>5라운드 × 20회의 중앙값</b>으로 바꾸고 전 arm을 재실측(변동 0.7% 이내).
+            헤드라인이 속도인 실험에서는 지연의 분산 관리가 정확도만큼 중요했습니다.</td></tr>
+  </tbody>
+</table>
+
+<h2 class="pagebreak">3. Phase 10 실측 — 정확도·비용 (2026-07-25, RTX 4080 SUPER)</h2>
+
+<p>트랙 <code>payload_4class_csicnorm</code>, val 22,628 · test 22,629건, 4클래스
+(CommandInjection / Normal / SQLInjection / XSS). <b>학습 없이</b> 기존 체크포인트를 조립해 arm 7종을 측정했습니다.</p>
+
+<table>
+  <caption>표 2. 캐스케이드 arm 7종. esc = 에스컬레이션 비율, spd = 2차 단독 대비 배속, ovh = 1차 단독 대비 비용</caption>
+  <thead><tr>
+    <th>1차</th><th>2차</th><th>τ 선택 규칙</th><th class="num">τ</th><th class="num">esc</th>
+    <th class="num">Macro-F1</th><th class="num">MCC</th><th class="num">ms/sample</th><th class="num">spd</th><th class="num">ovh</th>
+  </tr></thead>
+  <tbody>
+    <tr><td>gray</td><td>char-CNN</td><td>match-teacher</td><td class="num">0.9998</td><td class="num">78.36%</td><td class="num">0.9954</td><td class="num">0.9940</td><td class="num">0.0508</td><td class="num">1.11×</td><td class="num">7.74×</td></tr>
+    <tr><td>gray</td><td>char-CNN</td><td>budget 10%</td><td class="num">0.7509</td><td class="num">7.46%</td><td class="num">0.9856</td><td class="num">0.9756</td><td class="num">0.0108</td><td class="num">5.23×</td><td class="num">1.64×</td></tr>
+    <tr><td>gray</td><td>char-CNN</td><td>budget 5%</td><td class="num">0.5678</td><td class="num">2.54%</td><td class="num">0.9754</td><td class="num">0.9579</td><td class="num">0.0080</td><td class="num">7.05×</td><td class="num">1.22×</td></tr>
+    <tr><td>gray</td><td>BiLSTM</td><td>match-teacher</td><td class="num">0.8099</td><td class="num">9.98%</td><td class="num">0.9831</td><td class="num">0.9714</td><td class="num">0.0212</td><td class="num">6.92×</td><td class="num">3.23×</td></tr>
+    <tr><td><b>RGB</b></td><td>char-CNN</td><td>match-teacher</td><td class="num">0.9971</td><td class="num">27.73%</td><td class="num"><b>0.9955</b></td><td class="num"><b>0.9941</b></td><td class="num">0.0223</td><td class="num">2.52×</td><td class="num">3.32×</td></tr>
+    <tr class="hl"><td><b>RGB</b></td><td>char-CNN</td><td><b>budget 10%</b></td><td class="num">0.9425</td><td class="num">7.99%</td><td class="num">0.9934</td><td class="num">0.9907</td><td class="num">0.0111</td><td class="num">5.07×</td><td class="num">1.68×</td></tr>
+    <tr><td><b>RGB</b></td><td>char-CNN</td><td>budget 5%</td><td class="num">0.7516</td><td class="num">2.71%</td><td class="num">0.9890</td><td class="num">0.9837</td><td class="num">0.0081</td><td class="num">6.92×</td><td class="num">1.23×</td></tr>
+  </tbody>
+</table>
+
+<p class="note">같은 test·같은 지표의 기준선 — <b>1차 단독</b> gray 0.9676 / RGB 0.9804 (둘 다 0.0066 ms) ·
+<b>2차 단독</b> char-CNN 0.9954 (0.0561 ms) / BiLSTM 0.9838 (0.1468 ms) · <b>융합형</b> 0.0627 ms.</p>
+
+<div class="lead">
+<b>헤드라인 — “같은 정확도를 몇 분의 1 비용으로”</b><br>
+대표 운영점(RGB 1차 + 예산 10%)에서 트래픽의 <b>8.0%만 2차로 올려</b>
+char-CNN 대비 MCC 0.9940 → 0.9907(−0.33pp)에 <b>지연은 5.07배 낮습니다</b>(0.0561 → 0.0111 ms/sample).
+융합형(0.0627 ms) 대비로는 5.6배입니다.<br><br>
+정확도를 한 치도 양보하지 않으려면 <b>match-teacher</b> 운영점이 27.7% 에스컬레이션으로
+char-CNN을 <b>넘어서면서도</b>(MCC 0.9941 vs 0.9940) 2.52배 빠릅니다.
+</div>
+
+<div class="warn">
+<b>과장하지 않기 위해 명시하는 것</b> — 이 트랙의 clean 지표는 <b>표면 토큰 포화</b> 상태이고,
+위 정확도 차이는 단일 split의 실행 간 노이즈(±0.11pp)와 같은 자릿수입니다.
+따라서 <b>정확도 개선은 주장하지 않습니다.</b> 주장의 무게는 전부 <b>“같은 정확도에서의 비용 절감폭”</b>에 둡니다
+— 이쪽은 노이즈에 훨씬 둔감합니다.
+</div>
+
+<figure>
+  <img src="../figures/models/cascade_curve_payload_4class_csicnorm_cascade_raw_rgb_b0.1_bal.png" alt="cascade accuracy-cost curve">
+  <figcaption><b>그림 1.</b> τ 스윕으로 그린 정확도–비용 곡선(대표 운영점, RGB 1차).
+  왼쪽: 에스컬레이션 대비 Macro-F1 — 초록 마름모가 운영점(τ=0.9425), 주황 별이 oracle 상한.
+  오른쪽: 에스컬레이션 대비 평균 지연 — 융합형(0.0627 ms)·2차 단독(0.0561 ms) 대비 운영점이 0.0111 ms에 놓인다.
+  <b>곡선의 왼쪽 끝이 CNN 단독, 오른쪽 끝이 char-CNN 단독</b>이라는 점이 이 구조의 핵심 성질이다.</figcaption>
+</figure>
+
+<h3>3.1 미결 과제 — 확신도 게이트는 ‘나쁜 라우터’다</h3>
+<p>oracle 라우팅(1차가 틀린 샘플만 정확히 승급했을 때의 상한)과 비교하면 격차가 큽니다.</p>
+
+<table>
+  <thead><tr><th>1차</th><th class="num">oracle esc</th><th class="num">oracle Macro-F1</th><th class="num">실측 게이트가 같은 수준에 쓰는 esc</th><th class="num">과잉 배수</th></tr></thead>
+  <tbody>
+    <tr><td>gray</td><td class="num">3.96%</td><td class="num">0.9968</td><td class="num">78.36%</td><td class="num"><b>19.8배</b></td></tr>
+    <tr><td>RGB</td><td class="num">1.87%</td><td class="num">0.9982</td><td class="num">27.73%</td><td class="num"><b>14.8배</b></td></tr>
+  </tbody>
+</table>
+
+<p>max softmax 확신도는 오답을 <b>15~20배 과잉 포착</b>합니다. 문제는 정확도 상한이 아니라 <b>비용 상한</b>이며,
+게이트를 개선하면(예측 엔트로피 · 상위 2개 마진 · temperature scaling) 정확도를 그대로 두고
+에스컬레이션만 최대 −25.8pp 줄일 여지가 있습니다. <b>남은 가장 큰 미착수 이득</b>으로 기록해 뒀습니다.</p>
+
+<h3>3.2 clean에서 새로 잡는 건 없다 (상보성 분석)</h3>
+<p>공격 21,907건 기준으로 캐스케이드와 char-CNN의 <b>탐지 집합이 완전히 동일</b>합니다(둘 다 놓친 8건까지 같음).
+즉 이 구조의 기여는 <b>탐지 집합의 확장이 아니라 비용 축소</b>입니다 — 이 점을 논문에서 과장하지 않고 그대로 씁니다.</p>
+
+<h2 class="pagebreak">4. RQ2 — 회피 강건성과 ‘비용 기반 공격’</h2>
+
+<p>실제 WAF 우회 기법(주석 삽입 <code>/**/</code>, 대소문자 랜덤화, 공백/탭 치환, URL·이중 인코딩,
+동치 SQL 토큰 치환, XSS <code>String.fromCharCode</code>)을 누적 <i>k</i>=1~5로 적용한 problem-space 공격입니다.
+모든 변형은 <b>의미를 보존</b>합니다(실제로 동작하는 페이로드).</p>
+
+<table>
+  <caption>표 3. 회피 하 거동 (k=5 기준). any-misclass = 변형 하 오분류율, 낮을수록 강건</caption>
+  <thead><tr><th>운영점</th><th class="num">benign-evasion</th><th class="num">any-misclass</th>
+    <th class="num">esc (clean)</th><th class="num">esc (공격 k=5)</th><th class="num">비용 증가</th></tr></thead>
+  <tbody>
+    <tr><td>τ=0.9998 (match-teacher)</td><td class="num">0.0001</td><td class="num">0.3641</td><td class="num">78.36%</td><td class="num">79.96%</td><td class="num">1.02배</td></tr>
+    <tr class="hl"><td>τ=0.5678 (budget 5%)</td><td class="num">0.0009</td><td class="num">0.5557</td><td class="num">2.54%</td><td class="num">5.50%</td><td class="num"><b>2.17배</b></td></tr>
+    <tr><td class="muted">참고: char-CNN 단독</td><td class="num muted">0.0001</td><td class="num muted">0.2239</td><td class="num muted">—</td><td class="num muted">—</td><td class="num muted">—</td></tr>
+    <tr><td class="muted">참고: gray CNN 단독</td><td class="num muted">0.0022</td><td class="num muted">0.5944</td><td class="num muted">—</td><td class="num muted">—</td><td class="num muted">—</td></tr>
+  </tbody>
+</table>
+
+<h3>4.1 τ 스펙트럼은 강건성 축에서도 성립한다</h3>
+<p>캐스케이드의 회피 강건성은 <b>τ 하나로 두 단독 모델 사이를 연속 이동</b>합니다 — 높은 τ는 char-CNN 쪽(0.364),
+낮은 τ는 CNN 쪽(0.556). 2장에서 주장한 “연속 스펙트럼”이 clean 정확도뿐 아니라 <b>공격 하 강건성에서도 성립</b>한다는 뜻입니다.
+다만 τ=0.9998에서도 char-CNN 단독(0.224)에는 못 미치는데, 원인은 <b>넘기지 않은 21.6%</b>입니다.
+1차가 확신했기에 남은 샘플인데 변형되면 틀립니다 — <b>“확신도가 높다”가 “변형에 강하다”를 뜻하지 않습니다.</b></p>
+
+<h3>4.2 ⭐ 캐스케이드 고유의 공격면 — 정확도가 아니라 지연을 표적으로</h3>
+<div class="lead">
+저에스컬레이션 운영점에서 공격은 정확도를 흔드는 것과 <b>동시에</b> 2차 호출을 <b>2.17배</b>로 늘려
+예산 5% SLA를 깨뜨렸습니다(2.54% → 5.50%). <b>정확도 지표만 보면 전혀 보이지 않는 열화</b>입니다.<br>
+반대로 이미 78%를 넘기는 운영점은 증가 여지가 없어 1.02배에 그칩니다 —
+즉 <b>비용 공격 표면은 캐스케이드가 싸게 돌아갈수록 커집니다.</b> 운영 시 에스컬레이션 비율을 지표로 모니터링하고
+상한 큐를 두는 완화책이 필요합니다.
+</div>
+<p class="note">이 축은 <b>제안 모델을 캐스케이드로 세웠기 때문에 비로소 존재하는 발견</b>입니다.
+단일 모델만 다뤘다면 논문에 존재하지 않았을 결과입니다.</p>
+
+<h2 class="pagebreak">5. Phase 11 / RQ3 — 적대적 방어 학습 (2026-08-02)</h2>
+
+<h3>5.1 먼저 해결한 문제 — 방어할 대상이 이미 0이었다</h3>
+<p>원래 RQ3의 주 지표였던 <b>benign-evasion(공격→Normal 오분류 = 실제 WAF 우회)</b>은
+5개 모델 전부 ~0이었습니다(0.0000~0.0022). 이대로 실험하면 <b>0을 0으로 만드는 실험</b>이라
+개선폭도 희생폭도 측정 불가능합니다. → 주 지표를 <b>any-misclass</b>(변형 하 오분류율)로 옮기고,
+benign-evasion은 바닥 효과를 명시하며 보조 지표로 계속 보고합니다.
+<b>이 교체는 결과를 보고 고른 것이 아니라</b>, 근거가 되는 실측이 방어 실험 <b>이전에</b> 이미 존재했고 문서로 사전 고정했습니다.</p>
+
+<h3>5.2 방법론의 핵심 — seen / held-out 변형 분할</h3>
+<p>학습에 쓴 변형으로 평가하면 “본 적 있는 공격을 막았다”는 자명한 결과가 나옵니다. 그래서 변형 14종을
+4계열(E 인코딩 / C 대소문자 / W 공백·주석 / S 구문동치)로 묶고 두 시나리오를 함께 돌렸습니다.</p>
+<ul>
+  <li><b>S-0 (seen)</b>: 4계열 전부를 학습에 사용 → <b>낙관 상한</b>. 방어가 원리적으로 얼마나 줄일 수 있는가</li>
+  <li><b>S-A (leave-encoding-out)</b>: 가장 강력한 인코딩 계열(E)을 <b>학습에서 완전 배제</b> → <b>진짜 질문</b>. 미지의 변형에 일반화되는가</li>
+</ul>
+<p class="note">증강은 ‘추가’가 아니라 <b>치환</b> 방식입니다(공격 클래스만 불어나면 FPR이 방어 효과가 아니라 분포 변화 때문에 움직임).
+held-out 계열은 train은 물론 <b>val에도 넣지 않았습니다</b>(조기 종료를 통한 간접 누수 차단).
+캐스케이드는 학습이 없으므로 <b>1·2차 양쪽 방어본을 조립</b>하고 τ를 그 구성의 val에서 <b>재선택</b>했습니다.</p>
+
+<table>
+  <caption>표 4. 적대적 증강 후 any-misclass (k=5). ρ = 증강 비율</caption>
+  <thead><tr><th>구성</th><th class="num">캐스케이드 (제안)</th><th class="num">Δ</th>
+    <th class="num">단일 RGB CNN (비교 기준)</th><th class="num">Δ</th></tr></thead>
+  <tbody>
+    <tr><td>base (방어 없음)</td><td class="num"><b>0.4707</b></td><td class="num">—</td><td class="num"><b>0.5981</b></td><td class="num">—</td></tr>
+    <tr class="hl"><td>advtrain <b>S-0</b> ρ0.25</td><td class="num">0.0318</td><td class="num pos">−43.89pp</td><td class="num">0.1955</td><td class="num pos">−40.26pp</td></tr>
+    <tr class="hl"><td>advtrain <b>S-0</b> ρ0.5</td><td class="num">0.0287</td><td class="num pos">−44.20pp</td><td class="num">0.2029</td><td class="num pos">−39.52pp</td></tr>
+    <tr><td>advtrain <b>S-A</b> ρ0.25</td><td class="num">0.2780</td><td class="num">−19.27pp</td><td class="num">0.4693</td><td class="num">−12.88pp</td></tr>
+    <tr><td>advtrain <b>S-A</b> ρ0.5</td><td class="num">0.4227</td><td class="num neg">−4.80pp</td><td class="num">0.5704</td><td class="num neg">−2.77pp</td></tr>
+  </tbody>
+</table>
+
+<table>
+  <caption>표 5. 사전에 고정한 가설의 판정 결과</caption>
+  <thead><tr><th style="width:10%">가설</th><th style="width:20%">판정</th><th>근거</th></tr></thead>
+  <tbody>
+    <tr><td><b>H3-1</b><br>강건성 개선</td><td class="pos">✅ 효과 있음</td>
+        <td>S-0에서 40~44pp 감소 = 사전 기준(10pp)의 4배 이상. 단일 split 노이즈(±0.11pp)와 자릿수가 달라 CV 불필요</td></tr>
+    <tr><td><b>H3-2</b><br>대가 수용성</td><td>⚠️ 구조에 따라 갈림</td>
+        <td><b>캐스케이드는 전 구성 통과</b>(clean MCC 최대 −0.12pp, FPR 변화 0.00pp).
+            <b>단일 CNN은 4셀 중 2셀 실패</b>(S-0 ρ0.5 −1.86pp, S-A ρ0.25 −3.81pp·FPR +0.69pp)</td></tr>
+    <tr><td><b>H3-3</b> ⭐<br>미지 변형 일반화</td><td class="neg">❌ “본 변형 암기”</td>
+        <td>S-A/S-0 감소폭 비 — 캐스케이드 43.9%(ρ0.25)·10.9%(ρ0.5), 단일 CNN 32.0%·7.0%.
+            <b>네 경우 모두 사전 기준 50% 미달</b></td></tr>
+    <tr><td><b>H3-4</b><br>학습형 vs 정규화</td><td class="muted">⏸ 미판정</td>
+        <td>정규화 방어(입력 디코딩) 2셀 미실행 — 남은 작업</td></tr>
+  </tbody>
+</table>
+
+<p><b>H3-3이 이 Phase의 핵심 결과입니다.</b> 학습에 넣은 변형은 거의 완벽히 막지만(0.47 → 0.03),
+빼둔 인코딩 계열에는 거의 무력합니다. 원인은 명확합니다 — base에서 오분류를 끌어올린 변형이 사실상
+<code>space_to_comment</code>(+0.635) · <code>url_encode</code>(+0.584) · <code>double_url_encode</code>(+0.572) <b>3종뿐</b>이고,
+그중 2종이 held-out이라 S-A는 <b>배울 것이 거의 없었습니다.</b>
+이는 “인코딩 계열은 학습으로 못 막고 <b>입력 정규화</b>로 막는 종류”라는 가설을 강하게 지지합니다.</p>
+
+<h3>5.3 ⭐ 캐스케이드는 방어 비용을 ‘정확도’가 아니라 ‘지연’으로 지불한다</h3>
+<table>
+  <thead><tr><th>구조</th><th class="num">clean MCC 하락</th><th class="num">공격 하 에스컬레이션</th></tr></thead>
+  <tbody>
+    <tr><td>단일 RGB CNN</td><td class="num neg">최대 −3.81pp (FPR +0.69pp)</td><td class="num muted">해당 없음</td></tr>
+    <tr class="hl"><td>캐스케이드</td><td class="num pos">최대 −0.12pp (FPR 변화 0)</td><td class="num neg">34.97% → 최대 69.52%</td></tr>
+  </tbody>
+</table>
+<p>캐스케이드는 1차가 흔들려도 2차 char-CNN이 받아내므로 <b>정확도를 거의 잃지 않습니다.</b>
+대신 1차 확신도가 낮아진 만큼 2차 호출이 늘어 <b>추론 비용이 최대 2배</b>가 됩니다.
+<b>정확도 지표만 보면 “공짜 방어”로 오독되는 열화</b>이며, 4.2절의 비용 기반 공격과 직결됩니다.</p>
+
+<p class="note"><b>부수 확인</b> — RGB 캐스케이드 기준선을 새로 잰 것이 옳았습니다(RGB 0.4707 vs gray 0.3641, <b>10.66pp 차이</b>).
+단일 CNN에서는 gray(0.594)와 RGB(0.598)가 사실상 같았지만, 캐스케이드에서는 채널이 1차 확신도 분포를 바꾸고
+그것이 곧 게이트 동작이라 영향이 훨씬 큽니다. gray 수치를 기준선으로 썼다면 감소폭이 10pp 이상 왜곡됐을 것입니다.<br>
+<b>강건성 서열</b>(방어 없음): char-CNN 0.224 &lt; gray 캐스케이드 0.364 &lt; <b>RGB 캐스케이드 0.471</b> &lt; gray CNN 0.594 &lt; RGB CNN 0.598.
+제안 모델이 단일 CNN보다 강건하다는 관계는 유지됩니다.</p>
+
+<h2 class="pagebreak">6. Phase 12 — 선행연구 대조와 주장 강도 하향</h2>
+
+<p>“비용 개선”을 헤드라인으로 세운 이상, <b>같은 축의 선행이 있는지</b>를 먼저 조사했습니다. 결과: <b>있습니다.</b>
+숨기지 않고 <b>먼저 인용하고 대조</b>하는 방식으로 씁니다.</p>
+
+<h3>6.1 최근접 선행 — Tasdemir et al. 2023 (SQLi 캐스케이드, 20배)</h3>
+<p><i>Advancing SQL Injection Detection for High-Speed Data Centers: A Novel Approach Using Cascaded NLP</i>
+(arXiv:2312.13041, QUB + NVIDIA). 1차 Passive Aggressive Classifier → 2차 BERT-Electra,
+accuracy 99.86%, transformer 단독 대비 <b>20배</b>. 본문을 전수 확인한 결과 <b>겹치는 것은 프레이밍뿐</b>이었습니다.</p>
+
+<table>
+  <caption>표 6. Tasdemir 2023과의 대조 — 이 표가 차별화의 근거</caption>
+  <thead><tr><th style="width:18%">축</th><th style="width:38%">Tasdemir 2023</th><th>본 연구</th></tr></thead>
+  <tbody>
+    <tr><td>1·2차 <b>표현</b></td><td>텍스트 → 텍스트 (동종)</td><td><b>이미지 → 텍스트 (이종)</b> ⭐</td></tr>
+    <tr><td>라우팅 기준</td><td><b>예측 클래스</b>(양성이면 승급, Viola-Jones식)</td><td><b>예측 불확실성</b>(max softmax &lt; τ)</td></tr>
+    <tr><td>운영점</td><td>고정 1개</td><td><b>τ 연속 곡선</b>, 양 끝점이 두 단독 모델로 수렴 ⭐</td></tr>
+    <tr><td>과제</td><td>SQLi <b>이진</b></td><td>SQLi / XSS / CmdI / Normal <b>4-class</b></td></tr>
+    <tr><td>게이트 품질</td><td>미분석</td><td><b>oracle 대비 14.8배 과잉</b> 정량화 ⭐</td></tr>
+    <tr><td>회피 강건성</td><td><b>없음</b>(본문 전수 검색 결과 0)</td><td>RQ2 / RQ3 전 축 ⭐</td></tr>
+    <tr><td>통계 검정</td><td>없음</td><td>5-fold CV + Holm 보정</td></tr>
+    <tr><td>속도 배수</td><td>20× (기준 = BERT)</td><td>5.07× (기준 = char-CNN)</td></tr>
+  </tbody>
+</table>
+
+<div class="warn">
+<b>배수(20배 vs 5.07배)를 직접 비교하지 않습니다.</b> 2차 기준 모델이 다릅니다(BERT vs char-CNN).
+BERT가 훨씬 무거워 분모가 크므로 배수가 크게 나옵니다. 논문에는 <b>기준 모델을 반드시 명시</b>해 병기합니다.<br><br>
+<b>추가로 말할 수 있는 것</b>: 저쪽 라우팅은 <i>“공격처럼 보이면 무조건 승급”</i>이라 <b>비용 공격에 구조적으로 더 취약</b>합니다
+(공격자가 확신도를 조작할 필요조차 없음). 우리 확신도 게이트는 1차의 확신도를 떨어뜨려야 하므로 한 단계 어렵지만,
+<b>그럼에도 problem-space 변형만으로 2.17배</b>가 나왔습니다.
+</div>
+
+<h3>6.2 조사 결과 스스로 낮춘 주장 3건</h3>
+<table>
+  <thead><tr><th style="width:20%">항목</th><th style="width:26%">선행</th><th>조정 내용</th></tr></thead>
+  <tbody>
+    <tr><td><b>비용 기반 공격</b></td><td>DeepSloth (ICLR 2021 Spotlight) — 지연 1.5~5배 증폭</td>
+        <td>❌ “새 공격면을 <b>발견</b>했다” → ✅ “DeepSloth의 slowdown 공격이 웹공격 탐지 캐스케이드에서도 성립함을 실측했다.
+        단 DeepSloth는 <b>픽셀 gradient 교란(화이트박스)</b>인 반면 본 연구는 <b>모델 접근 없이, 실제로 동작하는 페이로드 변형만으로</b> 달성했다”
+        — <span class="pos">낮춘 문구가 오히려 더 강합니다</span></td></tr>
+    <tr><td><b>표현 불일치 탐지</b><br>(향후 M1)</td><td>Feature Squeezing (NDSS 2018) — 원본 vs 압축 입력의 예측 불일치</td>
+        <td>❌ “표현 불일치를 쓰는 것이 새롭다” → ✅ “캐스케이드는 이미 2차를 돌리므로 <b>추가 비용이 정확히 0</b>”
+        — 메커니즘은 기지이고, <b>구조적 무상화</b>가 유일한 기여</td></tr>
+    <tr><td><b>다단 조기종료</b><br>(향후 M4)</td><td>ACM SAC 2025 early-exit IDS, FastDet, ACM CSUR 서베이</td>
+        <td>침입탐지 도메인에 직접 선행이 다수 → <b>우선순위 최하로 강등 권고</b></td></tr>
+    <tr><td><b>RQ4 (암호화 경계)</b></td><td>Kutlimuratov et al. 2026 (Computers 15,174) — 흐름 메타데이터만으로 470k req/s</td>
+        <td>“신호가 흐름으로 이동한다”는 결론의 <b>도착지에 이미 사람이 있음</b> →
+        기여를 <b>“경계가 어디인지 정량 증명”</b>으로 좁힘 (고정키 XOR F1 0.9445 유지 → AES 0.3965 붕괴,
+        즉 엔트로피가 아니라 <b>키 랜덤화</b>가 원인)</td></tr>
+  </tbody>
+</table>
+
+<h3>6.3 반대로 확인된 우리 쪽 강점</h3>
+<ul>
+  <li><b>개선폭 기준선이 낮습니다.</b> <i>Scientific Reports</i>(Tadhani 2024)의 헤드라인 개선은 <b>+0.34pp</b>,
+      <i>Applied Sciences</i>(Eroğlu 2025)는 <b>+0.11~1.27pp</b>로 “surpassing existing benchmarks”라고 씁니다.
+      우리 gray→RGB <b>+2.69pp(5-fold CV)</b>는 한 자릿수 큽니다.</li>
+  <li><b>선행 8편 중 유의성 검정을 한 논문이 0편, 회피/적대적 실험을 한 논문도 0편</b>입니다.
+      즉 RQ2·RQ3 축은 경쟁자가 없습니다.</li>
+  <li>단, 그 축에서 우리가 가진 것은 아직 <b>“제안 모델도 흔들린다”는 음성 결과</b>가 중심입니다 → 다음 Phase의 동기.</li>
+</ul>
+
+<h2 class="pagebreak">7. 개정된 연구 질문과 기여</h2>
+
+<p>기존 RQ 표에는 <b>캐스케이드를 묻는 질문 자체가 없었습니다.</b> RQ1을 “정확도 우월성”이 아닌
+<b>“정확도–비용 Pareto 상의 위치 규명”</b>으로 정직하게 고치고, <b>RQ5(캐스케이드)를 신설</b>했습니다.
+번호는 파일명·상호참조에 박혀 있어 재배열하지 않고 뒤로 추가했습니다.</p>
+
+<table>
+  <caption>표 7. RQ 표 (2026-08-06 개정). 논문 서술 순서는 RQ1 → RQ5 → RQ2 → RQ3 → RQ6, RQ4는 별도 축</caption>
+  <thead><tr><th style="width:8%">ID</th><th>질문</th><th style="width:22%">상태</th></tr></thead>
+  <tbody>
+    <tr><td><b>RQ1</b></td><td>페이로드를 바이트 이미지로 변환한 탐지는 텍스트 기반 모델 대비 <b>정확도–비용 Pareto 상 어디에 위치하는가?</b></td>
+        <td class="neg">✅ 답 완료 — <b>음성 결과</b></td></tr>
+    <tr class="hl"><td><b>RQ5</b> ⭐</td><td>확신도 게이트 <b>캐스케이드</b>는 그 Pareto 위의 두 점을 τ 하나로 잇는 <b>연속 곡선</b>으로 바꾸는가?
+        char-CNN급 정확도를 얼마나 싸게 살 수 있으며, 그 게이트는 <b>최적 라우터에 얼마나 근접</b>한가?</td>
+        <td class="pos">✅ 답 완료 (본 보고 3장)</td></tr>
+    <tr><td><b>RQ2</b></td><td>캐스케이드는 실제 WAF 우회 기법에 얼마나 취약한가? 나아가 정확도가 아닌 <b>지연을 표적으로 하는 비용 기반 공격</b>이 성립하는가?</td>
+        <td class="pos">✅ 답 완료 (4장)</td></tr>
+    <tr><td><b>RQ3</b></td><td>적대적 증강은 <b>학습에서 보지 못한 변형까지 일반화</b>되는가? 캐스케이드에서 그 대가는 <b>어느 통화로 지불</b>되는가?</td>
+        <td class="pos">✅ 답 완료 (5장)</td></tr>
+    <tr><td><b>RQ4</b></td><td>탐지 신호가 콘텐츠에서 사라질 때(인코딩→암호화), 내용 기반 이미지 탐지는 <b>어디서 원리적으로 붕괴하는가?</b></td>
+        <td>✅ RQ4a 완료 / ⚠️ RQ4b 포화</td></tr>
+    <tr><td><b>RQ6</b></td><td>1차와 2차의 <b>표현 간 불일치</b> 자체가 “회피 시도”의 탐지 신호가 되는가? (단일 모델은 원리적으로 불가)</td>
+        <td class="muted">⏳ 미착수 (Phase 12 M1)</td></tr>
+  </tbody>
+</table>
+
+<h3>7.1 논문이 주장하는 기여 — 선행 대조 후 확정한 문구</h3>
+<table>
+  <thead><tr><th style="width:6%">#</th><th style="width:20%">기여</th><th>쓸 문구</th></tr></thead>
+  <tbody>
+    <tr><td>C1</td><td><b>표현 이질적 캐스케이드</b></td>
+        <td>“이미지 표현과 텍스트 표현을 잇는 캐스케이드로, <b>같은 정확도를 5.07배 싸게</b> 얻는다”
+        <span class="muted">(❌ “이미지 기반이 더 정확하다”)</span></td></tr>
+    <tr><td>C2</td><td><b>τ 연속 스펙트럼</b></td>
+        <td>“τ 하나가 clean 정확도뿐 아니라 <b>공격 하 강건성에서도</b> 두 단독 모델 사이를 연속 이동한다(0.364 ↔ 0.556)”</td></tr>
+    <tr><td>C3</td><td><b>problem-space slowdown 공격</b></td>
+        <td>“DeepSloth가 보인 slowdown 공격이 웹공격 탐지 캐스케이드에서도 성립함을 실측했다. 단 <b>모델 접근 없이,
+        실제로 동작하는 페이로드 변형만으로</b> 2.17배를 달성했다”
+        <span class="muted">(❌ “새로운 공격면을 발견했다”)</span></td></tr>
+    <tr><td>C4</td><td><b>게이트 품질 상한 정량화</b></td>
+        <td>“확신도 게이트는 oracle 대비 <b>14.8배 과잉</b> 승급한다 — 개선 여지의 상한을 못 박았다”</td></tr>
+    <tr><td class="muted">(C5)</td><td class="muted"><b>표현 불일치 회피 탐지</b> ⏳</td>
+        <td class="muted">“캐스케이드는 이미 2차를 돌리므로 <b>추가 비용 정확히 0</b>으로 회피 시도를 판정한다” — 미착수</td></tr>
+  </tbody>
+</table>
+
+<h3>7.2 정직하게 함께 쓸 한계</h3>
+<ul>
+  <li>이미지 단독은 텍스트 모델에 <b>유의하게 진다</b>.</li>
+  <li>clean 탐지 <b>상보성 이득이 없다</b> — 캐스케이드의 기여는 탐지 집합 확장이 아니라 비용 축소다.</li>
+  <li>적대적 증강은 <b>본 변형만 암기</b>한다.</li>
+  <li><b>소규모 배포에서는 char-CNN 단독으로 충분</b>하다.</li>
+  <li><b>적응형 공격(방어를 알고 설계된 공격)은 수행하지 않는다</b> — 한계로 명시.</li>
+  <li>성능 차이는 <b>표면 토큰이 포화된</b> 트랙에서 측정됐다.</li>
+  <li>ViT · hybrid(CNN stem + Transformer)는 CNN 대비 +0.12pp, <i>p</i>(adj)=1.0000으로 <b>미채택</b> — 시도했으나 안 됐음을 그대로 보고.</li>
+</ul>
+
+<h2 class="pagebreak">8. 진행 현황과 남은 계획</h2>
+
+<table>
+  <thead><tr><th style="width:10%">Phase</th><th>작업</th><th style="width:26%">상태</th></tr></thead>
+  <tbody>
+    <tr><td>1–3</td><td>데이터 확보 · 전처리 · 이미지 변환</td><td class="pos">✅ 완료</td></tr>
+    <tr><td>4</td><td>RQ1 모델 비교 (5-fold CV + Holm)</td><td class="pos">✅ 완료</td></tr>
+    <tr><td>5</td><td>RQ2 회피 공격</td><td class="pos">✅ 완료</td></tr>
+    <tr><td>6</td><td>RQ4 암호화 경계</td><td>✅ RQ4a / ⚠️ RQ4b 포화</td></tr>
+    <tr><td>7</td><td>관련연구 · 지표 개편 · RGB 채널</td><td class="pos">✅ 완료</td></tr>
+    <tr><td>8–9</td><td>ViT / hybrid arm</td><td>✅ <b>미채택 확정</b></td></tr>
+    <tr class="hl"><td><b>10</b></td><td><b>캐스케이드</b> (제안 모델)</td><td class="pos">✅ GPU 실측 완료</td></tr>
+    <tr class="hl"><td><b>11</b></td><td><b>RQ3 적대적 방어</b></td><td class="pos">✅ 실측 완료 (정규화 방어만 잔여)</td></tr>
+    <tr><td>12</td><td>캐스케이드 확장 3안 + 비용 축 선행 대조</td><td>🔵 <b>설계 확정, 구현 미착수</b></td></tr>
+    <tr><td>잔여</td><td>미상환 항목 → M1 → M2 → (여유 시 M4) → 논문 작성</td><td class="muted">⏳</td></tr>
+  </tbody>
+</table>
+
+<h3>8.1 먼저 갚아야 할 것 (기존 Phase의 구멍)</h3>
+<table>
+  <thead><tr><th style="width:8%">#</th><th style="width:32%">내용</th><th>왜 필요한가 / 비용</th></tr></thead>
+  <tbody>
+    <tr><td><b>G1</b></td><td>char-CNN 방어본의 <b>회피 재평가 미실행</b></td>
+        <td>학습은 끝났으나 회피 산출물이 없어 결과 표에 char-CNN 열이 비어 있음.
+        <b>없으면 “이미지 표현만 방어가 필요하다”는 해석을 배제할 수 없음.</b> 추론만, GPU 30분</td></tr>
+    <tr><td><b>G2</b></td><td><b>정규화 방어</b>(입력 디코딩) 2셀 미실행 → H3-4 미판정</td>
+        <td>5.2절 결론상 <b>“디코딩 한 줄이 학습형 방어를 이길” 가능성이 높음.</b>
+        그 결과가 나오면 그것이 더 강한 실무적 기여. M2의 비교 기준이므로 M2보다 먼저 실행</td></tr>
+    <tr><td><b>G3</b></td><td>상보성 분석이 <b>clean 한정</b></td><td>변형 테스트셋 상보성 — M1과 같은 실행에서 해결 가능</td></tr>
+    <tr><td class="muted"><b>G4</b></td><td class="muted">적응형 공격 미수행</td><td class="muted"><b>한계로 명시</b>(수행하지 않기로 확정)</td></tr>
+    <tr><td class="muted"><b>G5</b></td><td class="muted">관련연구 서지정보 원문 확정</td><td class="muted">논문 작성 시</td></tr>
+    <tr><td><b>G6</b></td><td>RQ4b(USTC 흐름) <b>포화</b>(F1 0.9999)로 판별력 없음</td><td>부록 강등 또는 host 단위 분할 재실험 — <b>여쭤볼 사항 Q1</b></td></tr>
+  </tbody>
+</table>
+
+<h3>8.2 Phase 12 확장 3안</h3>
+<table>
+  <thead><tr><th style="width:8%">안</th><th style="width:30%">내용</th><th>신규성 / 비용 / 리스크</th></tr></thead>
+  <tbody>
+    <tr class="hl"><td><b>M1</b><br>(권장)</td><td>1·2차 <b>표현 불일치</b>를 “회피 시도” 신호로 사용 (RQ6)</td>
+        <td>신규성 중상 — Feature Squeezing 선행이 있으나 <b>추가 비용 0</b>이 고유.
+        <b>새 학습 0.</b> 리스크: 에스컬레이션된 8%에만 정의됨(커버리지)</td></tr>
+    <tr><td><b>M2</b></td><td><b>인코딩 불변 채널 인코더</b> — 학습으로 못 얻는 불변성을 이미지화 구조에 넣음</td>
+        <td>신규성 중상. H3-3이 실패한 지점을 정면으로 겨냥. 재빌드 + 1~2셀 학습.
+        리스크: 정규화 방어와 사실상 같아질 위험 → G2를 먼저 실행해 비교 기준 확보</td></tr>
+    <tr><td class="muted"><b>M4</b><br>(강등 권고)</td><td class="muted"><b>다단 조기종료</b>로 1차 비용 자체를 절감 (5.07배 → 7.2배 예상)</td>
+        <td class="muted">신규성 <b>낮음</b> — 침입탐지용 early-exit 직접 선행 다수(6.2절).
+        1셀. 리스크: 보조 헤드가 본 정확도를 해칠 수 있음</td></tr>
+  </tbody>
+</table>
+<p class="note">세 안 모두 <b>캐스케이드 구조를 전제로만 성립</b>합니다. “단일 모델로도 되는 것”은
+제안 모델의 존재 이유가 되지 못하므로 넣지 않았습니다.
+판정 기준(H5-1 ROC-AUC ≥ 0.90, H6-1 S-A 감소폭 ≥ S-0의 50%, H7-2 speedup ≥ 6.5배 등)은 <b>실측 전에 이미 문서로 고정</b>했습니다.</p>
+
+<h2 class="pagebreak">9. 여쭙고 싶은 것</h2>
+
+<div class="qa">
+  <span class="qid">Q1</span><span class="qtitle">RQ4 처리 방침 — 가장 먼저 여쭙고 싶습니다</span>
+  <p>RQ4a(암호화 경계의 정량 증명)는 좋은 결과가 나왔습니다(고정키 XOR F1 0.9445 유지 → AES 0.3965 붕괴 =
+  탐지를 죽이는 것은 엔트로피가 아니라 <b>키 랜덤화</b>). 그런데 ① <b>RQ4b(흐름 이미지화)는 F1 0.9999로 포화</b>돼
+  판별력이 없고(USTC-TFC2016이 너무 쉬움), ② 조사해 보니 <b>흐름 메타데이터 기반 탐지는 이미 선행이 있습니다</b>(470k req/s).
+  → RQ4 기여를 <b>경계의 정량 증명으로 좁히고 흐름 실험은 부록으로</b> 내릴까요, 아니면 host 단위 분할로 재실험해 난이도를 올릴까요?
+  <br><span class="note">교수님께서 직접 제안하신 방향이라 임의로 강등하지 않고 여쭙습니다.</span></p>
+</div>
+
+<div class="qa">
+  <span class="qid">Q2</span><span class="qtitle">헤드라인을 ‘정확도’가 아니라 ‘비용’으로 두는 것</span>
+  <p>주장을 “더 정확하다”가 아니라 <b>“같은 정확도를 5.07배 싸게”</b>로 두려 합니다.
+  정확도 차이는 단일 split 노이즈(±0.11pp)와 같은 자릿수라 주장하지 않을 생각입니다. 이 프레이밍이 심사에서 받아들여질까요?</p>
+</div>
+
+<div class="qa">
+  <span class="qid">Q3</span><span class="qtitle">남은 기간의 진행 순서 — 3안 중 선택</span>
+  <p>8.2절 표의 <b>M1 → M2</b> 순으로 가고, M4는 직접 선행이 많아 후순위로 내리려 합니다. 동의하시는지요?
+  (구멍 G1 · G2를 먼저 갚은 뒤 착수할 계획입니다.)</p>
+</div>
+
+<div class="qa">
+  <span class="qid">Q4</span><span class="qtitle">음성 결과의 배치</span>
+  <p>적대적 증강이 <b>본 변형만 암기</b>(−44.20 vs −4.80pp), ViT/hybrid <b>미채택</b>(<i>p</i>=1.0000),
+  clean 상보성 이득 0 등 음성 결과가 여럿입니다. ‘한계’로 쓸지 ‘발견’으로 쓸지 어떻게 배치하는 것이 좋을까요?</p>
+</div>
+
+<div class="qa">
+  <span class="qid">Q5</span><span class="qtitle">비용 기반 공격의 위치 설정</span>
+  <p>DeepSloth(ICLR 2021)가 early-exit 망에서 지연 1.5~5배 증폭을 이미 보였고 우리 2.17배는 그 범위 안입니다.
+  다만 DeepSloth는 <b>픽셀 gradient 교란(화이트박스)</b>인 반면 우리는 <b>모델 접근 없이 실제로 동작하는 페이로드 변형만으로</b> 달성했습니다.
+  이 정도를 독립 기여로 세울까요, ‘기존 공격의 도메인 이전’으로 낮출까요?</p>
+</div>
+
+<div class="qa">
+  <span class="qid">Q6</span><span class="qtitle">적응형 공격 미수행</span>
+  <p>방어 논문의 표준 비판 지점인 <b>적응형 공격은 수행하지 않을</b> 계획입니다.
+  학부 범위에서 ‘한계로 명시’가 수용될 수 있을까요?</p>
+</div>
+
+<div class="qa">
+  <span class="qid">Q7</span><span class="qtitle">지표 — Accuracy 병기 및 F1 Efficiency 채택 여부</span>
+  <p>선행 8편은 전부 Accuracy로 보고하는데 저희는 불균형 데이터라 MCC · PR-AUC가 헤드라인입니다. <b>Accuracy 병기</b>로 갈까요?
+  추가로 Tasdemir가 제안한 <b>F1 Efficiency</b>(F1과 지연의 가중평균)로 우리 캐스케이드를 평가하면 대조가 깔끔해집니다 —
+  저희는 τ 스윕이 있어 <b>가중치 α별 최적 운영점 이동</b>까지 그릴 수 있습니다(저쪽은 고정 운영점이라 불가). 채택할까요?</p>
+</div>
+
+<div class="qa">
+  <span class="qid">Q8</span><span class="qtitle">유사 선행과의 거리</span>
+  <p>국내 발표문(‘시그니처 필터링 + 2D-CNN 하이브리드’)이 구조적으로 가깝지만 <b>2쪽 학술발표문</b>이고
+  1차가 Suricata 룰셋 · 2차가 Open-set 이상탐지라 메커니즘이 다릅니다. 관련연구에서 <b>한 문단 구분</b>으로 충분할까요?</p>
+</div>
+
+<h2 class="pagebreak">부록. 재현 · 검증 관련 메모</h2>
+
+<h3>A. 실험 환경</h3>
+<ul>
+  <li>학습·측정: RTX 4080 SUPER / PyTorch cu124. 지연은 배치 512 순전파 기준 ms/sample,
+      <b>CUDA synchronize 필수</b>(비동기 실행이라 동기화 없이 재면 0에 가깝게 나옴).</li>
+  <li>전처리는 seed=42 결정론, Train/Val/Test = 70/15/15 stratified. 클래스 불균형은 train만 언더샘플링(val/test는 실분포 유지).</li>
+  <li>모든 모델의 평가는 <b>단일 지표 모듈</b>로 일원화했습니다(계산 방식 차이 배제).
+      지표는 Accuracy · Macro-F1 · MCC · PR-AUC · ROC-AUC + attack-focused(benign-evasion / FPR).</li>
+  <li>단위 테스트 80건 통과. 커밋 전 전체 테스트를 실행합니다.</li>
+</ul>
+
+<h3>B. 이번 구간에 겪은 재현성 사고와 조치 (방법론 서술에 남길 것)</h3>
+<table>
+  <thead><tr><th style="width:32%">사고</th><th>조치 및 교훈</th></tr></thead>
+  <tbody>
+    <tr><td>지연 측정이 실행마다 <b>60% 흔들림</b> → speedup이 9.30배로 부풀려짐</td>
+        <td>5라운드 × 20회 중앙값으로 변경 후 전 arm 재실측(변동 0.7% 이내, 실제 7.05배).
+        <b>헤드라인이 속도인 실험에서 지연의 분산 관리는 정확도만큼 중요하다.</b></td></tr>
+    <tr><td>산출물 파일명에 실험 축이 빠져 결과가 <b>서로 덮어씀</b> (3회 발생)</td>
+        <td>파일명 규칙을 단일 모듈로 통합. 특히 세 번째는 <b>“당장 못 쓰는 조합이라 막아뒀더니 그 차단이 버그를 가리고 있다가
+        차단을 푸는 순간 덮어썼다”</b> — 축은 <b>쓸 수 있게 되기 전에</b> 넣어야 한다.</td></tr>
+    <tr><td>기본 학습률이 <b>한쪽 아키텍처 기준값</b>이라 ViT 계열이 자동으로 불리했음</td>
+        <td>lr만 맞춰도 MCC가 최대 +23.9pp 이동. <b>“같은 학습 루프를 썼으니 공정하다”는 성립하지 않는다.</b>
+        이 교훈을 RQ3의 조기 종료 기준(arm별 자기 목적함수)에 재적용했습니다.</td></tr>
+    <tr><td>이미지 모델은 학습 데이터에 <b>원문 텍스트가 없어</b> 그 자리에서 변형 불가</td>
+        <td>train split 전체를 텍스트→이미지 온더플라이 경로로 통일(원본만 기존 경로로 두면
+        “증강본 여부”가 새 shortcut이 됨). 두 경로가 <b>바이트 단위로 동일</b>함을 회귀 테스트로 고정.</td></tr>
+  </tbody>
+</table>
+
+<p class="note" style="margin-top:18px; border-top:1px solid #d8dee6; padding-top:8px;">
+본 보고서의 모든 수치는 저장소의 설계·의사결정 문서(docs/09 · 10 · 11 · 12)와 실험 산출 JSON에 근거합니다.
+실험 결과 JSON은 용량 문제로 저장소에서 제외되어 있으며 재현 스크립트로 재생성됩니다. 그림은 저장소에 추적·보관됩니다.
+</p>
+
+</body>
+</html>
