@@ -34,16 +34,29 @@
 
 ⭐ = 논문 본문에서 반드시 인용·대조해야 하는 것.
 
-### 1.1 확보 실패 — 수동 다운로드 필요
+### 1.1 추가 확보 (2026-08-09) — 진행보고서 인용 논문 일괄 수집
+
+`docs/reports/progress_2026-08-08.pdf` 가 인용한 논문을 전수 대조해 **노트북 쪽 `docs/thetics/` 를
+데스크톱과 동기화**하면서, §1.2 에 "유료"로 적혀 있던 ACM 2편을 함께 확보했다.
+
+| 파일명 | 서지 | 왜 넣었나 |
+|---|---|---|
+| `acm_sac2025_earlyexit_ids.pdf` | Simioni, Viegas, Santin, Horhulhack. *An Early Exit Deep Neural Network for Fast Inference Intrusion Detection*. **ACM SAC '25**, pp.730–737. doi:10.1145/3672608.3707974 | **M4 의 직접 선행**(조기종료 IDS) |
+| `acm_csur_earlyexit_survey.pdf` | Rahmath P. et al. *Early-Exit Deep Neural Network — A Comprehensive Survey*. **ACM CSUR**. doi:10.1145/3698767 | M4 관련연구 서술의 표준 인용 |
+
+> ⚠️ **"ACM DL 유료"는 더 이상 참이 아니다.** 2026-08-09 확인 시 ACM DL 이 전면 Open Access 로
+> 전환돼("ACM is now Open Access" 배너) 두 편 모두 로그인 없이 받혔다. 받는 법:
+> `https://dl.acm.org/doi/pdf/<DOI>?download=true` 를 **브라우저로** 열면 즉시 내려받아진다
+> (curl 은 봇 차단으로 403 — MDPI 도 동일하므로 브라우저 경로를 쓸 것).
+
+### 1.2 확보 실패 — 수동 다운로드 필요
 
 | 논문 | 사유 | 필요 이유 |
 |---|---|---|
-| *An Early Exit DNN for Fast Inference Intrusion Detection*, **ACM SAC 2025**, doi:10.1145/3672608.3707974 | ACM DL 유료 | **M4 의 직접 선행.** M4 를 진행한다면 필수 |
-| *FastDet: Detecting Encrypted Malicious Traffic Faster via Early Exit*, Springer LNCS 2024 | 유료 | M4 + RQ4(암호화) 교차 지점 |
-| *Early-Exit DNN — A Comprehensive Survey*, ACM CSUR 2024, doi:10.1145/3698767 | 유료 | M4 관련연구 서술의 표준 인용 |
-| *Multi-Shield* (Robust image classification with multi-modal LLMs), Pattern Recognition Letters | 유료 | M1 의 최신 유사 사례(보조) |
+| *FastDet: Detecting Encrypted Malicious Traffic Faster via Early Exit*, Springer LNCS 2024, doi:10.1007/978-981-97-0834-5_18 | 유료(OpenAlex `is_oa=false`, 2026-08-09 확인) | M4 + RQ4(암호화) 교차 지점 |
+| *Multi-Shield* = Robust image classification with multi-modal LLMs, **Pattern Recognition Letters 2025**, doi:10.1016/j.patrec.2025.04.022 | OA 로 표시되나 ScienceDirect 가 CAPTCHA 로 막음 | M1 의 최신 유사 사례(보조) |
 
-→ 학교 도서관 프록시로 받을 것. **M4 를 포기하면 앞의 3편은 불필요**(§4.3).
+→ 학교 도서관 프록시 또는 브라우저에서 직접 받을 것. **M4 를 포기하면 FastDet 은 불필요**(§4.3).
 
 ---
 
