@@ -49,7 +49,8 @@ import data_text  # noqa: E402
 import augment as AUG  # noqa: E402
 from payload_to_image import payload_to_image, payload_to_rgb_image  # noqa: E402
 from tagging import (  # noqa: E402
-    DEFAULT_AUG_BUDGET, DEFAULT_AUG_RATIO, DEFAULT_LR, DEFENSE_MODES, build_tag,
+    DEFAULT_AUG_BUDGET, DEFAULT_AUG_RATIO, DEFAULT_AUX_WEIGHT, DEFAULT_LR,
+    DEFENSE_MODES, build_tag,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -59,8 +60,11 @@ CKPT_DIR = PROJECT_ROOT / "experiments" / "checkpoints"
 
 # 이미지를 쓰는 모델과 바이트 시퀀스를 쓰는 모델을 구분한다.
 # vit/hybrid 는 RGB CNN 과 **완전히 같은 이미지 입력**을 받는 비교 arm 이다(vit.py 참조).
-IMAGE_MODELS = {"cnn", "vit", "hybrid"}
+# cnn_ee = 조기종료 CNN(Phase 12/M4). 백본은 cnn 과 동일하고 블록마다 보조 헤드가 붙는다.
+IMAGE_MODELS = {"cnn", "cnn_ee", "vit", "hybrid"}
 TEXT_MODELS = {"charcnn", "bilstm"}
+# 학습 중 여러 헤드의 logits 를 돌려주는 모델(손실을 가중합해야 한다).
+MULTI_HEAD_MODELS = {"cnn_ee"}
 
 # DEFAULT_LR 등 tag 관련 상수는 tagging.py 가 단일 진실 소스다(위 import).
 # 여기서 재노출하는 이유: cascade.py / cross_validate.py 가 `train.DEFAULT_LR` 로 참조 중이라
@@ -239,6 +243,11 @@ def build_model(model: str, num_classes: int, in_channels: int = 1,
     if model == "cnn":
         import cnn
         return cnn.build_model(num_classes, in_channels=in_channels)
+    if model == "cnn_ee":
+        import cnn
+        # 조기종료 임계값은 학습에 관여하지 않는다(학습 중에는 조기종료를 하지 않는다).
+        # 평가 시점의 손잡이라 cascade.py 가 val 에서 골라 넣어준다.
+        return cnn.build_early_exit_model(num_classes, in_channels=in_channels)
     if model in ("vit", "hybrid"):
         import vit
         return vit.build_model(num_classes, in_channels=in_channels,
@@ -281,10 +290,38 @@ def train_one_epoch(model, loader, criterion, optimizer, device) -> float:
     return total_loss / max(n, 1)
 
 
+def build_criterion(class_weights, device, aux_weight: float):
+    """단일 헤드/다중 헤드 모두를 받는 손실 함수를 만든다.
+
+    조기종료 모델(cnn_ee)은 학습 모드에서 헤드별 logits 리스트를 돌려준다. 그때의 손실은
+        L = CE(최종 헤드) + aux_weight × Σ CE(보조 헤드)
+    다. 보조 헤드에 가중치를 두는 이유(docs/11 §9 리스크): 가중치가 크면 얕은 헤드가 백본을
+    자기 쪽으로 끌어당겨 **본 헤드 정확도를 깎는다**. H7-1 의 MCC 조건(±0.11pp)을 못 지키면
+    채택하지 않는다는 판정이 여기에 걸려 있으므로, 가중치는 tag 축으로 남겨 ablation 한다.
+
+    단일 헤드 모델에는 기존과 완전히 같은 CrossEntropy 가 적용된다(경로 분기 없음).
+    """
+    ce = nn.CrossEntropyLoss(weight=torch.tensor(class_weights, device=device))
+
+    def criterion(output, target):
+        if isinstance(output, (list, tuple)):
+            loss = ce(output[-1], target)  # 마지막이 본 헤드
+            for aux in output[:-1]:
+                loss = loss + aux_weight * ce(aux, target)
+            return loss
+        return ce(output, target)
+
+    return criterion
+
+
 def fit(model, train_loader, val_loader, classes, class_weights, device,
-        epochs: int, lr: float, patience: int):
-    """학습 루프 + val Macro-F1 기준 조기 종료. best 가중치를 복원해 반환한다."""
-    criterion = nn.CrossEntropyLoss(weight=torch.tensor(class_weights, device=device))
+        epochs: int, lr: float, patience: int, aux_weight: float = DEFAULT_AUX_WEIGHT):
+    """학습 루프 + val Macro-F1 기준 조기 종료. best 가중치를 복원해 반환한다.
+
+    aux_weight 는 다중 헤드 모델(cnn_ee)에만 영향을 준다 — 단일 헤드 모델에서는 무시된다.
+    그래서 cross_validate.py 등 기존 호출부는 인자를 안 넘겨도 동작이 바뀌지 않는다.
+    """
+    criterion = build_criterion(class_weights, device, aux_weight)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     best_f1, best_state, best_epoch, since_improved = -1.0, None, -1, 0
@@ -342,6 +379,10 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--lr", type=float, default=DEFAULT_LR)
     parser.add_argument("--patience", type=int, default=5, help="조기 종료 인내 에폭")
+    parser.add_argument("--aux-weight", type=float, default=DEFAULT_AUX_WEIGHT,
+                        help="조기종료 보조 헤드 손실 가중치(--model cnn_ee 전용). "
+                             "크면 본 헤드 정확도를 깎고, 작으면 보조 헤드가 못 배운다. "
+                             "기본값이 아니면 tag 에 '_aw' 접미사가 붙는다")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--limit", type=int, default=None, help="학습 샘플 수 제한(스모크용)")
     parser.add_argument("--smoke", action="store_true", help="빠른 동작 확인 모드(작게 실행)")
@@ -404,12 +445,22 @@ def main() -> None:
 
     model = build_model(args.model, len(classes), in_channels=in_channels,
                         patch=args.patch).to(device)
+    if args.model == "cnn_ee":
+        # ⚠️ 학습·체크포인트 선택·test 보고는 **조기종료를 끈 상태**(전 깊이)로 한다.
+        #    임계값은 아직 정해지지 않았고(cascade.py 가 val 에서 고른다), 여기서 임의의 값을
+        #    쓰면 그 값에 맞춰 best 에폭이 뽑혀 버린다. 끈 상태의 지표가 곧 '아키텍처 상한'이며
+        #    일반 CNN 과 직접 비교 가능한 수치다(H7-1 의 정확도 조건이 이 비교를 요구한다).
+        import cnn as cnn_mod
+        model.exit_threshold = cnn_mod.NO_EARLY_EXIT
+        print(f"  [cnn_ee] 보조 헤드 손실 가중치={args.aux_weight:g} / "
+              f"학습·평가 중 조기종료 비활성(임계값은 cascade.py 가 val 에서 선택)")
     n_params = sum(p.numel() for p in model.parameters())
     print(f"  파라미터 수: {n_params:,}")
 
     model, best_val_f1, best_epoch = fit(
         model, train_loader, val_loader, classes, class_weights, device,
         epochs=args.epochs, lr=args.lr, patience=args.patience,
+        aux_weight=args.aux_weight,
     )
 
     # 최종 test 평가 + 처리량 측정
@@ -430,6 +481,11 @@ def main() -> None:
         "balance": args.balance, "channels": args.channels, "in_channels": in_channels,
         "rgb_encoders": list(encoders) if (args.model in IMAGE_MODELS and args.channels == "rgb") else None,
         "patch": args.patch if args.model == "vit" else None,
+        # 조기종료 축 — 파일명만으로는 "이 지표가 조기종료를 끈 상태"라는 걸 알 수 없으므로 남긴다.
+        "aux_weight": args.aux_weight if args.model in MULTI_HEAD_MODELS else None,
+        "exit_threshold": None,  # 학습 산출물은 항상 조기종료를 끈 상태의 지표다
+        "exit_note": ("조기종료 비활성(전 깊이) 기준 지표 — 운영 임계값은 cascade.py 가 val 에서 선택"
+                      if args.model in MULTI_HEAD_MODELS else None),
     }
     # 방어 블록 — 파일명만으로는 복원되지 않는 정보(실제 치환 건수·계열 목록·조기종료 기준)를 남긴다.
     result["defense"] = {
@@ -458,6 +514,9 @@ def main() -> None:
             patch=args.patch if args.model == "vit" else None,
             lr=args.lr, balance=args.balance,
             defense=args.defense, mutation_split=args.mutation_split, aug_ratio=args.aug_ratio,
+            # 보조 헤드 가중치는 학습을 가르는 축 → 체크포인트 tag 에 들어간다.
+            # (조기종료 임계값은 추론 축이라 여기 없다 — cascade.py 의 결과 tag 담당)
+            aux_weight=args.aux_weight if args.model in MULTI_HEAD_MODELS else None,
         )
         M.save_report(result, RESULTS_DIR / f"{tag}.json")
         # 샘플 단위 예측 저장(모델 간 '탐지 불일치' 분석용 — detection_analysis.py 가 소비)

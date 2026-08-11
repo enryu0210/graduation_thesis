@@ -35,7 +35,7 @@
 - ⚠️ RGB npz 파일명 약어 `_ENCODER_ABBR` 는 build_image_dataset.py 와 data_image.py 두 곳에 중복 → 인코더 추가 시 동시 갱신(저장/로드 파일명 일치).
 
 ## 모델 / 학습
-- 이미지 모델(같은 npz 입력): `cnn`(제안, 93,988p) · `vit`(단일 ViT, 2.7M) · `hybrid`(CNN stem+Transformer, 0.58M) — `src/models/cnn.py`, `vit.py`.
+- 이미지 모델(같은 npz 입력): `cnn`(93,988p) · `cnn_ee`(조기종료, 백본 동일 + 보조 헤드 2개) · `vit`(단일 ViT, 2.7M) · `hybrid`(CNN stem+Transformer, 0.58M) — `src/models/cnn.py`, `vit.py`.
   텍스트 모델: `charcnn` · `bilstm`(`text_models.py`), 별도 sklearn 베이스라인 `baseline_tfidf.py`.
 - ⚠️ 새 이미지 모델 추가 시 `IMAGE_MODELS` 를 **2곳** 갱신: `train.py`, `cross_validate.py`(트랙의 "5곳"과는 별개).
 - ⚠️ `train.py` 를 `--smoke` 없이 돌리면 **추적 대상 그림**(`docs/figures/models/cm_*.png`)을 덮어씀 → 로컬 코드 검증은 반드시 `--smoke`(저장 생략).
@@ -79,5 +79,8 @@
 - 방어 구성(Phase 11): `cascade.py --defense advtrain --mutation-split {S0,SA} --aug-ratio ρ` → **1·2차 양쪽** 방어본을 조립하고 τ 를 그 구성의 val 에서 **재선택**한다(확신도 분포가 달라 기존 τ 재사용 불가).
 - 체크포인트/산출물 tag 는 `tagging.build_tag` 단일 진실 소스 + 캐스케이드 고유 축(2차 모델·τ 선택 규칙·방어) 추가. ⚠️ cascade.py 가 규칙 사본을 들고 있었으나 tagging.py 로 통합됨(2026-08-02).
 - ⚠️ **"막아둔 조합"이 tag 버그를 가린다**: `run_evasion` 이 캐스케이드+채널을 `p.error` 로 막고 있던 동안, 저장 tag 의 채널 축이 `model=="cnn"` 조건에 묶여 있는 걸 아무도 못 봤다. 차단을 푼 즉시 RGB 결과가 gray 결과를 덮어씀(2026-08-02, docs/10 §5.1). → **축은 그 조합을 쓸 수 있게 되기 전에 tag 에 넣어둘 것.** 차단을 풀 때는 저장 경로의 tag 부터 점검.
+- 조기종료 1차(Phase 12/M4): `cascade.py --stage1 cnn_ee`. 종료 임계값은 **val 에서 선택 → test 1회 적용**(τ 와 같은 원칙, 순서는 임계값 → τ).
+  ⚠️ 조기종료는 **마스킹이 아니라 축소 배치**로 구현돼 있다(그래야 지연이 실제로 준다). 근거는 eval 모드 BatchNorm 의 running stats — 학습 모드에서 이 경로를 타게 만들면 배치 구성에 따라 결과가 흔들린다(`tests/test_early_exit.py` 가 고정).
+  ⚠️ 조기종료 모델의 지연은 **배치 구성이 곧 비용** → `measure_latency(sample_idx=...)` 로 무작위 대표 배치를 쓴다(앞 N개만 재면 클래스 편향).
 - ⚠️ 캐스케이드가 줄이는 건 **추론 지연**뿐. 두 모델을 다 학습하므로 **학습 비용은 합산** — 근거는 처리량(docs/04 §5: 81,964 vs 6,010 /s)이지 학습 지표(s/epoch)가 아님.
 - ⚠️ 캐스케이드 고유 리스크: 회피 변형이 1차 확신도를 낮추면 에스컬레이션↑ → **정확도 그대로인데 지연만 폭증**(비용 기반 공격). `run_evasion` 이 조건별 `escalation_rate` 를 함께 기록.

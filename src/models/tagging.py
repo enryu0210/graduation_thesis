@@ -34,6 +34,11 @@ DEFAULT_AUG_BUDGET = 3
 
 DEFENSE_MODES = ("none", "advtrain", "norm")
 
+# Phase 12 (M4) 조기종료 축. 보조 헤드 손실 가중치는 **학습을 가르는 축**이라 체크포인트 tag 에
+# 들어가고, 조기종료 임계값은 **추론 손잡이**라 결과 tag 에만 들어간다(τ 와 같은 성격).
+# 기본값이면 접미사를 생략해 기존 파일명과 호환된다.
+DEFAULT_AUX_WEIGHT = 0.3
+
 
 def defense_suffix(defense: str = "none", mutation_split: str | None = None,
                    aug_ratio: float | None = None) -> str:
@@ -54,11 +59,36 @@ def defense_suffix(defense: str = "none", mutation_split: str | None = None,
     raise ValueError(f"알 수 없는 방어 방식: {defense} (가능: {DEFENSE_MODES})")
 
 
+def aux_weight_suffix(aux_weight: float | None = None) -> str:
+    """조기종료 보조 헤드 손실 가중치 접미사(학습 축).
+
+    ⚠️ 조기종료 모델은 이름(`cnn_ee`)이 이미 tag 에 들어가므로 축이 하나 더 필요한 이유는
+    "같은 조기종료 모델을 서로 다른 가중치로 학습한 것"을 구분하기 위해서다. 이 축이 없으면
+    가중치 ablation 이 서로 덮어쓴다(커밋 5eede2f 형 사고).
+    """
+    if aux_weight is None or aux_weight == DEFAULT_AUX_WEIGHT:
+        return ""
+    return f"_aw{aux_weight:g}"
+
+
+def exit_suffix(exit_threshold: float | None = None) -> str:
+    """조기종료 임계값 접미사(추론 축 — 결과 파일에만 붙인다).
+
+    체크포인트에는 붙이지 않는다. 임계값이 달라도 가중치는 같은 파일이며, 이 값은
+    캐스케이드의 τ 처럼 val 에서 골라 test 에 1회 적용하는 운영점이기 때문이다.
+    None(= 조기종료를 쓰지 않음/기본 운영점)이면 생략해 기존 파일명과 호환된다.
+    """
+    if exit_threshold is None:
+        return ""
+    return f"_ex{exit_threshold:g}"
+
+
 def build_tag(track: str, model: str, text: str = "raw", *,
               channels: str = "gray", encoders: tuple[str, str, str] | None = None,
               patch: str | None = None, lr: float | None = None,
               balance: bool = False, defense: str = "none",
-              mutation_split: str | None = None, aug_ratio: float | None = None) -> str:
+              mutation_split: str | None = None, aug_ratio: float | None = None,
+              aux_weight: float | None = None) -> str:
     """산출물/체크포인트 공통 tag 를 만든다.
 
     인자는 "이미 결정된 값"만 받는다(모델이 이미지인지 등의 판정은 호출부 책임).
@@ -66,10 +96,12 @@ def build_tag(track: str, model: str, text: str = "raw", *,
     - patch             : ViT 전용. None 이면 생략
     - lr                : DEFAULT_LR 이거나 None 이면 생략
     - defense 계열      : defense_suffix 참조
+    - aux_weight        : 조기종료(cnn_ee) 전용. 기본값이거나 None 이면 생략
     """
     ch_tag = data_image._channel_suffix(channels, encoders)
     patch_tag = f"_p{patch}" if patch else ""
     lr_tag = "" if (lr is None or lr == DEFAULT_LR) else f"_lr{lr:g}"
+    aw_tag = aux_weight_suffix(aux_weight)
     def_tag = defense_suffix(defense, mutation_split, aug_ratio)
     bal_tag = "_bal" if balance else ""
-    return f"{track}_{model}_{text}{ch_tag}{patch_tag}{lr_tag}{def_tag}{bal_tag}"
+    return f"{track}_{model}_{text}{ch_tag}{patch_tag}{lr_tag}{aw_tag}{def_tag}{bal_tag}"

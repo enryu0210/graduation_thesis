@@ -46,7 +46,7 @@ RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 
 # 모델 종류별 입력 경로가 다르다(이미지 npz / 문자열 CSV / TF-IDF).
 # ⚠️ train.py 의 IMAGE_MODELS 와 함께 갱신할 것(이미지 모델 추가 시 두 곳).
-IMAGE_MODELS = {"cnn", "vit", "hybrid"}
+IMAGE_MODELS = {"cnn", "cnn_ee", "vit", "hybrid"}
 TEXT_NN_MODELS = {"charcnn", "bilstm"}
 TFIDF_MODELS = {"tfidf_logreg", "tfidf_rf"}
 ALL_MODELS = IMAGE_MODELS | TEXT_NN_MODELS | TFIDF_MODELS
@@ -204,6 +204,11 @@ def run_fold_torch(model_name: str, pool_x, y, classes, tr_idx, va_idx, te_idx,
     in_channels = 3 if (is_image and pool_x.ndim == 4 and pool_x.shape[-1] == 3) else 1
     model = T.build_model(model_name, len(classes), in_channels=in_channels,
                           patch=args.patch).to(device)
+    if model_name == "cnn_ee":
+        # train.py 와 같은 규칙: CV 지표는 **조기종료를 끈** 전 깊이 기준이다.
+        # 임계값은 val 에서 고르는 운영점이라 CV(설정 간 비교)에서는 켜면 안 된다.
+        import cnn as cnn_mod
+        model.exit_threshold = cnn_mod.NO_EARLY_EXIT
 
     model, best_val_f1, best_epoch = T.fit(
         model, train_loader, val_loader, classes, class_weights, device,

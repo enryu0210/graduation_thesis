@@ -59,7 +59,8 @@ from payload_to_image import payload_to_image, payload_to_rgb_image  # noqa: E40
 from preprocess import normalize_text  # noqa: E402  (입력 정규화 방어 — 전처리와 같은 함수를 쓴다)
 import data_image  # noqa: E402  (채널 접미사 규칙 재사용)
 from tagging import (  # noqa: E402
-    DEFAULT_AUG_RATIO, DEFENSE_MODES, build_tag, defense_suffix,
+    DEFAULT_AUG_RATIO, DEFENSE_MODES, aux_weight_suffix, build_tag, defense_suffix,
+    exit_suffix,
 )
 import problem_space as PS  # noqa: E402
 
@@ -224,7 +225,9 @@ def build_torch_predict(track: str, model_name: str, side: int, max_len: int,
 def load_cascade_tau(track: str, stage2: str, text: str, balanced: bool,
                      channels: str = "gray", encoders: tuple[str, ...] | None = None,
                      defense: str = "none", mutation_split: str | None = None,
-                     aug_ratio: float | None = None) -> float:
+                     aug_ratio: float | None = None, stage1: str = "cnn",
+                     aux_weight: float | None = None,
+                     exit_threshold: float | None = None) -> float:
     """cascade.py 가 val 에서 확정해 저장한 운영 임계값 τ 를 읽어온다.
 
     왜 파일에서 읽나: τ 를 여기서 다시 고르면 **회피 실험 데이터로 τ 를 튜닝**하는 셈이라
@@ -235,12 +238,20 @@ def load_cascade_tau(track: str, stage2: str, text: str, balanced: bool,
     채널·방어 축이 빠져 있어 gray 구성의 τ 를 RGB 구성에 쓸 수 있었다(그래서 그 조합 자체를
     막아뒀다). 이제 cascade.py 가 축을 전부 tag 에 넣으므로 여기서도 같은 규칙으로 찾는다.
     다른 운영점을 시험하려면 `--tau` 로 직접 넘긴다.
+
+    ⚠️ stage1 축(조기종료, Phase 12/M4)은 **아직 이 스크립트가 공격 대상으로 지원하지 않지만**
+    미리 넣어둔다. 축이 없으면 조기종료 캐스케이드를 공격할 수 있게 되는 순간 **일반 CNN
+    캐스케이드의 τ 를 조용히 집어** 엉뚱한 운영점을 시험하게 된다 — 막아둔 조합이 tag 버그를
+    가리다가 차단을 푸는 순간 터진 2026-08-02 사고(docs/10 §5.1)와 정확히 같은 구조다.
     """
     s2 = "" if stage2 == "charcnn" else f"-{stage2}"
     ch_tag = data_image._channel_suffix(channels, encoders)
     def_tag = defense_suffix(defense, mutation_split, aug_ratio)
+    # cascade.py 의 저장 tag 와 같은 순서·같은 규칙(사본이 아니라 tagging.py 의 함수를 쓴다).
+    ee_tag = ("" if stage1 != "cnn_ee"
+              else "_ee" + aux_weight_suffix(aux_weight) + exit_suffix(exit_threshold))
     path = (RESULTS_DIR /
-            f"{track}_cascade{s2}_{text}{ch_tag}{def_tag}{'_bal' if balanced else ''}.json")
+            f"{track}_cascade{s2}_{text}{ch_tag}{ee_tag}{def_tag}{'_bal' if balanced else ''}.json")
     if not path.exists():
         rebuild = (f"python src/models/cascade.py --track {track} --stage2 {stage2}"
                    f"{' --balance' if balanced else ''}"
