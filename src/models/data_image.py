@@ -27,6 +27,7 @@ IMAGES_DIR = PROJECT_ROOT / "data" / "images"
 _ENCODER_ABBR = {
     "raw_byte": "rb",
     "char_class": "cc",
+    "normalized_char_class": "nc",
     "local_entropy": "le",
     "bit_popcount": "bp",
     "structural_special": "ss",

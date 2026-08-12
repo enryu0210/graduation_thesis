@@ -63,6 +63,7 @@ def encode_labels(labels: pd.Series) -> tuple[np.ndarray, list[str]]:
 _ENCODER_ABBR = {
     "raw_byte": "rb",
     "char_class": "cc",
+    "normalized_char_class": "nc",
     "local_entropy": "le",
     "bit_popcount": "bp",
     "structural_special": "ss",
