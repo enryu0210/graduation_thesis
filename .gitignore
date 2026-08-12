@@ -35,3 +35,8 @@ kaggle.json
 Thumbs.db
 .vscode/
 .idea/
+
+# --- 제출용 압축본 ---
+# reports 의 인용 논문 PDF 는 개별 파일로 추적한다. 압축본은 그 중복이라 제외.
+# (docs/reports/README.md "함께 두는 인용 논문 PDF" 절 참조)
+docs/reports/*.zip

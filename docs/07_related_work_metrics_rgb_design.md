@@ -38,7 +38,20 @@
   (이미 metrics.py 의 `attack_focused`(benign-evasion)로 부분 대응 중.)
 
 ### 1.3 불균형 보안 데이터 지표 모범사례 (핵심 발견)
-- **"ROC-AUC는 고불균형에서 오해를 부른다"** (MDPI Technologies 2025): 클래스 불균형·비대칭 비용에서
+
+> **서지 확정(2026-08-12, G5 상환)** — 원문 대조로 파일명·권호를 확정했다. 아래 두 편이 근거이며,
+> PDF 는 `docs/thetics/`(gitignore)에 있고 목록의 추적본은 **docs/12 §1.3** 이다.
+> - `technologies-14-00054-v2.pdf` — Imani, Joudaki, Bagheri, Arabnia. *Why ROC-AUC Is Misleading
+>   for Highly Imbalanced Data: In-Depth Evaluation of MCC, F2-Score, H-Measure, and AUC-Based
+>   Metrics Across Diverse Classifiers*. **Technologies 2026, 14(1), 54**. doi:10.3390/technologies14010054
+>   ⚠️ 아래 원문에 *"MDPI Technologies 2025"* 로 적혀 있던 것은 **오기**다 — 게재는 2026-01-10.
+> - `2512.19203v2.pdf` — Thiyagarajan & Williams. *Evaluating MCC for Low-Frequency Cyberattack
+>   Detection in Imbalanced Intrusion Detection Data*. **arXiv:2512.19203v2**, 2026-01.
+>   같은 논지의 **침입탐지 도메인 판본**(CSE-CIC-IDS2017) — accuracy 가 소수 공격 클래스의 실패를
+>   가리고 MCC 가 그것을 드러낸다. 우리 트랙(Normal 3.4k vs 공격 각 28~40k)과 조건이 같아
+>   **지표 선택의 도메인 근거로 함께 인용**한다.
+
+- **"ROC-AUC는 고불균형에서 오해를 부른다"** (Imani et al., Technologies 2026): 클래스 불균형·비대칭 비용에서
   ROC-AUC가 분류기 간 실무적 차이를 가린다.
 - **MCC (Matthews Correlation Coefficient)** 가 불균형에 강건 — "높은 MCC는 항상 높은 ROC-AUC를 함의하지만 역은 아님".
   MCC 최적화 모델이 Acc/AUC 최적화보다 정규화 MCC 우수(0.80 vs 0.78/0.73).

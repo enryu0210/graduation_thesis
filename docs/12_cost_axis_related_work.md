@@ -5,6 +5,9 @@
 > 주제로 한 선행연구가 있는가"** 를 조사한 결과.
 > **⚠️ `docs/thetics/` 는 `.gitignore` 대상(27행)이라 PDF 는 추적되지 않는다.
 > 이 문서가 수집 목록의 유일한 추적본이므로, 논문을 추가하면 여기에도 반드시 적는다.**
+> **→ 전체 목록은 §1.3 이다**(§1·§1.1 은 Phase 12 의 비용 축 수집분만 다룬다).
+> 2026-08-12 전수 대조에서 **6편이 어느 문서에도 없었다** — gitignore 라 기기를 옮기면
+> 사라질 상태였다. §1.3 이 그 상환분이다.
 
 ---
 
@@ -57,6 +60,32 @@
 | *Multi-Shield* = Robust image classification with multi-modal LLMs, **Pattern Recognition Letters 2025**, doi:10.1016/j.patrec.2025.04.022 | OA 로 표시되나 ScienceDirect 가 CAPTCHA 로 막음 | M1 의 최신 유사 사례(보조) |
 
 → 학교 도서관 프록시 또는 브라우저에서 직접 받을 것. **M4 를 포기하면 FastDet 은 불필요**(§4.3).
+
+### 1.3 ⭐ `docs/thetics/` 전체 인벤토리 (18편, 2026-08-12 전수 대조)
+
+⚠️ **§1·§1.1 은 Phase 12 의 '비용 축' 수집분만 적은 것이었다.** 그 앞 Phase 에서 모은 논문은
+어느 문서에도 파일명이 없었고, `docs/thetics/` 가 gitignore 대상이라 **기기를 옮기면 조용히
+사라질 상태**였다(실제로 6편이 그랬다 — 아래 🆕 표시). 여기서 전수 기록해 상환한다(G5 부분 상환).
+**앞으로 논문을 추가하면 이 표에 적는다.**
+
+| 파일명 | 서지 | 논문에서 쓰는 곳 |
+|---|---|---|
+| 🆕 `2016904.2016908.pdf` ⭐ | Nataraj, Karthikeyan, Jacob, Manjunath. *Malware Images: Visualization and Automatic Classification*. **VizSec 2011**. doi:10.1145/2016904.2016908 | **이미지화 계열의 원점.** 바이트-플롯 = 우리 R 채널(`raw_byte`)의 근거. 마스터 §10 |
+| 🆕 `3510003.3510229.pdf` ⭐ | Wu, Zou, Dou, Yang, Xu et al. *VulCNN: An Image-inspired Scalable Vulnerability Detection System*. **ICSE 2022**. doi:10.1145/3510003.3510229 | 소스코드 이미지화 + **채널에 구문 정보**를 넣는 계열 → G 채널(`char_class`) 근거 |
+| 🆕 `applsci-15-07163-v2.pdf` | Eroğlu Demirkan & Aydos. *Enhancing Malware Detection via RGB Assembly Visualization and Hybrid Deep Learning Models*. **Appl. Sci. 2025, 15, 7163**. doi:10.3390/app15137163 | "assembly-RGB 의 green 채널에 구문 정보" — `channel_encoders.py` 가 인용하는 그 논문 |
+| 🆕 `EBSCO-FullText-2026. 07. 15..pdf` | Tadhani, Vekariya, Sorathiya, Alshathri, El-Shafai. *Securing web applications against XSS and SQLi attacks using a novel deep learning approach*. **Scientific Reports 14:1803 (2024)**. doi:10.1038/s41598-023-48845-4 | **텍스트 기반 웹공격 탐지 비교 대상**(CNN+LSTM 하이브리드). 마스터 §10 |
+| 🆕 `technologies-14-00054-v2.pdf` ⭐ | Imani, Joudaki, Bagheri, Arabnia. *Why ROC-AUC Is Misleading for Highly Imbalanced Data: In-Depth Evaluation of MCC, F2-Score, H-Measure, and AUC-Based Metrics*. **Technologies 2026, 14(1), 54**. doi:10.3390/technologies14010054 | **지표 선택(MCC·PR-AUC)의 근거.** docs/07 §1.3 |
+| 🆕 `2512.19203v2.pdf` | Thiyagarajan & Williams. *Evaluating MCC for Low-Frequency Cyberattack Detection in Imbalanced Intrusion Detection Data*. **arXiv:2512.19203v2**, 2026-01 | 위 지표 근거의 **침입탐지 도메인 판본**(CSE-CIC-IDS2017). docs/07 §1.3 보강 |
+| `시그니처 기반 필터링과 2D-CNN을…hybrid.pdf` | (국문) 시그니처 기반 필터링 + 2D-CNN 하이브리드 악성 트래픽 탐지 | 국내 선행. 캐스케이드 구조의 국문 대조 |
+| `2312.13041v1.pdf` ⭐ · `mdpi_lightweight_cascade_zeroday.pdf` · `tiis_two_stage_waf_stacked_ensemble.pdf` | §1 표 참조 | 비용 축 캐스케이드 3편 |
+| `deepsloth_2010.02432.pdf` ⭐ · `feature_squeezing_ndss2018.pdf` ⭐ | §1 표 참조 | F7·M1 의 직접 선행 |
+| `calexnet_…2509.08318.pdf` · `p4sdn_…2509.12291.pdf` · `cascading_llm_failure_2605.17288.pdf` | §1 표 참조 | 조기종료·캐스케이드 붕괴 |
+| `acm_sac2025_earlyexit_ids.pdf` · `acm_csur_earlyexit_survey.pdf` | §1.1 표 참조 | M4 의 선행(미채택이지만 관련연구에는 남김) |
+
+> **`docs/reports/` 에 사본이 있는 5편**(`2312.13041v1` · `2512.19203v2` · `deepsloth_2010.02432` ·
+> `feature_squeezing_ndss2018` · `s42400-023-00170-z`)은 **2026-08-12 부터 git 추적 대상**이다.
+> 교수님 제출 묶음으로 복사해 둔 것이고, 커밋해 두면 다른 기기에서 다시 받을 필요가 없다.
+> 나머지 13편은 여전히 `docs/thetics/`(gitignore)에만 있으므로 **이 표가 유일한 흔적**이다.
 
 ---
 
