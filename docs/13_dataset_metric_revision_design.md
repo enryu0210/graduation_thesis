@@ -131,6 +131,25 @@ MCC 는 보고 열이 아니라 **자동 의사결정의 기준값**으로 코�
 **기준 지표는 Macro-F1 로 이관한다.** 근거: §1.3 대로 최근 논문의 공통 통화이고,
 클래스별 성능을 균등 가중해 소수 클래스 실패가 드러나므로 MCC 의 역할을 가장 가깝게 대체한다.
 
+### 1.5 구현 완료 (2026-08-13)
+
+| 파일 | 변경 |
+|---|---|
+| `src/eval/metrics.py` | `mcc` 제거 / `attack_score` · `tpr_at_fpr` · `partial_roc_auc` · `attack_operating_points` · `calibration_metrics` · `alert_load` · `save_reliability_diagram` 신설. 기준값은 모듈 상수(`TARGET_FPRS` · `PAUC_MAX_FPR` · `DEPLOYMENT_ATTACK_PREVALENCES` · `ECE_N_BINS`) |
+| `src/eval/cross_validate.py` | fold 요약에서 `mcc` 제거, 중첩 지표(`pauc` · `ece` · `benign_evasion_rate`)와 `tpr_at_fpr_*` 평탄화 추가. ⚠️ **일부 fold 에만 있는 지표는 요약에서 제외** — 부분 평균은 paired 비교를 오염시킨다 |
+| `src/eval/cv_compare.py` | `--metric` 기본값 `macro_f1`, `choices` 에 신설 지표 추가. `LOWER_IS_BETTER`(ece·benign-evasion) 도입 → 순위 정렬 방향과 그림 x축 범위 보정 |
+| `src/models/cascade.py` | `EXIT_F1_TOLERANCE` 로 개명, 조기종료 임계값 선택·H7-1 판정·콘솔 출력을 Macro-F1 기준으로 재작성. 교정 곡선 저장 추가 |
+| `src/models/train.py`, `baseline_tfidf.py` | 교정 곡선(`cal_<tag>.png`) 저장 추가 |
+| `tests/test_metrics.py` | **신규 24개** — 손계산 대조로 정의를 못박음. `mcc` 부활 방지 테스트 포함 |
+
+**검증**: `pytest tests/ -q` → **166 passed**. `train.py --track csic_binary --model cnn --smoke`
+로 실제 데이터 경로 통과 확인(콘솔에 TPR@FPR·pAUC·ECE 노출).
+
+⚠️ **경보 부하가 왜 필요한지 실제로 드러난 예** (합성 입력 점검):
+Accuracy 0.997 / Macro-F1 0.995 / PR-AUC 1.000 / ROC-AUC 1.000 인 모델도, FPR 0.03 에
+배포 공격비율 0.1% 를 가정하면 **경보 정밀도가 0.032** 로 붕괴한다(100만 요청당 헛경보 29,970건
+vs 진짜 1,000건). 기존 지표만 보고했다면 이 모델을 "완벽"으로 보고했을 것이다.
+
 ⚠️ **허용폭 0.0011 은 그대로 쓸 수 없다.** 이 값은 "단일 split 실행 간 MCC 흔들림 ±0.11pp"를
 실측해 정한 것이다(docs/07 §2.5). 지표가 Macro-F1 로 바뀌고 데이터셋도 바뀌므로
 **새 트랙에서 같은 방식으로 노이즈 폭을 재측정**한 뒤 값을 정한다. (동일 설정 반복 학습 → 표준편차)
@@ -306,11 +325,11 @@ WADBERT 2026 둘 다 CSIC 2010 + SR-BH 2020 병기). → **삭제하면 선행�
 - [ ] `src/data/download_srbh.py` 신설 + `.gitignore` 에 `data/raw/srbh2020/` 추가 후 `git check-ignore -v` 확인
 - [ ] SR-BH 라벨 노이즈 자체 감사(§2.6) → 48,522건 규모 재현 확인
 - [ ] CAPEC→4클래스 매핑 구현(§2.5 규칙 3건) + 제외 건수 보고
-- [ ] `metrics.py`: TPR@FPR · pAUC · 경보부하 · ECE 추가 / MCC 제거(§1.4 표 5개 지점 동시 처리)
-- [ ] Macro-F1 노이즈 폭 재측정 → `EXIT_F1_TOLERANCE` 값 확정(§1.4)
-- [ ] `pytest tests/ -q` 통과 후 GPU 재실행 착수(§4 순서)
-- [ ] docs/07 §1.3 의 지표 근거를 Arp et al. 로 교체(마스터 문서 §11 주장강도 표도 동기화)
-- [ ] 마스터 설계문서 §3 데이터셋 표를 §2.4 로, §6.1 지표 목록을 §1.2 로 갱신
+- [x] `metrics.py`: TPR@FPR · pAUC · 경보부하 · ECE 추가 / MCC 제거 → **완료(§1.5)**, 166 tests pass
+- [x] docs/07 §1.3·§3 에 Phase 13 대체 표시, 마스터 설계문서 §6.1 지표 목록 갱신 → **완료**
+- [ ] Macro-F1 노이즈 폭 재측정 → `EXIT_F1_TOLERANCE` 값 확정(§1.4). ⚠️ **새 트랙 준비 후에 할 일**
+- [ ] GPU 재실행 착수(§4 순서)
+- [ ] 마스터 설계문서 §3 데이터셋 표를 §2.4 로 갱신(데이터셋 교체 실행 시점에)
 - [ ] docs/12 §1 수집목록에 §6 인용문헌 6편 등재
 
 ---

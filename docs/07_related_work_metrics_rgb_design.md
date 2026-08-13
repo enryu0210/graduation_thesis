@@ -39,6 +39,12 @@
 
 ### 1.3 불균형 보안 데이터 지표 모범사례 (핵심 발견)
 
+> ⚠️ **이 절은 Phase 13(docs/13 §1.2)으로 대체되었다** — 2026-08-13 교수 미팅.
+> 근거 문헌이 **Arp et al. (USENIX Security 2022 / CACM 67(11):104–112, 2024)** 로 격상됐고,
+> **MCC 는 지표군에서 제거**됐다(기준 지표는 Macro-F1 로 이관, docs/13 §1.4).
+> 아래 두 편은 삭제하지 않고 **보조 근거**로 남긴다. 아래 §2.4·§2.5 의 MCC 수치는
+> **당시 실측 기록**이므로 그대로 보존한다(재측정 후에는 docs/13 §4 의 새 수치를 쓴다).
+
 > **서지 확정(2026-08-12, G5 상환)** — 원문 대조로 파일명·권호를 확정했다. 아래 두 편이 근거이며,
 > PDF 는 `docs/thetics/`(gitignore)에 있고 목록의 추적본은 **docs/12 §1.3** 이다.
 > - `technologies-14-00054-v2.pdf` — Imani, Joudaki, Bagheri, Arabnia. *Why ROC-AUC Is Misleading
@@ -161,11 +167,16 @@ gray 를 기준으로 한 7쌍 비교에서 gray 는 **RGB 4조합 전부에 유
 
 ---
 
-## 3. 성과지표 개편 (③) — 구현 계획
+## 3. 성과지표 개편 (③) — 구현 완료 (⚠️ Phase 13 에서 재개편됨)
 - `src/eval/metrics.py` `compute_metrics` 에 추가: `mcc`, `pr_auc_macro`(Average Precision, OvR macro),
   그리고 `attack_focused` 는 이미 FPR(normal_false_positive_rate) 제공 → 요약 출력에 노출.
 - 모든 모델이 같은 함수로 계산되므로 **베이스라인/CNN/RGB 전부 자동 반영**(단일 진실 소스 유지).
 - 논문 표: (Acc) · Macro-F1 · **MCC** · **PR-AUC** · benign-evasion · FPR 열로 재구성.
+
+> ⚠️ **Phase 13(2026-08-13)에서 위 구성이 교체되었다 — 최신 정의는 docs/13 §1.2.**
+> `mcc` 는 코드에서 삭제됐고, `operating_points`(TPR@FPR·pAUC) · `calibration`(ECE) ·
+> `attack_focused.alert_load`(base rate 환산 경보부하)가 신설됐다.
+> 논문 표 구성도 docs/13 §1.2 (나) 표를 따른다.
 
 ---
 

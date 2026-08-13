@@ -176,14 +176,14 @@ def test_single_head_model_path_is_unchanged():
 
 # ── 임계값 선택 규칙 ─────────────────────────────────────────────────────────
 def _exit_rows(pairs):
-    """(임계값, MCC, 평균깊이) 목록을 스윕 행 형태로."""
-    return [{"exit_threshold": t, "mcc": m, "macro_f1": m, "accuracy": m,
+    """(임계값, Macro-F1, 평균깊이) 목록을 스윕 행 형태로."""
+    return [{"exit_threshold": t, "macro_f1": m, "accuracy": m,
              "exit_rates": [0.0, 0.0, 1.0], "mean_exit_depth": d}
             for t, m, d in pairs]
 
 
 def test_select_picks_the_cheapest_point_within_tolerance():
-    # 무종료(임계값 최대) MCC=0.9700. 허용 0.0011 안에 드는 것 중 평균 깊이가 가장 얕은 것.
+    # 무종료(임계값 최대) Macro-F1=0.9700. 허용 0.0011 안에 드는 것 중 평균 깊이가 가장 얕은 것.
     rows = _exit_rows([(0.0, 0.9000, 1.0), (0.5, 0.9695, 1.4), (0.9, 0.9699, 2.1),
                        (1.01, 0.9700, 3.0)])
     out = select_exit_threshold(rows, tolerance=0.0011)

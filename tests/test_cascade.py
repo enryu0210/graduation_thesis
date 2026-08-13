@@ -74,7 +74,7 @@ def test_tau_grid_spans_both_extremes():
 # ── select_tau: 운영점 선택 규칙 ──────────────────────────────────────────────
 def _rows(pairs):
     """(escalation, macro_f1) 목록을 스윕 행 형태로 만든다."""
-    return [{"tau": 0.1 * i, "escalation_rate": e, "macro_f1": f, "mcc": f,
+    return [{"tau": 0.1 * i, "escalation_rate": e, "macro_f1": f,
              "accuracy": f, "benign_evasion_rate": 0.0,
              "normal_false_positive_rate": 0.0}
             for i, (e, f) in enumerate(pairs)]

@@ -344,20 +344,40 @@ def main() -> None:
         print(f"  fold {k}: " + M.format_summary(args.model, res))
 
     # 3) fold 간 요약(평균±표준편차) — 유의성 판정은 cv_compare.py 담당
-    keys = ["accuracy", "macro_f1", "mcc", "pr_auc_macro"]
+    # ⚠️ Phase 13: mcc 제거, 기준 지표는 macro_f1(docs/13 §1.4). pauc·ece 를 새로 실었다.
+    keys = ["accuracy", "macro_f1", "pr_auc_macro"]
     summary = {}
     for key in keys:
         vals = [r[key] for r in fold_results if isinstance(r.get(key), (int, float))]
         if vals:
             summary[key] = {"mean": float(np.mean(vals)), "std": float(np.std(vals, ddof=1)),
                             "per_fold": [float(v) for v in vals]}
-    # benign-evasion 은 attack_focused 안에 있어 따로 추출한다(보안 헤드라인 지표).
-    ev = [r["attack_focused"]["benign_evasion_rate"] for r in fold_results
-          if "attack_focused" in r]
-    if ev:
-        summary["benign_evasion_rate"] = {"mean": float(np.mean(ev)),
-                                          "std": float(np.std(ev, ddof=1)),
-                                          "per_fold": [float(v) for v in ev]}
+
+    # 중첩 딕셔너리 안에 있는 지표들은 따로 꺼낸다(fold 간 평균을 내려면 평탄화가 필요).
+    #   경로 → cv 요약 키. 값이 None 인 fold 가 섞이면(예: 한 클래스만 있는 fold)
+    #   해당 지표는 요약에서 빼 버린다 — 일부 fold 만 있는 평균은 비교를 오염시킨다.
+    nested = {
+        "benign_evasion_rate": ("attack_focused", "benign_evasion_rate"),
+        "pauc": ("operating_points", "pauc"),
+        "ece": ("calibration", "ece"),
+    }
+    for out_key, (parent, child) in nested.items():
+        vals = [r[parent][child] for r in fold_results
+                if isinstance(r.get(parent), dict)
+                and isinstance(r[parent].get(child), (int, float))]
+        if len(vals) == len(fold_results):
+            summary[out_key] = {"mean": float(np.mean(vals)), "std": float(np.std(vals, ddof=1)),
+                                "per_fold": [float(v) for v in vals]}
+
+    # 저 FPR 운영 지점의 TPR — 목표 FPR 별로 별도 키(tpr_at_fpr_0.01 등)로 싣는다.
+    for i, target in enumerate(M.TARGET_FPRS):
+        vals = [r["operating_points"]["tpr_at_fpr"][i]["tpr"] for r in fold_results
+                if isinstance(r.get("operating_points"), dict)
+                and isinstance(r["operating_points"]["tpr_at_fpr"][i].get("tpr"), (int, float))]
+        if len(vals) == len(fold_results):
+            summary[f"tpr_at_fpr_{target:g}"] = {
+                "mean": float(np.mean(vals)), "std": float(np.std(vals, ddof=1)),
+                "per_fold": [float(v) for v in vals]}
 
     # tag 규칙은 tagging.build_tag 단일 진실 소스를 쓴다(train.py 와 자동으로 일치).
     # ⚠️ Phase 11 방어 arm 의 CV 는 아직 미지원이다 — cross_validate 는 npz 풀에서 fold 를

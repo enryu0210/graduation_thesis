@@ -152,7 +152,11 @@ RQ1 은 원래 *"이미지 기반 CNN 이 텍스트 모델과 **유사하거나 
 ## 6. 실험 설계
 
 ### 6.1 RQ1 — 정확도–비용 Pareto 위치
-- 지표: Accuracy, Macro-F1, **MCC**, PR-AUC, ROC-AUC + attack-focused(benign-evasion/FPR)
+- 지표(**Phase 13 개편, docs/13 §1.2 가 최신**): Precision/Recall/**Macro-F1** · PR-AUC ·
+  **TPR@1%FPR·TPR@0.1%FPR** · **pAUC(FPR≤0.01)** · **경보부하(base rate 환산)** · **ECE**
+  + attack-focused(benign-evasion/FPR). Accuracy·전구간 ROC-AUC 는 부록.
+  ⚠️ **MCC 는 제거됨**(2026-08-13 교수 지시). 기준 지표는 Macro-F1 로 이관(docs/13 §1.4).
+  아래 §4 의 F2 등 **과거 실측 수치는 MCC 로 측정된 기록**이므로 그대로 읽고, 새 측정과 섞지 말 것.
 - **비용 지표**: 추론 처리량(/s)과 지연(ms/sample) — 이 축이 결론의 본체
 - 5-fold CV(train/val/test 를 풀로 합쳐 재분할) + paired t-test + **Holm 보정**
 - ⚠️ 단일 split 은 실행 간 ±0.11pp 흔들림(cuDNN 비결정성) → 우열 주장은 **반드시 CV 로 판정**

@@ -17,7 +17,7 @@ Phase 4/RQ1 보강 — 교차검증 결과 비교 + paired t-test (유의성 판
     - 쌍별 비교를 여러 번 하면 우연히 유의해질 확률이 커진다 → Holm-Bonferroni 보정을 적용한다.
 
 사용법:
-    python src/eval/cv_compare.py                     # MCC 기준 전체 비교
+    python src/eval/cv_compare.py                     # Macro-F1 기준 전체 비교
     python src/eval/cv_compare.py --metric macro_f1
     python src/eval/cv_compare.py --ref payload_4class_cnn_raw_rgb   # 특정 설정 기준 비교
 """
@@ -94,13 +94,20 @@ def holm_bonferroni(pvals: list[float]) -> list[float]:
     return adjusted.tolist()
 
 
+# 값이 작을수록 좋은 지표들 — 순위 방향과 그림 축을 뒤집어야 한다.
+# (Phase 13 에서 ece 가 추가되며 필요해졌다. benign_evasion_rate 도 원래 여기 속한다.)
+LOWER_IS_BETTER = {"benign_evasion_rate", "ece"}
+
+
 def plot_ranking(runs: dict[str, np.ndarray], metric: str, out_path: Path) -> None:
     """평균±표준편차 막대그래프. 라벨은 ASCII 만(한글은 □ 로 깨짐 — CLAUDE.md)."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    items = sorted(runs.items(), key=lambda kv: kv[1].mean(), reverse=True)
+    # 낮을수록 좋은 지표는 오름차순으로 정렬해야 위쪽이 '더 좋은 설정'이 된다.
+    items = sorted(runs.items(), key=lambda kv: kv[1].mean(),
+                   reverse=metric not in LOWER_IS_BETTER)
     names = [short_name(t) for t, _ in items]
     means = [v.mean() for _, v in items]
     stds = [v.std(ddof=1) for _, v in items]
@@ -112,9 +119,12 @@ def plot_ranking(runs: dict[str, np.ndarray], metric: str, out_path: Path) -> No
     ax.invert_yaxis()
     ax.set_xlabel(f"{metric} (5-fold mean +- SD)")
     ax.set_title(f"RQ1 5-fold cross-validation: {metric}")
-    # 값 차이가 작아 0부터 그리면 구분이 안 된다 → 관심 구간만 확대.
+    # 값 차이가 작아 전 구간(0~1)을 그리면 막대가 구분되지 않는다 → 데이터 범위만 확대한다.
+    # ⚠️ 상한을 1.0 으로 고정하면 ECE(0.01 수준)나 benign-evasion 은 막대가 보이지 않는다.
     lo = min(m - s for m, s in zip(means, stds))
-    ax.set_xlim(max(0.0, lo - 0.01), 1.0)
+    hi = max(m + s for m, s in zip(means, stds))
+    margin = max((hi - lo) * 0.15, 0.005)
+    ax.set_xlim(max(0.0, lo - margin), min(1.0, hi + margin))
     ax.grid(axis="x", alpha=0.3)
     fig.tight_layout()
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -129,9 +139,13 @@ def main() -> None:
         pass
 
     parser = argparse.ArgumentParser(description="CV 결과 비교 + paired t-test")
-    parser.add_argument("--metric", default="mcc",
-                        choices=["mcc", "macro_f1", "accuracy", "pr_auc_macro",
-                                 "benign_evasion_rate"])
+    # ⚠️ Phase 13(docs/13 §1.4): 기본 기준 지표가 mcc → macro_f1 로 이관됐다.
+    #    MCC 는 제거됐으므로 choices 에서도 빠졌다. 대신 저 FPR 운영 지점·pAUC·ECE 로도
+    #    paired 비교를 할 수 있게 열어 둔다(cross_validate 가 summary 에 함께 싣는다).
+    parser.add_argument("--metric", default="macro_f1",
+                        choices=["macro_f1", "accuracy", "pr_auc_macro",
+                                 "benign_evasion_rate", "pauc", "ece",
+                                 "tpr_at_fpr_0.01", "tpr_at_fpr_0.001"])
     parser.add_argument("--ref", default=None,
                         help="이 설정을 기준으로만 비교(생략 시 전체 쌍 비교)")
     parser.add_argument("--alpha", type=float, default=0.05)
@@ -142,9 +156,11 @@ def main() -> None:
     runs, fingerprint = load_cv_results(args.metric)
     print(f"\n=== RQ1 5-fold CV 비교: {args.metric} (설정 {len(runs)}개, 라벨지문 {fingerprint}) ===\n")
 
-    # 1) 순위표
-    ranked = sorted(runs.items(), key=lambda kv: kv[1].mean(), reverse=True)
-    print(f"{'설정':40}{'평균':>9}{'표준편차':>11}   fold별")
+    # 1) 순위표 — 낮을수록 좋은 지표(ece, benign-evasion)는 정렬 방향을 뒤집는다.
+    ranked = sorted(runs.items(), key=lambda kv: kv[1].mean(),
+                    reverse=args.metric not in LOWER_IS_BETTER)
+    direction = "낮을수록 좋음" if args.metric in LOWER_IS_BETTER else "높을수록 좋음"
+    print(f"{'설정':40}{'평균':>9}{'표준편차':>11}   fold별  ({direction})")
     for tag, vals in ranked:
         folds = " ".join(f"{v:.4f}" for v in vals)
         print(f"{short_name(tag):40}{vals.mean():>9.4f}{vals.std(ddof=1):>11.4f}   {folds}")

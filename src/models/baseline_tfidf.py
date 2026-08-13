@@ -100,6 +100,12 @@ def run(track: str, text: str, clf_name: str, max_features: int) -> dict:
         y_test, y_pred, classes, FIG_DIR / f"cm_{tag}.png",
         title=f"TF-IDF+{clf_name} ({track})",
     )
+    # 교정 곡선(Phase 13): 신경망과 같은 기준으로 비교하려면 베이스라인도 함께 남겨야 한다.
+    if result.get("calibration"):
+        M.save_reliability_diagram(
+            result["calibration"], FIG_DIR / f"cal_{tag}.png",
+            title=f"TF-IDF+{clf_name} ({track})",
+        )
     print("  " + M.format_summary(result["model"], result))
     return result
 

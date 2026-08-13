@@ -74,8 +74,12 @@ CKPT_DIR = PROJECT_ROOT / "experiments" / "checkpoints"
 STAGE2_MODELS = ("charcnn", "bilstm")
 # 1차 후보: 일반 RGB CNN 과 조기종료 CNN(Phase 12/M4). 둘 다 같은 이미지 입력을 받는다.
 STAGE1_MODELS = ("cnn", "cnn_ee")
-# H7-1 의 정확도 조건(docs/11 §7): 단일 split 실행 간 노이즈 ±0.11pp 를 그대로 쓴다.
-EXIT_MCC_TOLERANCE = 0.0011
+# H7-1 의 정확도 조건(docs/11 §7). 조기종료를 켰을 때 허용할 val 정확도 하락폭.
+# ⚠️ Phase 13(docs/13 §1.4): 기준 지표가 MCC → Macro-F1 로 이관됐다.
+#    0.0011 은 원래 "단일 split 실행 간 MCC 흔들림 ±0.11pp"를 실측해 정한 값이다(docs/07 §2.5).
+#    지표와 데이터셋이 모두 바뀌었으므로 이 값은 **새 트랙에서 재측정해야 한다**
+#    (동일 설정 반복 학습 → Macro-F1 표준편차). 재측정 전까지는 잠정값이다.
+EXIT_F1_TOLERANCE = 0.0011
 
 # BiLSTM 은 긴 시퀀스(2304)를 순환 처리해 활성값 메모리가 배치×길이로 폭증한다.
 # run_evasion.py 에서 배치 1024 로 CUDA OOM(30GiB+)이 났던 전례가 있어 여기서도 작게 잡는다.
@@ -221,7 +225,6 @@ def sweep_exit_thresholds(net, x_img, y_true: np.ndarray, classes: list[str],
             "exit_threshold": float(thr),
             "accuracy": m["accuracy"],
             "macro_f1": m["macro_f1"],
-            "mcc": m["mcc"],
             "exit_rates": cnn_mod.exit_distribution(exits, net.n_stages),
             "mean_exit_depth": float(np.mean(exits) + 1.0),  # 1-based 블록 수
         })
@@ -229,24 +232,27 @@ def sweep_exit_thresholds(net, x_img, y_true: np.ndarray, classes: list[str],
     return rows
 
 
-def select_exit_threshold(rows: list[dict], tolerance: float = EXIT_MCC_TOLERANCE) -> dict:
+def select_exit_threshold(rows: list[dict], tolerance: float = EXIT_F1_TOLERANCE) -> dict:
     """정확도를 지키는 선에서 가장 싼 임계값을 고른다(val 기준, test 는 보지 않는다).
 
-    규칙: '조기종료를 끈 지점'의 MCC 대비 하락이 tolerance(기본 0.11pp = 단일 split 노이즈)
-    이내인 지점 중 **평균 깊이가 최소**인 것. 동률이면 MCC 가 높은 쪽.
+    규칙: '조기종료를 끈 지점'의 Macro-F1 대비 하락이 tolerance 이내인 지점 중
+    **평균 깊이가 최소**인 것. 동률이면 Macro-F1 이 높은 쪽.
 
-    ⚠️ 이 규칙은 H7-1(같은 test MCC 유지하에 1차 비용 ≥30% 감소)을 val 에서 미리 강제한다.
+    ⚠️ 이 규칙은 H7-1(같은 test Macro-F1 유지하에 1차 비용 ≥30% 감소)을 val 에서 미리 강제한다.
     조건을 만족하는 지점이 하나도 없으면 조기종료를 **끄는 것**이 정답이므로 그 지점을 돌려준다
     (docs/08 의 hybrid 처럼 "시도했으나 미채택"이 정직한 결과다).
+
+    ⚠️ Phase 13(docs/13 §1.4): 판정 지표가 MCC → Macro-F1 로 이관됐다. tolerance 의 근거값도
+    새 트랙에서 재측정 대상이다(EXIT_F1_TOLERANCE 주석 참조).
     """
     baseline = max(rows, key=lambda r: r["exit_threshold"])  # 임계값 최대 = 조기종료 없음
-    feasible = [r for r in rows if baseline["mcc"] - r["mcc"] <= tolerance]
+    feasible = [r for r in rows if baseline["macro_f1"] - r["macro_f1"] <= tolerance]
     if not feasible:
         feasible = [baseline]
-    best = min(feasible, key=lambda r: (r["mean_exit_depth"], -r["mcc"]))
+    best = min(feasible, key=lambda r: (r["mean_exit_depth"], -r["macro_f1"]))
     return {
-        "rule": f"val MCC drop <= {tolerance:g} 중 평균 깊이 최소",
-        "baseline_no_exit_mcc": baseline["mcc"],
+        "rule": f"val Macro-F1 drop <= {tolerance:g} 중 평균 깊이 최소",
+        "baseline_no_exit_macro_f1": baseline["macro_f1"],
         "selected": best,
         "adopted": best["exit_threshold"] < baseline["exit_threshold"],
     }
@@ -319,7 +325,6 @@ def sweep_taus(p1: np.ndarray, p2: np.ndarray, y_true: np.ndarray,
             "escalation_rate": float(escalate.mean()),
             "accuracy": m["accuracy"],
             "macro_f1": m["macro_f1"],
-            "mcc": m["mcc"],
             "benign_evasion_rate": af.get("benign_evasion_rate"),
             "normal_false_positive_rate": af.get("normal_false_positive_rate"),
         })
@@ -378,7 +383,7 @@ def oracle_point(p1: np.ndarray, p2: np.ndarray, y_true: np.ndarray,
     return {
         "escalation_rate": float(escalate.mean()),
         "macro_f1": m["macro_f1"],
-        "mcc": m["mcc"],
+        "accuracy": m["accuracy"],
     }
 
 
@@ -530,8 +535,9 @@ def main() -> None:
     p.add_argument("--exit-threshold", type=float, default=None,
                    help="조기종료 임계값을 직접 지정(기본은 val 스윕으로 선택). "
                         "직접 지정하면 결과 tag 에 '_ex' 가 붙어 별도 파일로 남는다")
-    p.add_argument("--exit-tolerance", type=float, default=EXIT_MCC_TOLERANCE,
-                   help="임계값 선택 시 허용할 val MCC 하락폭(기본 0.0011 = 단일 split 노이즈)")
+    p.add_argument("--exit-tolerance", type=float, default=EXIT_F1_TOLERANCE,
+                   help="임계값 선택 시 허용할 val Macro-F1 하락폭 "
+                        "(기본 0.0011 — ⚠️ 새 트랙에서 재측정 필요, docs/13 §1.4)")
     p.add_argument("--n-exits", type=int, default=15, help="조기종료 임계값 격자 개수")
     args = p.parse_args()
 
@@ -598,7 +604,8 @@ def main() -> None:
             net1.exit_threshold = exit_info["selected"]["exit_threshold"]
             sel = exit_info["selected"]
             print(f"  [조기종료/val] {exit_info['rule']} → threshold={sel['exit_threshold']:.6f} "
-                  f"MCC={sel['mcc']:.4f}(무종료 {exit_info['baseline_no_exit_mcc']:.4f}) "
+                  f"macroF1={sel['macro_f1']:.4f}"
+                  f"(무종료 {exit_info['baseline_no_exit_macro_f1']:.4f}) "
                   f"평균깊이={sel['mean_exit_depth']:.3f} "
                   f"종료분포={[round(r, 4) for r in sel['exit_rates']]}")
             if not exit_info["adopted"]:
@@ -661,7 +668,7 @@ def main() -> None:
         net1.exit_threshold = adopted_thr  # 원상복구(이후 코드가 운영 임계값을 전제한다)
 
         cost_cut = (ms1_noexit - ms1) / ms1_noexit if ms1_noexit > 0 else None
-        mcc_delta = m1_exit["mcc"] - m1_noexit["mcc"]
+        f1_delta = m1_exit["macro_f1"] - m1_noexit["macro_f1"]
         speedup = result["latency"]["speedup_vs_stage2_only"]
         ms_cascade_noexit = ms1_noexit + esc_rate * ms2
         result["early_exit"] = {
@@ -670,8 +677,8 @@ def main() -> None:
             "selection": exit_info,
             "exit_rates_test": cnn_mod.exit_distribution(exits_te, net1.n_stages),
             "mean_exit_depth_test": float(np.mean(exits_te) + 1.0),
-            "stage1_mcc_with_exit": m1_exit["mcc"],
-            "stage1_mcc_no_exit": m1_noexit["mcc"],
+            "stage1_macro_f1_with_exit": m1_exit["macro_f1"],
+            "stage1_macro_f1_no_exit": m1_noexit["macro_f1"],
             "stage1_ms_no_exit": ms1_noexit,
             "stage1_cost_reduction": cost_cut,
             # 같은 τ·같은 에스컬레이션에서 조기종료만 뺀 반사실 — 캐스케이드 속도 이득의 순수분
@@ -679,15 +686,17 @@ def main() -> None:
             "speedup_vs_stage2_only_no_exit": (ms2 / ms_cascade_noexit
                                                if ms_cascade_noexit > 0 else None),
             "verdict": {
-                # ⚠️ docs/11 §7 의 문구는 "같은 test MCC(±0.11pp 이내) 유지"지만, 여기서는
-                #    **하락이 0.11pp 이내**라는 단측 조건으로 읽는다. 조기종료가 정확도를
+                # ⚠️ docs/11 §7 의 문구는 "같은 test 정확도(±0.11pp 이내) 유지"지만, 여기서는
+                #    **하락이 tolerance 이내**라는 단측 조건으로 읽는다. 조기종료가 정확도를
                 #    올렸다는 이유로 기각하는 것은 명백한 사양 결함이기 때문이다. val 선택
                 #    규칙도 처음부터 단측(하락만 제한)이었으므로 이쪽이 일관된다.
                 #    이 해석은 **실측 전에** 확정했다(docs/11 §12.3).
+                # ⚠️ Phase 13: 판정 지표를 MCC → Macro-F1 로 이관(docs/13 §1.4).
                 "H7-1": {
-                    "criterion": f"MCC 하락 <= {args.exit_tolerance:g} and 1차 비용 감소 >= 30%",
-                    "mcc_delta": mcc_delta, "cost_reduction": cost_cut,
-                    "result": ("충족" if (mcc_delta >= -args.exit_tolerance
+                    "criterion": (f"Macro-F1 하락 <= {args.exit_tolerance:g} "
+                                  "and 1차 비용 감소 >= 30%"),
+                    "macro_f1_delta": f1_delta, "cost_reduction": cost_cut,
+                    "result": ("충족" if (f1_delta >= -args.exit_tolerance
                                         and cost_cut is not None and cost_cut >= 0.30)
                                else "미충족"),
                 },
@@ -713,10 +722,10 @@ def main() -> None:
     result["tau_selection"] = op_val
     result["oracle_routing"] = oracle
     result["stage_alone"] = {
-        f"stage1_{args.stage1}": {"macro_f1": m1["macro_f1"], "mcc": m1["mcc"],
+        f"stage1_{args.stage1}": {"macro_f1": m1["macro_f1"],
                                   "accuracy": m1["accuracy"],
                                   "attack_focused": m1.get("attack_focused")},
-        f"stage2_{args.stage2}": {"macro_f1": m2["macro_f1"], "mcc": m2["mcc"],
+        f"stage2_{args.stage2}": {"macro_f1": m2["macro_f1"],
                                   "accuracy": m2["accuracy"],
                                   "attack_focused": m2.get("attack_focused")},
     }
@@ -736,12 +745,12 @@ def main() -> None:
 
     # 8) 콘솔 요약
     print("\n  [test 결과 — 단독 vs 캐스케이드]")
-    print(f"    stage-1 {args.stage1:<12}: macroF1={m1['macro_f1']:.4f} MCC={m1['mcc']:.4f} "
-          f"| {ms1:.4f} ms/sample")
-    print(f"    stage-2 {args.stage2:<12}: macroF1={m2['macro_f1']:.4f} MCC={m2['mcc']:.4f} "
-          f"| {ms2:.4f} ms/sample")
+    print(f"    stage-1 {args.stage1:<12}: macroF1={m1['macro_f1']:.4f} "
+          f"acc={m1['accuracy']:.4f} | {ms1:.4f} ms/sample")
+    print(f"    stage-2 {args.stage2:<12}: macroF1={m2['macro_f1']:.4f} "
+          f"acc={m2['accuracy']:.4f} | {ms2:.4f} ms/sample")
     print(f"    캐스케이드           : macroF1={result['macro_f1']:.4f} "
-          f"MCC={result['mcc']:.4f} | {ms_cascade:.4f} ms/sample "
+          f"acc={result['accuracy']:.4f} | {ms_cascade:.4f} ms/sample "
           f"(에스컬레이션 {esc_rate:.2%})")
     print(f"    oracle 라우팅(상한)  : macroF1={oracle['macro_f1']:.4f} "
           f"(에스컬레이션 {oracle['escalation_rate']:.2%})")
@@ -752,8 +761,9 @@ def main() -> None:
         print(f"\n  [M4 조기종료 — 같은 가중치에서 켰다/껐다 비교]")
         print(f"    1차 비용 : {ee['stage1_ms_no_exit']:.4f} → {ms1:.4f} ms/sample "
               f"({ee['stage1_cost_reduction']:.1%} 감소)")
-        print(f"    1차 MCC  : {ee['stage1_mcc_no_exit']:.4f} → {ee['stage1_mcc_with_exit']:.4f} "
-              f"(Δ{ee['verdict']['H7-1']['mcc_delta']:+.4f})")
+        print(f"    1차 macroF1: {ee['stage1_macro_f1_no_exit']:.4f} → "
+              f"{ee['stage1_macro_f1_with_exit']:.4f} "
+              f"(Δ{ee['verdict']['H7-1']['macro_f1_delta']:+.4f})")
         print(f"    종료분포 : {[round(r, 4) for r in ee['exit_rates_test']]} "
               f"(평균 깊이 {ee['mean_exit_depth_test']:.3f}블록)")
         print(f"    캐스케이드 speedup: {ee['speedup_vs_stage2_only_no_exit']:.2f}배(무종료) → "
@@ -790,6 +800,12 @@ def main() -> None:
     M.save_predictions(y_te, pred_te, classes, RESULTS_DIR / f"pred_{tag}.npz", y_score=prob_te)
     M.save_confusion_matrix(y_te, pred_te, classes, FIG_DIR / f"cm_{tag}.png",
                             title=f"cascade {args.stage1}->{args.stage2} ({args.track})")
+    # 교정 곡선(Phase 13, docs/13 §1.2): 캐스케이드는 확신도로 승급을 결정하므로
+    # 교정 품질이 게이트 설계의 전제다. 캐스케이드 최종 확률에 대해 남긴다.
+    if result.get("calibration"):
+        M.save_reliability_diagram(
+            result["calibration"], FIG_DIR / f"cal_{tag}.png",
+            title=f"cascade {args.stage1}->{args.stage2} ({args.track})")
     fig_pareto(test_rows, {"tau": tau, "escalation_rate": esc_rate,
                            "macro_f1": result["macro_f1"]}, oracle, ms1, ms2,
                FIG_DIR / f"cascade_curve_{tag}.png",

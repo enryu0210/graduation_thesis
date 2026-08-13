@@ -296,8 +296,9 @@ def build_criterion(class_weights, device, aux_weight: float):
     조기종료 모델(cnn_ee)은 학습 모드에서 헤드별 logits 리스트를 돌려준다. 그때의 손실은
         L = CE(최종 헤드) + aux_weight × Σ CE(보조 헤드)
     다. 보조 헤드에 가중치를 두는 이유(docs/11 §9 리스크): 가중치가 크면 얕은 헤드가 백본을
-    자기 쪽으로 끌어당겨 **본 헤드 정확도를 깎는다**. H7-1 의 MCC 조건(±0.11pp)을 못 지키면
-    채택하지 않는다는 판정이 여기에 걸려 있으므로, 가중치는 tag 축으로 남겨 ablation 한다.
+    자기 쪽으로 끌어당겨 **본 헤드 정확도를 깎는다**. H7-1 의 정확도 조건(Macro-F1 하락
+    ≤ tolerance — Phase 13 에서 MCC 에서 이관, docs/13 §1.4)을 못 지키면 채택하지 않는다는
+    판정이 여기에 걸려 있으므로, 가중치는 tag 축으로 남겨 ablation 한다.
 
     단일 헤드 모델에는 기존과 완전히 같은 CrossEntropy 가 적용된다(경로 분기 없음).
     """
@@ -525,6 +526,12 @@ def main() -> None:
             y_true, y_pred, classes, FIG_DIR / f"cm_{tag}.png",
             title=f"{args.model} ({args.track})",
         )
+        # 교정 곡선(Phase 13): 캐스케이드 게이트가 확신도를 쓰므로 모델별로 남겨 둔다.
+        if result.get("calibration"):
+            M.save_reliability_diagram(
+                result["calibration"], FIG_DIR / f"cal_{tag}.png",
+                title=f"{args.model} ({args.track})",
+            )
         CKPT_DIR.mkdir(parents=True, exist_ok=True)
         torch.save(model.state_dict(), CKPT_DIR / f"{tag}.pt")
         print(f"  [저장] 지표/그림/체크포인트 → experiments/, docs/figures/models/")
