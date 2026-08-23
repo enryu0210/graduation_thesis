@@ -157,6 +157,11 @@ RQ1 은 원래 *"이미지 기반 CNN 이 텍스트 모델과 **유사하거나 
   + attack-focused(benign-evasion/FPR). Accuracy·전구간 ROC-AUC 는 부록.
   ⚠️ **MCC 는 제거됨**(2026-08-13 교수 지시). 기준 지표는 Macro-F1 로 이관(docs/13 §1.4).
   아래 §4 의 F2 등 **과거 실측 수치는 MCC 로 측정된 기록**이므로 그대로 읽고, 새 측정과 섞지 말 것.
+  ⚠️ **지표별 1차 출처가 다르다** — TPR@FPR·pAUC 는 Arp et al. P7(+McClish 1989), 경보부하는
+  P8(+Axelsson CCS 1999), **ECE 는 Arp et al. 이 아니라 Naeini AAAI 2015 · Guo ICML 2017**.
+  논문 인용 시 docs/13 **§1.6** 을 그대로 따를 것(원문 대조 완료, 2026-08-23).
+  ⚠️ **TPR@0.1%FPR·pAUC 는 test 셋 Normal 표본 수가 부족하면 성립하지 않는다**(현 트랙 722개 →
+  측정 불가, SR-BH 교체 후 성립). 보고 시 Normal 표본 수 병기 — 근거는 docs/13 **§1.7**.
 - **비용 지표**: 추론 처리량(/s)과 지연(ms/sample) — 이 축이 결론의 본체
 - 5-fold CV(train/val/test 를 풀로 합쳐 재분할) + paired t-test + **Holm 보정**
 - ⚠️ 단일 split 은 실행 간 ±0.11pp 흔들림(cuDNN 비결정성) → 우열 주장은 **반드시 CV 로 판정**

@@ -25,7 +25,7 @@
 | MCC | 헤드라인 | **완전 제거** (2026-08-13 확정, §1.1.1) |
 | 단일 요약 기준 지표 | MCC | **Macro-F1** 로 이관 (CV 비교·캐스케이드 임계값 선택, §1.4) |
 | 클래스 구성 | 4클래스 | **4클래스 유지** — CAPEC 라벨을 매핑해 접음 (2026-08-13 확정, §2.5) |
-| 지표 근거 문헌 | MDPI Technologies 2026, arXiv 2512.19203 | **Arp et al., USENIX Security 2022 / CACM 67(11):104–112, 2024** (최상위 권위로 교체) |
+| 지표 근거 문헌 | MDPI Technologies 2026, arXiv 2512.19203 | **Arp et al., USENIX Security 2022 / CACM 67(11):104–112, 2024** (최상위 권위로 교체) ⚠️ **지표마다 출처가 다르다 — §1.6** |
 
 ⚠️ **비용**: 데이터셋 교체는 Phase 4~12 의 **측정값 전부를 무효화**한다(F1~F13, τ 선택값,
 회피 기준선, CV 결과 — 현재 `experiments/results/` 에 141개 JSON). 아이디어·코드는 살고 **숫자만 재생산**된다.
@@ -91,10 +91,21 @@
 
 - 기존 `benign-evasion`(공격→Normal 오분류율)은 **유지**한다. 4·5번이 그것의 운영 해석판이다.
 - 통계 검증: 5-fold CV + paired t-test + Holm 보정 **유지** + **부트스트랩 95% CI 신설**.
+  ⚠️ 2026-08-23 확인 — **부트스트랩 CI 는 아직 구현이 없다**(§5 대기 목록).
+- ⚠️ **3·4번은 test 셋 Normal 표본 수가 부족하면 성립하지 않는다** — 현 트랙에서 TPR@0.1%FPR 은
+  측정 불가다. 성립 조건과 트랙별 실측 해상도는 **§1.7**, 외부셋에서의 가용 지표도 거기 있다.
 
-⚠️ **6번(ECE)은 단순한 지표 추가가 아니다.** 캐스케이드는 "1차 확신도 < τ 이면 승급"이므로
-확신도가 교정되어 있지 않으면 게이트 자체가 근거를 잃는다. 지금까지 이 전제를 측정하지 않았다.
-즉 이번 개편은 심사 대응이면서 **RQ5 의 빈 구멍을 메우는 작업**이다.
+⚠️ **6번(ECE)의 근거는 Arp et al. 이 아니다** — 2026-08-23 원문 대조로 확인했다. 출처와
+필요성 논거를 모두 정정했으니 **§1.6 을 반드시 함께 읽을 것.** (이 표의 "Arp et al. 권고를
+그대로 따른다"는 문장은 3·4·5번에만 해당한다.)
+
+⚠️ **표의 각 행이 근거로 삼는 문헌이 다르다.** 지표별 1차 출처:
+
+| 지표 | 1차 출처 |
+|---|---|
+| 3 TPR@FPR · 4 pAUC | Arp et al. **P7** (bounded AUC 권고) + pAUC 표준화는 **McClish 1989** |
+| 5 경보 부하 | Arp et al. **P8** + 계보의 원점 **Axelsson, ACM CCS 1999** |
+| 6 ECE | **Naeini et al. AAAI 2015** · **Guo et al. ICML 2017** (Arp et al. 아님) |
 
 **(다) 구현 지점** — 지표 **추가**는 `src/eval/metrics.py` **한 곳**만 고치면 전 모델에 자동
 반영된다(단일 진실 소스 규칙, CLAUDE.md). `compute_metrics` 에 `tpr_at_fpr` · `pauc` · `ece` 키를
@@ -154,6 +165,111 @@ vs 진짜 1,000건). 기존 지표만 보고했다면 이 모델을 "완벽"으�
 실측해 정한 것이다(docs/07 §2.5). 지표가 Macro-F1 로 바뀌고 데이터셋도 바뀌므로
 **새 트랙에서 같은 방식으로 노이즈 폭을 재측정**한 뒤 값을 정한다. (동일 설정 반복 학습 → 표준편차)
 그 전까지 조기종료 임계값 선택 결과는 신뢰하지 않는다.
+
+### 1.6 ⚠️ 출처 검증 결과 (2026-08-23) — 원문 대조로 3건 정정
+
+신설 지표 4종이 "실제로 그 논문에 있는 권고인지"를 원문으로 전수 대조했다. **3종은 확인,
+1종(ECE)은 오귀속**이었다. 심사위원이 원문을 열어보면 드러나는 종류의 오류라 여기 남긴다.
+
+**(가) 확인된 것 — Arp et al. 의 공신력과 인용 정확성**
+
+서지 확정: **CACM 67(11):104–112, 2024, doi:10.1145/3643456**, ACM DL 의 **Research Highlights**
+게재(= CACM 편집위 선별 지면). 원본은 USENIX Security 2022. 권위를 문제 삼기 어렵다.
+
+| 우리 주장 | 원문 | 판정 |
+|---|---|---|
+| P7 이 저 FPR 구간 bounded AUC 를 권고 | *"we recommend considering the curves only up to **tractable false-positive rates** and to compute **bounded AUC values**"* | ✅ 정확 |
+| P8 이 base rate 를 함께 논하라고 권고 | *"we advocate the use of precision and recall... these functions account for class imbalance"* | ✅ 정확 |
+| **§1.1 의 "Arp et al. 는 MCC 를 권고한다"** | P8 권고 절: *"other measures like **Matthews Correlation Coefficient (MCC)** are more suitable"* | ✅ **정확 — §1.1 의 역질문 대응 자료는 그대로 유효** |
+
+**(나) 정정 1 — ECE 는 Arp et al. 에 없다**
+
+원문 전수 검색 결과 **calibration · calibration error · ECE · reliability diagram 언급 0건**이다.
+그런데 `metrics.py` 헤더와 위 §1.2 는 신설 4종을 전부 "그 논문의 권고를 그대로 구현했다"로
+묶어 서술하고 있었다. → 출처를 아래 3편으로 교체했다(코드 주석도 함께 수정 완료).
+
+- **Naeini, Cooper, Hauskrecht. AAAI 2015** — ECE 정의의 원점
+- **Guo, Pleiss, Sun, Weinberger. ICML 2017**, *On Calibration of Modern Neural Networks* —
+  reliability diagram + ECE 를 현대 신경망 평가 표준으로 만든 논문. **"정확도는 올라갔지만
+  현대 심층망은 더 이상 교정돼 있지 않다"**는 이 논문의 발견이 우리가 ECE 를 재야 하는 직접 논거다.
+- **CalexNet (arXiv:2509.08318)** — 이미 `docs/thetics/` 에 보유. 조기종료 분기의 캘리브레이션을
+  다루므로 **캐스케이드 도메인 판본**으로 맞는 인용이다(docs/12 §1 표에 등재됨).
+
+**(다) 정정 2 — ECE 의 필요성 논거가 과대 주장이었다**
+
+기존 문구: *"확신도가 교정되어 있지 않으면 게이트 자체가 근거를 잃는다."* → **정확하지 않다.**
+τ 게이트에 필요한 것은 확신도의 **순위(ranking)** 이지 수치의 교정이 아니다. 확신도가 전부
+0.99 쪽에 쏠려 있어도 val 에서 τ=0.995 로 잡히면 게이트는 정상 작동한다. 즉 심사에서
+**"val 에서 τ 를 튜닝하는데 교정이 왜 필요한가"** 한 마디에 무너지는 논거다.
+
+정정된 논거 3가지:
+1. **τ 의 이식성** — 교정돼 있어야 val 에서 고른 τ 가 다른 데이터셋·배포 환경에서 같은 의미를
+   갖는다. **Data 2025 외부셋 실험이 정확히 이 검증**이다.
+2. **τ 의 해석 가능성** — "확신도 0.9 미만은 승급"이 실제로 "오답 확률 10%"를 뜻하는지.
+3. **틀린 샘플에 과확신하는 실패의 진단** — 이건 순위 자체를 망가뜨리므로 게이트에 실제 타격이다.
+   평균인 ECE 가 가리는 이 국소 실패를 **MCE** 가 드러낸다.
+
+**(라) 정정 3 — 서지 보강 2편**
+
+pAUC 와 경보 부하는 Arp et al. 이 "권고"했을 뿐 그 지표를 **만든** 논문이 아니다. 1차 출처를 병기한다.
+
+- **McClish, D.K.** *Analyzing a portion of the ROC curve.* **Medical Decision Making 9(3):190–195, 1989.**
+  — 우리가 쓰는 sklearn `max_fpr` 의 [0.5,1] 표준화가 이 논문의 보정이다(코드 주석엔 있었으나 문서엔 없었다).
+- **Axelsson, S.** *The base-rate fallacy and its implications for the difficulty of intrusion
+  detection.* **ACM CCS 1999.** doi:10.1145/319709.319710 — **"침입 탐지의 한계 요인은 탐지율이
+  아니라 오탐률"**을 보인 이 계열의 원점. 넣으면 경보 부하 지표가 27년 축적된 표준 논거 위에 선다.
+
+### 1.7 ⚠️ 저 FPR 지표의 성립 조건 — 현 트랙에서는 측정 불가
+
+**FPR 의 해상도는 test 셋 Normal 표본 수가 결정한다.** Normal 이 N 개면 FPR 이 가질 수 있는 값은
+1/N 의 배수뿐이다. 목표 FPR 이 1/N 보다 작으면 **그 지점은 존재하지 않고**, 코드는 "오탐 0건"
+지점을 집어온다 → 사실상 "무오탐 탐지율"이 되고 표본 하나에 크게 흔들린다.
+
+| 트랙 | test Normal | 해상도(1건당) | TPR@1%FPR | TPR@0.1%FPR |
+|---|---|---|---|---|
+| `payload_4class_csicnorm` (주) | **722** | 0.139pp | FP 7.2건 → 거침 | ❌ **정의 불가** |
+| `csic_binary` | 726 | 0.138pp | 거침 | ❌ 불가 |
+| `payload_4class` | 8,062 | 0.0124pp | ✅ | FP 8건 → 겨우 |
+| **SR-BH 2020** (예정, test 15%) | **≈78,779** | 0.0013pp | ✅ | ✅ |
+
+pAUC(FPR≤1%)도 같은 제약을 받는다 — 722개 트랙에서는 그 구간에 들어오는 음성이 약 7개뿐이라
+**계단 몇 칸짜리 값**이 되어 비교 근거로 쓸 수 없다.
+
+**→ 결론 2가지.**
+1. 신설 지표 3종(TPR@FPR·pAUC·경보부하)은 **데이터셋 교체와 세트로만 성립**한다. 현 트랙에서
+   미리 돌려 논문에 싣는 것은 위험하다. 이건 오히려 교수 지시 2건(지표·데이터셋)이 왜 한 묶음이어야
+   하는지에 대한 논거가 된다.
+2. 논문에 저 FPR 지표를 실을 때는 **Normal 표본 수를 반드시 함께 표기**한다.
+
+**외부 검증셋(Data 2025)에서의 지표 가용성** — 악성만 있고 정상이 없다(§2.3).
+
+| 지표 | 외부셋 |
+|---|---|
+| Recall(탐지율) · benign-evasion | ✅ |
+| **ECE / MCE** | ✅ (확신도 vs 정답 여부만 필요) → **§1.6(다)-1 의 τ 이식성 검증 핵심** |
+| TPR@FPR · pAUC · 경보부하 · FPR | ❌ 음성 표본이 없어 정의 불가 |
+
+### 1.8 nan 누출 차단 (2026-08-23) — sklearn 판본 차이가 만든 조용한 오염
+
+**증상**: `tests/test_metrics.py::test_pauc_returns_none_when_roc_is_undefined` 가 노트북에서
+실패했다(`assert nan is None`). §1.5 에 "166 passed" 로 기록된 것은 데스크톱 기준이었다.
+
+**원인**: sklearn 은 "계산 불가"를 **판본에 따라 두 방식**으로 알린다 — `ValueError` 를 던지거나,
+`UndefinedMetricWarning` 과 함께 **`nan` 을 반환**하거나. 우리 코드는 `except ValueError` 로
+앞의 것만 잡고 있었다. 같은 패턴이 `partial_roc_auc` · `_safe_roc_auc` · `_safe_pr_auc` **3곳**에 있었다.
+
+⚠️ **이 버그가 위험한 이유는 죽지 않아서다.** nan 이 새면:
+- `cross_validate` 의 fold 요약은 값이 수치형인지만 검사하므로 nan 이 통과 → **평균 전체가 nan**
+  이 되거나, `cv_compare` 의 순위 정렬이 조용히 틀어진다.
+- `json.dump` 는 nan 을 `NaN` 으로 쓰는데 이는 **표준 JSON 이 아니라** 다른 도구가 못 읽는다.
+- 그리고 정상 표본이 없는 셋에서 터지므로, **Data 2025 외부 검증(§1.7)이 정확히 이 조건**이다.
+
+**조치**: `_finite_or_none()` 헬퍼를 만들어 3곳에 적용하고, `partial_roc_auc` 에는
+`tpr_at_fpr` 과 같은 단일 클래스 명시 가드를 앞에 뒀다. **예외 처리와 반환값 검사를 둘 다** 한다 —
+sklearn 판본 고정으로는 노트북/데스크톱 양쪽 재현이 보장되지 않기 때문이다.
+
+**검증**: 신규 테스트 2개(`_finite_or_none` 직접 검사 + `compute_metrics` 전 경로 nan 누출 검사)
+추가 → `pytest tests/ -q` **168 passed**(기존 실패 1건 해소).
 
 ---
 
@@ -326,6 +442,13 @@ WADBERT 2026 둘 다 CSIC 2010 + SR-BH 2020 병기). → **삭제하면 선행�
 - [ ] SR-BH 라벨 노이즈 자체 감사(§2.6) → 48,522건 규모 재현 확인
 - [ ] CAPEC→4클래스 매핑 구현(§2.5 규칙 3건) + 제외 건수 보고
 - [x] `metrics.py`: TPR@FPR · pAUC · 경보부하 · ECE 추가 / MCC 제거 → **완료(§1.5)**, 166 tests pass
+- [x] 신설 지표 4종 **출처 원문 대조** → ECE 오귀속 정정 + 서지 2편 보강 + ECE 논거 하향 → **완료(§1.6)**
+- [x] 저 FPR 지표의 표본 수 제약 규명 + 외부셋 가용성 정리 → **완료(§1.7)**
+- [ ] ⚠️ **부트스트랩 95% CI 미구현** — §1.2 (나) 에 "신설"로 적혀 있으나 `src/` 전체에 `bootstrap`
+      문자열이 0건이다(2026-08-23 확인). 문서만 앞서 나간 상태 → 구현하거나 문구를 내려야 한다
+- [x] ⚠️ `partial_roc_auc` 의 `nan` 반환 버그 → **완료(§1.8)**, 168 tests pass
+- [ ] ⚠️ **Arp et al. 원문 PDF 미보유** — 지표 정당화의 1차 근거인데 `docs/thetics/` 에 없다.
+      USENIX 판(오픈액세스)을 받아 docs/12 §1.3 인벤토리에 등재할 것
 - [x] docs/07 §1.3·§3 에 Phase 13 대체 표시, 마스터 설계문서 §6.1 지표 목록 갱신 → **완료**
 - [ ] Macro-F1 노이즈 폭 재측정 → `EXIT_F1_TOLERANCE` 값 확정(§1.4). ⚠️ **새 트랙 준비 후에 할 일**
 - [ ] GPU 재실행 착수(§4 순서)
@@ -350,3 +473,19 @@ WADBERT 2026 둘 다 CSIC 2010 + SR-BH 2020 병기). → **삭제하면 선행�
    (SR-BH 라벨 노이즈 48,522건 감사)
 6. *WADBERT: Dual-channel Web Attack Detection Based on BERT Models.* **arXiv:2601.21893**, 2026-01.
    (최신 SOTA 대조 대상, F1 보고)
+
+**§1.6 출처 검증으로 추가된 지표 1차 출처 4편** (2026-08-23)
+
+7. Axelsson, S. *The base-rate fallacy and its implications for the difficulty of intrusion
+   detection.* **ACM CCS 1999**, pp. 1–7. doi:10.1145/319709.319710
+   (확장판: *ACM TISSEC 3(3):186–205, 2000*) — **경보 부하** 지표의 도메인 원점
+8. McClish, D.K. *Analyzing a portion of the ROC curve.* **Medical Decision Making 9(3):190–195, 1989.**
+   — **pAUC** 표준화(McClish 보정, sklearn `max_fpr` 이 쓰는 그것)의 1차 출처
+9. Naeini, M.P., Cooper, G.F., Hauskrecht, M. *Obtaining Well Calibrated Probabilities Using
+   Bayesian Binning.* **AAAI 2015.** — **ECE** 정의의 원점
+10. Guo, C., Pleiss, G., Sun, Y., Weinberger, K.Q. *On Calibration of Modern Neural Networks.*
+    **ICML 2017.** — reliability diagram + ECE 를 현대 신경망 평가 표준으로 만든 논문.
+    "현대 심층망은 정확해졌지만 더 이상 교정돼 있지 않다"가 우리가 ECE 를 재는 직접 논거
+
+> 이 4편은 **9·10번이 ECE 의 진짜 출처**라는 점이 핵심이다(Arp et al. 에는 교정 논의가 없다 — §1.6 나).
+> 캐스케이드 도메인 판본인 CalexNet(arXiv:2509.08318)은 **이미 보유**하고 있으며 docs/12 §1 표에 등재돼 있다.

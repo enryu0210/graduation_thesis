@@ -13,18 +13,33 @@ Phase 4 — 공용 분류 성능 지표 모듈 (RQ1 평가의 단일 진실 소�
     - 추론 처리량(throughput) — 실제 WAF 배포 가능성 논의용
 
 Phase 13 개편 (docs/13 §1.2, 2026-08-13 교수 미팅):
-    근거 문헌을 Arp et al. (USENIX Security 2022 / CACM 67(11):104-112, 2024) 로 올리고,
-    그 논문의 권고를 그대로 구현했다.
+    ⚠️ **지표마다 근거 문헌이 다르다.** 예전 주석은 신설 4종을 전부 Arp et al. 권고로 묶어
+    서술했으나, 원문 대조 결과 ECE 는 그 논문에 **나오지 않는다**(docs/13 §1.6). 심사에서
+    원문을 열어보면 바로 드러나므로 아래처럼 지표별로 분리해 둔다.
+
     - 신설 `operating_points` : TPR@1%FPR · TPR@0.1%FPR · pAUC(FPR<=0.01)
-        → "ROC 는 감당 가능한 FPR 까지만 보라". WAF 는 저 FPR 영역에서만 운영 가능하므로
-          전 구간 평균인 ROC-AUC 는 실무적 차이를 가린다.
-    - 신설 `calibration` : ECE(+MCE, 구간별 표) → 캐스케이드의 tau 게이트가 곧 확신도
-        임계값이라, 확신도가 교정돼 있지 않으면 게이트 자체가 근거를 잃는다(RQ5 의 전제).
+        근거: Arp et al. P7 — "consider the curves only up to tractable false-positive
+        rates and compute bounded AUC values". WAF 는 저 FPR 영역에서만 운영 가능하므로
+        전 구간 평균인 ROC-AUC 는 실무적 차이를 가린다.
+        pAUC 표준화 방식의 1차 출처는 McClish (1989) — PAUC_MAX_FPR 주석 참조.
     - 신설 `attack_focused.alert_load` : 배포 base rate 기준 경보 부하
-        → "FPR 은 음성 클래스의 base rate 와 함께 논하라"(base rate fallacy).
+        근거: Arp et al. P8(base rate fallacy). 그 계보의 원점은 보안 도메인의
+        Axelsson (ACM CCS 1999) — DEPLOYMENT_ATTACK_PREVALENCES 주석 참조.
+    - 신설 `calibration` : ECE(+MCE, 구간별 표)
+        ⚠️ 근거는 Arp et al. 이 **아니다**. Naeini et al. (AAAI 2015, ECE 정의) 와
+        Guo et al. (ICML 2017, reliability diagram + "현대 심층망은 더 이상 교정돼 있지
+        않다") 이며, 캐스케이드 도메인 판본은 CalexNet (arXiv:2509.08318).
+        필요성 논거는 calibration_metrics 독스트링에 적었다(과대 주장 정정됨).
     - 제거 `mcc` : 교수 지시로 완전 제거. 기준 지표는 Macro-F1 로 이관했다.
-        ⚠️ 제거 근거와 반대 근거(Arp et al. 는 MCC 를 권고한다)는 docs/13 §1.1 에 보존.
+        ⚠️ 제거 근거와 반대 근거(Arp et al. 는 P8 권고 절에서 MCC 를 명시 권고한다 —
+        원문 대조로 확인, docs/13 §1.6)는 docs/13 §1.1 에 보존.
         cv_compare 의 검정 기준과 cascade 의 임계값 선택 규칙도 함께 이관됨(docs/13 §1.4).
+
+참고 문헌 (서지 정본은 docs/13 §6):
+    Arp et al. USENIX Security 2022 / CACM 67(11):104-112, 2024. doi:10.1145/3643456
+    Axelsson. The base-rate fallacy... ACM CCS 1999. doi:10.1145/319709.319710
+    McClish. Analyzing a portion of the ROC curve. Med Decis Making 9(3):190-195, 1989.
+    Naeini, Cooper, Hauskrecht. AAAI 2015 / Guo, Pleiss, Sun, Weinberger. ICML 2017.
 
 의존성:
     torch 불필요 — numpy/scikit-learn/matplotlib 만 사용한다.
@@ -60,15 +75,34 @@ from sklearn.preprocessing import label_binarize
 
 # 운영 지점으로 보고할 FPR. WAF 는 오탐이 곧 정상 사용자 차단이라 1% 도 이미 후한 값이다.
 # 두 지점을 함께 보고하는 이유: 배포 환경마다 감당 가능한 오탐률이 달라 하나로 못 정한다.
+#
+# ⚠️ **이 지표의 해상도는 test 셋의 Normal 표본 수가 결정한다** (docs/13 §1.7).
+#    FPR 이 가질 수 있는 값은 (오탐 건수 / Normal 수) 의 배수뿐이므로, Normal 이 N 개면
+#    해상도는 1/N 이다. 목표 FPR 이 1/N 보다 작으면 그 지점은 **존재하지 않고**, 코드는
+#    "오탐 0건" 지점을 집어온다 → 사실상 "무오탐 탐지율"이 되고 표본 하나에 크게 흔들린다.
+#    실측 예: payload_4class_csicnorm test 의 Normal 은 722개 → 해상도 0.139%
+#             → TPR@1%FPR 은 계산 가능하지만 **TPR@0.1%FPR 은 측정 불가**.
+#             SR-BH 2020 으로 교체하면 test Normal 이 약 78,779개가 되어 둘 다 성립한다.
+#    → 저 FPR 지표를 보고할 때는 반드시 Normal 표본 수를 함께 싣는다.
 TARGET_FPRS = (0.01, 0.001)
 
-# pAUC 를 끊을 FPR 상한. Arp et al.: "감당 가능한 FPR 까지만 ROC 를 보고 bounded AUC 를 계산하라".
+# pAUC 를 끊을 FPR 상한. Arp et al. P7: "감당 가능한 FPR 까지만 ROC 를 보고 bounded AUC 를 계산하라".
+# 표준화(McClish 보정)의 1차 출처는 McClish, *Analyzing a portion of the ROC curve*,
+# Medical Decision Making 9(3):190-195, 1989 — partial_roc_auc() 독스트링 참조.
+# ⚠️ 위 TARGET_FPRS 의 해상도 제약이 여기에도 그대로 걸린다. [0, max_fpr] 구간의 ROC 곡선은
+#    Normal 표본 중 이 구간에 들어오는 몇 개로만 그려지므로(722개 트랙에서는 약 7개),
+#    표본이 적으면 pAUC 는 계단 몇 칸짜리 값이 되어 비교 근거로 못 쓴다.
 PAUC_MAX_FPR = 0.01
 
 # 경보 부하를 계산할 때 가정하는 **배포 환경의 공격 비율**(base rate).
-# ⚠️ 우리 데이터셋의 공격 비율(약 91%)은 수집 방식 때문에 인위적으로 부풀려진 값이다.
+# ⚠️ 우리 데이터셋의 공격 비율은 수집 방식 때문에 인위적으로 부풀려진 값이다. 트랙별 실측
+#    (docs/03 분포 기준): payload_4class_csicnorm 96.8% · payload_4class 73.1% ·
+#    csic_binary 64.1%. (SR-BH 2020 으로 교체하면 약 42% 가 된다 — 그때 이 주석을 갱신할 것.)
 #    실제 웹 트래픽에서 공격은 극소수이므로, 그 비율로 환산하지 않으면 Precision 이
 #    실제보다 훨씬 좋아 보인다(base rate fallacy). 정확한 값을 알 수 없으니 두 가정을 병기한다.
+# 근거: Axelsson. *The base-rate fallacy and its implications for the difficulty of
+#       intrusion detection.* ACM CCS 1999. doi:10.1145/319709.319710
+#       — "침입 탐지의 한계 요인은 탐지율이 아니라 오탐률"임을 보인 이 계열의 원점.
 DEPLOYMENT_ATTACK_PREVALENCES = (0.01, 0.001)
 
 # 경보 부하를 표시할 기준 요청 수(= "100만 요청당 오탐 몇 건"). 사람이 읽을 수 있는 단위로 환산.
@@ -207,14 +241,21 @@ def partial_roc_auc(y_binary: np.ndarray, score: np.ndarray,
                     max_fpr: float = PAUC_MAX_FPR) -> float | None:
     """FPR <= max_fpr 구간만 본 ROC-AUC(pAUC)를 반환한다.
 
-    sklearn 의 `max_fpr` 은 McClish 보정을 적용해 값을 [0.5, 1] 로 표준화한다.
+    sklearn 의 `max_fpr` 은 McClish 보정(McClish, Med Decis Making 9(3):190-195, 1989)을
+    적용해 값을 [0.5, 1] 로 표준화한다.
     즉 0.5 = 무작위, 1.0 = 완벽이며 **전 구간 ROC-AUC 와 직접 비교하면 안 된다**
     (같은 척도가 아니다). 논문 표에서는 pAUC 열을 따로 두고 상한 FPR 을 함께 명시할 것.
     """
+    y_binary = np.asarray(y_binary)
+    # 한쪽 클래스만 있으면 ROC 가 정의되지 않는다(예: 정상 표본이 없는 외부 검증셋).
+    # tpr_at_fpr 과 같은 방식으로 **먼저 명시적으로** 걸러 낸다 — sklearn 의 처리 방식에
+    # 기대지 않기 위해서다(아래 _finite_or_none 주석 참조).
+    if y_binary.size == 0 or y_binary.min() == y_binary.max():
+        return None
+
     try:
-        return float(roc_auc_score(y_binary, score, max_fpr=max_fpr))
+        return _finite_or_none(roc_auc_score(y_binary, score, max_fpr=max_fpr))
     except ValueError:
-        # 한쪽 클래스만 있는 경우 등.
         return None
 
 
@@ -242,10 +283,19 @@ def calibration_metrics(y_true: np.ndarray, y_score: np.ndarray,
                         n_bins: int = ECE_N_BINS) -> dict:
     """확신도 교정 오차(ECE·MCE)와 reliability diagram 용 구간별 표를 계산한다.
 
-    왜 필요한가:
-        캐스케이드는 "1차 확신도 < tau 이면 2차로 승급"한다. 확신도가 교정되어 있지 않으면
-        (예: 모델이 틀린 샘플에도 0.99 를 준다) 게이트가 승급할 샘플을 못 고르므로
-        캐스케이드의 전제 자체가 무너진다. 즉 이 값은 RQ5 의 성립 조건이다.
+    왜 필요한가 (⚠️ 2026-08-23 정정 — 이전 논거는 과대 주장이었다, docs/13 §1.6):
+        예전 주석은 "확신도가 교정 안 되면 게이트가 승급 대상을 못 골라 캐스케이드의 전제가
+        무너진다"고 적었으나 이는 정확하지 않다. tau 게이트에 필요한 것은 확신도의
+        **순위(ranking)** 이지 수치의 교정이 아니다. 확신도가 전부 0.99 쪽에 쏠려 있어도
+        val 에서 tau=0.995 로 잡히면 게이트는 정상 작동한다. 즉 "val 에서 tau 를 튜닝하는데
+        교정이 왜 필요한가"라는 반문에 그 논거는 버티지 못한다.
+
+        실제 값어치는 다음 셋이다:
+        (ㄱ) tau 의 이식성 — 교정돼 있어야 val 에서 고른 tau 가 다른 데이터셋·배포 환경에서도
+             같은 의미를 갖는다. Data 2025 외부셋 실험이 정확히 이 검증이다.
+        (ㄴ) tau 의 해석 가능성 — "확신도 0.9 미만은 승급"이 실제로 "오답 확률 10%"를 뜻하는지.
+        (ㄷ) **틀린 샘플에 과확신하는 실패의 진단** — 이건 순위 자체를 망가뜨리므로 게이트에
+             실제 타격이다. 평균인 ECE 가 가리는 이 국소 실패를 MCE 가 드러낸다.
 
     정의:
         확신도 = max 확률, 정답 여부 = argmax 가 맞았는지. 확신도를 n_bins 개 등폭 구간으로
@@ -288,9 +338,9 @@ def alert_load(tpr: float | None, fpr: float | None,
                per_requests: int = ALERT_LOAD_PER_REQUESTS) -> list[dict]:
     """배포 환경의 공격 비율을 가정해 "실제로 사람이 처리할 경보량"을 환산한다.
 
-    왜 필요한가 (base rate fallacy, Arp et al.):
-        우리 test 셋의 공격 비율(약 91%)은 수집 방식 때문에 부풀려진 값이다. 그 비율에서
-        계산한 Precision 은 실배포에서 의미가 없다. 실제 웹 트래픽은 대부분 정상이므로,
+    왜 필요한가 (base rate fallacy — Axelsson CCS 1999, Arp et al. P8):
+        우리 test 셋의 공격 비율(트랙별 64~97%, DEPLOYMENT_ATTACK_PREVALENCES 주석의 실측치)은
+        수집 방식 때문에 부풀려진 값이다. 그 비율에서 계산한 Precision 은 실배포에서 의미가 없다. 실제 웹 트래픽은 대부분 정상이므로,
         FPR 이 0.5% 라도 하루 수백만 요청에서는 오탐이 수천 건이 되어 운영이 불가능해진다.
         그 간극을 숫자로 보여 주는 것이 이 함수다.
 
@@ -425,6 +475,29 @@ def save_predictions(
     return out_path
 
 
+def _finite_or_none(value) -> float | None:
+    """nan/inf 를 None 으로 바꾼다 — 지표가 조용히 오염되는 것을 막는 마지막 관문.
+
+    왜 필요한가 (2026-08-23 실제 사고, docs/13 §5):
+        sklearn 은 "계산 불가"를 **판본에 따라 두 가지 방식**으로 알린다 —
+        ValueError 를 던지거나, UndefinedMetricWarning 과 함께 **nan 을 돌려주거나**.
+        우리 코드는 앞의 것만 잡고 있어서(`except ValueError`) 뒤의 경우 nan 이 그대로 통과했다.
+        (`test_pauc_returns_none_when_roc_is_undefined` 가 이 기기에서 실패한 원인이다.)
+
+        nan 이 새면 실패가 눈에 안 보이는 형태로 번진다:
+        - cross_validate 의 fold 요약은 값이 수치형인지만 검사하므로 nan 이 통과 →
+          평균 전체가 nan 이 되거나, cv_compare 의 순위 정렬이 조용히 틀어진다.
+        - json.dump 는 nan 을 `NaN` 으로 쓰는데, 이는 표준 JSON 이 아니라 다른 도구가 못 읽는다.
+
+        → 예외 처리와 **반환값 검사를 둘 다** 해야 한다. sklearn 판본을 고정하는 것으로는
+          다른 기기(노트북/데스크톱)에서 재현되지 않는다.
+    """
+    if value is None:
+        return None
+    value = float(value)
+    return value if np.isfinite(value) else None
+
+
 def _safe_roc_auc(y_true: np.ndarray, y_score: np.ndarray, n_classes: int) -> float | None:
     """ROC-AUC(OvR macro)를 계산하되, 계산 불가 상황에서는 None 을 돌려준다.
 
@@ -434,8 +507,10 @@ def _safe_roc_auc(y_true: np.ndarray, y_score: np.ndarray, n_classes: int) -> fl
     try:
         if n_classes == 2:
             # 이진 분류는 양성(코드 1) 클래스 점수 한 열만 사용한다.
-            return float(roc_auc_score(y_true, y_score[:, 1]))
-        return float(roc_auc_score(y_true, y_score, multi_class="ovr", average="macro"))
+            return _finite_or_none(roc_auc_score(y_true, y_score[:, 1]))
+        return _finite_or_none(
+            roc_auc_score(y_true, y_score, multi_class="ovr", average="macro")
+        )
     except ValueError:
         return None
 
@@ -448,9 +523,11 @@ def _safe_pr_auc(y_true: np.ndarray, y_score: np.ndarray, n_classes: int) -> flo
     """
     try:
         if n_classes == 2:
-            return float(average_precision_score(y_true, y_score[:, 1]))
+            return _finite_or_none(average_precision_score(y_true, y_score[:, 1]))
         y_true_bin = label_binarize(y_true, classes=list(range(n_classes)))
-        return float(average_precision_score(y_true_bin, y_score, average="macro"))
+        return _finite_or_none(
+            average_precision_score(y_true_bin, y_score, average="macro")
+        )
     except ValueError:
         return None
 

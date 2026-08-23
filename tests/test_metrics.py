@@ -98,6 +98,43 @@ def test_pauc_is_half_for_random_scores():
 
 def test_pauc_returns_none_when_roc_is_undefined():
     assert M.partial_roc_auc(np.zeros(10, dtype=int), np.linspace(0, 1, 10)) is None
+    # 양성만 있는 경우도 같다(정상 표본이 없는 외부 검증셋 = Data 2025 의 상황).
+    assert M.partial_roc_auc(np.ones(10, dtype=int), np.linspace(0, 1, 10)) is None
+
+
+def test_finite_or_none_blocks_nan_and_inf():
+    """sklearn 이 예외 대신 nan 을 돌려주는 판본에서 지표가 오염되지 않도록 막는다.
+
+    ⚠️ 이 가드가 없으면 실패가 눈에 안 보인다 — nan 이 CV 요약 평균을 통째로 nan 으로
+    만들거나 순위 정렬을 조용히 틀어 놓는다(docs/13 §5, 2026-08-23).
+    """
+    assert M._finite_or_none(float("nan")) is None
+    assert M._finite_or_none(float("inf")) is None
+    assert M._finite_or_none(float("-inf")) is None
+    assert M._finite_or_none(None) is None
+    # 정상값은 그대로 통과해야 한다(가드가 과잉 차단하면 지표가 사라진다).
+    assert M._finite_or_none(0.0) == 0.0
+    assert M._finite_or_none(np.float64(0.73)) == pytest.approx(0.73)
+
+
+def test_score_metrics_never_leak_nan_into_results():
+    """단일 클래스 입력에서 점수 기반 지표가 전부 None 이어야 한다(nan 금지).
+
+    compute_metrics 전체를 통과시켜 확인하는 이유: 개별 함수를 고쳐도 상위에서 다시
+    float() 로 감싸면 nan 이 되살아나기 때문이다.
+    """
+    y = np.zeros(20, dtype=int)  # Normal 만 있는 셋
+    scores = np.tile([0.7, 0.1, 0.1, 0.1], (20, 1))
+    result = M.compute_metrics(y, y, ["Normal", "SQLi", "XSS", "CmdI"], y_score=scores)
+
+    for key in ("roc_auc_ovr", "pr_auc_macro"):
+        value = result[key]
+        assert value is None or np.isfinite(value), f"{key} 에 nan 이 샜다: {value}"
+
+    op = result["operating_points"]
+    assert op["pauc"] is None or np.isfinite(op["pauc"])
+    for row in op["tpr_at_fpr"]:
+        assert row["tpr"] is None or np.isfinite(row["tpr"])
 
 
 # ── ECE ──────────────────────────────────────────────────────────────────────
