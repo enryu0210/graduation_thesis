@@ -447,8 +447,11 @@ WADBERT 2026 둘 다 CSIC 2010 + SR-BH 2020 병기). → **삭제하면 선행�
 - [ ] ⚠️ **부트스트랩 95% CI 미구현** — §1.2 (나) 에 "신설"로 적혀 있으나 `src/` 전체에 `bootstrap`
       문자열이 0건이다(2026-08-23 확인). 문서만 앞서 나간 상태 → 구현하거나 문구를 내려야 한다
 - [x] ⚠️ `partial_roc_auc` 의 `nan` 반환 버그 → **완료(§1.8)**, 168 tests pass
-- [ ] ⚠️ **Arp et al. 원문 PDF 미보유** — 지표 정당화의 1차 근거인데 `docs/thetics/` 에 없다.
-      USENIX 판(오픈액세스)을 받아 docs/12 §1.3 인벤토리에 등재할 것
+- [x] ⚠️ **Arp et al. 원문 PDF 확보** (2026-08-23) — USENIX Security 2022 판(19p, 오픈액세스)과
+      CACM 2024 확장판(메타데이터 `Commun. ACM 2024.67:104-112` 로 서지 확인) 2편을
+      `docs/thetics/` 에 받고 docs/12 §1.3 인벤토리에 등재. `git check-ignore` 로 미추적 확인 완료.
+      ⚠️ 즉 **두 파일은 이 기기에만 있다** — 데스크톱에서도 작업하려면 다시 받아야 한다
+      (URL: `usenix.org/system/files/sec22-arp.pdf`, `discovery.ucl.ac.uk/10212285/1/3643456.pdf`)
 - [x] docs/07 §1.3·§3 에 Phase 13 대체 표시, 마스터 설계문서 §6.1 지표 목록 갱신 → **완료**
 - [ ] Macro-F1 노이즈 폭 재측정 → `EXIT_F1_TOLERANCE` 값 확정(§1.4). ⚠️ **새 트랙 준비 후에 할 일**
 - [ ] GPU 재실행 착수(§4 순서)

@@ -61,7 +61,7 @@
 
 → 학교 도서관 프록시 또는 브라우저에서 직접 받을 것. **M4 를 포기하면 FastDet 은 불필요**(§4.3).
 
-### 1.3 ⭐ `docs/thetics/` 전체 인벤토리 (18편, 2026-08-12 전수 대조)
+### 1.3 ⭐ `docs/thetics/` 전체 인벤토리 (20편 — 2026-08-12 전수 대조 18편 + 2026-08-23 Arp et al. 2편)
 
 ⚠️ **§1·§1.1 은 Phase 12 의 '비용 축' 수집분만 적은 것이었다.** 그 앞 Phase 에서 모은 논문은
 어느 문서에도 파일명이 없었고, `docs/thetics/` 가 gitignore 대상이라 **기기를 옮기면 조용히
@@ -76,6 +76,8 @@
 | 🆕 `EBSCO-FullText-2026. 07. 15..pdf` | Tadhani, Vekariya, Sorathiya, Alshathri, El-Shafai. *Securing web applications against XSS and SQLi attacks using a novel deep learning approach*. **Scientific Reports 14:1803 (2024)**. doi:10.1038/s41598-023-48845-4 | **텍스트 기반 웹공격 탐지 비교 대상**(CNN+LSTM 하이브리드). 마스터 §10 |
 | 🆕 `technologies-14-00054-v2.pdf` ⭐ | Imani, Joudaki, Bagheri, Arabnia. *Why ROC-AUC Is Misleading for Highly Imbalanced Data: In-Depth Evaluation of MCC, F2-Score, H-Measure, and AUC-Based Metrics*. **Technologies 2026, 14(1), 54**. doi:10.3390/technologies14010054 | **지표 선택(MCC·PR-AUC)의 근거.** docs/07 §1.3 |
 | 🆕 `2512.19203v2.pdf` | Thiyagarajan & Williams. *Evaluating MCC for Low-Frequency Cyberattack Detection in Imbalanced Intrusion Detection Data*. **arXiv:2512.19203v2**, 2026-01 | 위 지표 근거의 **침입탐지 도메인 판본**(CSE-CIC-IDS2017). docs/07 §1.3 보강 |
+| 🆕 `arp_dos_donts_usenixsec22.pdf` ⭐⭐ | Arp, Quiring, Pendlebury, Warnecke, Pierazzi, Wressnegger, Cavallaro, Rieck. *Dos and Don'ts of Machine Learning in Computer Security*. **USENIX Security 2022** (19p) | **Phase 13 지표 개편의 1차 근거.** P7=bounded AUC(TPR@FPR·pAUC), P8=base rate fallacy(경보부하) + MCC 권고. docs/13 §1.6 |
+| 🆕 `arp_pitfalls_cacm2024.pdf` ⭐⭐ | 위 확장판. *Pitfalls in Machine Learning for Computer Security*. **CACM 67(11):104–112, 2024**. doi:10.1145/3643456 (Research Highlights) | 위와 같은 논문의 저널 판 — **심사 대응 시 인용할 쪽**(ACM 대표 매체). docs/13 §1.6 |
 | `시그니처 기반 필터링과 2D-CNN을…hybrid.pdf` | (국문) 시그니처 기반 필터링 + 2D-CNN 하이브리드 악성 트래픽 탐지 | 국내 선행. 캐스케이드 구조의 국문 대조 |
 | `2312.13041v1.pdf` ⭐ · `mdpi_lightweight_cascade_zeroday.pdf` · `tiis_two_stage_waf_stacked_ensemble.pdf` | §1 표 참조 | 비용 축 캐스케이드 3편 |
 | `deepsloth_2010.02432.pdf` ⭐ · `feature_squeezing_ndss2018.pdf` ⭐ | §1 표 참조 | F7·M1 의 직접 선행 |
