@@ -128,6 +128,28 @@ docs/13 §1.9~§1.11 의 지표 역검증에서 실제로 대조한 논문이다
 | *Towards Better-Calibrated ML Models for NIDS* (**IEEE WiMob 2025**, 11257482) | IEEE 유료 | 동상 |
 | McClish. *Analyzing a portion of the ROC curve.* **Med Decis Making 9(3), 1989** | 유료 | pAUC 부록 강등 시 인용 부담도 사라짐 |
 
+### 1.5 ⭐ 주제별 폴더 구조 (2026-08-24 재편) — 파일 경로의 기준
+
+논문이 32편으로 늘어 한 폴더에서 찾기 어려워졌다. **기능·역할별 5개 폴더**로 나눴다.
+⚠️ **§1~§1.4 표의 파일명 앞에는 아래 폴더가 붙는다.**
+
+| 폴더 | 무엇을 모았나 | 편수 | 대표 논문 |
+|---|---|---|---|
+| `01_평가지표_방법론/` | **어떤 지표로 평가할 것인가**의 근거 — 보안 ML 평가 방법론 · 불균형 지표 · 교정(calibration) | 11 | Arp et al.(USENIX Sec'22 / CACM'24) · Axelsson(CCS'99) · Guo(ICML'17) · Saito(PLOS ONE'15) · Davis & Goadrich(ICML'06) · CALIBURN |
+| `02_캐스케이드_조기종료_비용/` | **2단 구조·조기종료로 추론 비용을 줄이는 계열** — 제안 모델의 직접 선행 | 9 | Tasdemir(arXiv:2312.13041) · MDPI 경량 캐스케이드 · TIIS 2단 WAF · CalexNet · ACM SAC'25 · ACM CSUR 서베이 |
+| `03_회피공격_방어/` | **탐지 우회 공격과 방어** (연구 질문 2·3) | 4 | AdvSQLi(IEEE TIFS) · WAF-A-MoLE · DeepSloth(ICLR'21) · Feature Squeezing(NDSS'18) |
+| `04_이미지화_표현/` | **바이트를 이미지로 바꿔 분류하는 계열** — 제안 표현의 근거 | 4 | Nataraj(VizSec'11, 이미지화의 원점) · VulCNN(ICSE'22) · Appl.Sci. RGB assembly · fileless malware 이미지화 |
+| `05_웹공격탐지_데이터셋/` | **웹공격 탐지 모델·데이터셋 최신 대조 대상** | 4 | WADBERT · WAMM · Uncertainty-Aware Ensemble · Sci.Rep. XSS/SQLi |
+
+**분류가 애매해 판단이 필요했던 것 2건** (다음에 찾을 때 헤매지 않도록 남긴다)
+
+- **CALIBURN** → `01`. 스트리밍 IDS 논문이라 `02` 도 가능하나, **우리가 쓰는 지점이 지표**다
+  (Brier 사용례 + 경보 예산 α → FP 상한 임계값). 캐스케이드 τ 선택의 경쟁 표준으로도 인용한다.
+- **CalexNet** → `02`. 교정 논문이지만 대상이 **조기종료 분기**라 캐스케이드 도메인 판본으로 쓴다.
+
+> ⚠️ `docs/thetics/README.md` 에 같은 표를 두었으나 **그 파일도 gitignore 대상**이다(편의용 사본).
+> 기기를 옮기면 사라지므로 **이 절이 유일한 추적본**이다.
+
 ---
 
 ## 2. ⭐ Tasdemir et al. 2023 정독 결과 — 가장 중요

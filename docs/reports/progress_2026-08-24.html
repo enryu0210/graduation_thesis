@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>진행 보고 2026-08-24 — 평가지표·데이터셋 재확정 이행 현황</title>
+<style>
+  /* A4 인쇄 기준. 이 파일은 Chrome --headless --print-to-pdf 로 PDF 화된다. */
+  @page { size: A4; margin: 17mm 15mm 15mm 15mm; }
+
+  html { font-size: 10.2pt; }
+  body {
+    font-family: "Malgun Gothic", "맑은 고딕", "Noto Sans KR", sans-serif;
+    line-height: 1.55; color: #1a1a1a; margin: 0;
+  }
+
+  /* ── 표지 ── */
+  .cover { border-bottom: 3px solid #1f3a5f; padding-bottom: 10px; margin-bottom: 18px; }
+  .cover .kicker { font-size: 9pt; color: #5a6b80; letter-spacing: .04em; }
+  .cover h1 { font-size: 17pt; margin: 6px 0 4px; color: #1f3a5f; line-height: 1.35; }
+  .cover .sub { font-size: 10pt; color: #444; margin-bottom: 8px; }
+  .cover .meta { font-size: 8.8pt; color: #666; }
+
+  h2 {
+    font-size: 12.5pt; color: #1f3a5f; margin: 22px 0 8px;
+    border-left: 5px solid #1f3a5f; padding-left: 9px;
+    page-break-after: avoid;
+  }
+  h3 { font-size: 10.8pt; margin: 15px 0 5px; color: #26456e; page-break-after: avoid; }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0 6px 0; padding-left: 20px; }
+  li { margin: 3px 0; }
+
+  table { border-collapse: collapse; width: 100%; margin: 9px 0 11px; font-size: 8.9pt; page-break-inside: avoid; }
+  th, td { border: 1px solid #c8d0da; padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { background: #eaeff5; color: #1f3a5f; font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.hl td { background: #fff6e0; font-weight: 600; }
+  caption { caption-side: bottom; font-size: 8.2pt; color: #667; text-align: left; padding-top: 4px; }
+
+  .lead {
+    background: #f4f7fb; border: 1px solid #d3dded; border-left: 5px solid #1f3a5f;
+    padding: 10px 13px; margin: 12px 0; font-size: 9.6pt;
+  }
+  .warn {
+    background: #fdf4f4; border: 1px solid #e8cccc; border-left: 5px solid #a83232;
+    padding: 9px 12px; margin: 10px 0; font-size: 9.2pt;
+  }
+  .note { font-size: 8.6pt; color: #555; margin: 5px 0 10px; }
+
+  code { font-family: Consolas, "D2Coding", monospace; font-size: 0.9em; background: #f0f2f5; padding: 1px 3px; }
+  .pos { color: #1a6b3c; font-weight: 600; }
+  .neg { color: #a83232; font-weight: 600; }
+  .muted { color: #777; }
+
+  figure { margin: 12px 0; page-break-inside: avoid; }
+  figure img { width: 100%; border: 1px solid #dde3ea; }
+  figcaption { font-size: 8.3pt; color: #556; margin-top: 4px; }
+
+  /* 2단 구조 도식 — 이미지 없이 CSS 로만 그린다(폰트 깨짐·경로 의존 없음) */
+  .flow { display: flex; align-items: stretch; gap: 8px; margin: 10px 0; font-size: 8.8pt; }
+  .flow .box { border: 1.5px solid #1f3a5f; border-radius: 4px; padding: 7px 9px; flex: 1; background: #f7f9fc; }
+  .flow .box b { color: #1f3a5f; }
+  .flow .arrow { align-self: center; color: #1f3a5f; font-size: 14pt; font-weight: bold; }
+  .flow .box.alt { border-color: #a06a1f; background: #fdf8ef; }
+  .flow .box.alt b { color: #a06a1f; }
+
+  .pagebreak { page-break-before: always; }
+  .qa { border-top: 1px solid #d8dee6; padding-top: 8px; margin-top: 12px; page-break-inside: avoid; }
+  .qa .qid { display: inline-block; background: #1f3a5f; color: #fff; font-size: 8.4pt;
+             padding: 1px 7px; border-radius: 3px; margin-right: 6px; }
+  .qa .qtitle { font-weight: 600; font-size: 10pt; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="kicker">학부 졸업논문 · 진행 보고</div>
+  <h1>웹 공격 문자열을 이미지로 바꿔 탐지하는 2단 구조 연구</h1>
+  <div class="sub">지난 미팅 지시 2건(<b>평가지표</b>·<b>데이터셋</b>) 이행 현황과, 최근 논문 대조로 지표 선택을 역검증한 결과</div>
+  <div class="meta">보고일 2026-08-24 · 보고 범위 2026-08-13 ~ 2026-08-24</div>
+</div>
+
+<div class="lead">
+  <b>세 줄 요약</b>
+  <ol style="margin:6px 0 0; padding-left: 18px;">
+    <li><b>지시 ① 평가지표</b> — 말씀하신 대로 기존 요약 지표를 완전히 걷어내고, 보안 분야 최상위 학회의
+        평가 방법론 논문을 근거로 지표 체계를 다시 세웠습니다. <b>코드 반영과 시험까지 완료</b>했습니다.</li>
+    <li>다만 "근거 문헌이 있다"와 "실제 최근 논문이 그 지표를 쓴다"는 다른 문제라, <b>연구 주제가 비슷한
+        논문들을 역으로 조사</b>했습니다. 그 결과 <b>지표 6종 중 4종은 지지, 1종은 제외, 1종은 조건부</b>로
+        정리했고 <b>1종을 새로 추가</b>했습니다(4장).</li>
+    <li><b>지시 ② 데이터셋</b> — 2010년 데이터를 주 데이터에서 내리고 <b>2020년 실서버 수집 데이터</b>로
+        교체하기로 확정했습니다. 여기에 <b>2025년 실운영 공격 데이터로 외부 검증</b>을 붙여, "최신성"을
+        데이터 연도가 아니라 <b>측정된 일반화 성능</b>으로 답하려 합니다(5장).</li>
+  </ol>
+</div>
+
+<h2>1. 무엇을 만들고 있는가</h2>
+
+<p><b>문제.</b> 웹 서버로 들어오는 요청에는 SQL 삽입, 크로스사이트 스크립팅, 명령 삽입 같은 공격 문자열이
+섞여 들어옵니다. 이것을 실시간으로 걸러내야 하는데, 정확한 모델은 느리고 빠른 모델은 부정확하다는
+맞교환이 늘 존재합니다.</p>
+
+<p><b>접근.</b> 공격 문자열의 바이트 값을 그대로 48×48 컬러 이미지로 바꿔 이미지 분류 신경망에 넣습니다.
+문자열을 순서대로 읽는 모델보다 훨씬 빠릅니다. 그런데 <b>정확도는 텍스트 모델이 더 높다는 것이 저희
+측정 결과</b>였습니다. 그래서 둘 중 하나를 고르는 대신 <b>둘을 잇는 2단 구조</b>를 제안 모델로 삼았습니다.</p>
+
+<div class="flow">
+  <div class="box"><b>들어오는 요청 전량</b><br>바이트 → 48×48 컬러 이미지</div>
+  <div class="arrow">▶</div>
+  <div class="box"><b>1차: 이미지 신경망</b><br>빠르지만 덜 정확<br><span class="muted">전량 통과</span></div>
+  <div class="arrow">▶</div>
+  <div class="box alt"><b>확신도 문턱값</b><br>모델이 스스로 매긴 확신이<br>기준 미달인 <b>소수만</b> 통과</div>
+  <div class="arrow">▶</div>
+  <div class="box"><b>2차: 텍스트 신경망</b><br>정확하지만 약 13배 느림<br><span class="muted">일부만 처리</span></div>
+</div>
+<p class="note">문턱값 하나를 조절하면 "전부 빠른 모델" ↔ "전부 정확한 모델" 사이를 연속적으로 오갈 수 있습니다.
+1·2차 모두 이미 학습해 둔 모델을 그대로 쓰므로 <b>추가 학습 비용은 0</b>입니다.</p>
+
+<h2>2. 연구 질문과 지금까지의 답</h2>
+
+<table>
+<tr><th style="width:34%">연구 질문</th><th style="width:44%">지금까지의 답</th><th>상태</th></tr>
+<tr><td>① 공격 문자열을 이미지로 바꾼 탐지는 텍스트 기반 모델과 견주어 <b>정확도–속도 상 어디에 있는가</b></td>
+    <td><b>정확도에서는 진다.</b> 통계 검정으로 확정했습니다. 대신 속도는 크게 앞섭니다</td><td>답 완료(음성)</td></tr>
+<tr><td>② 그 둘을 잇는 <b>2단 구조</b>는 얼마나 싸게 같은 정확도를 사는가</td>
+    <td>전체의 약 8%만 2차로 넘겨 같은 정확도를 유지했습니다. 다만 이 배수에는 조건이 붙습니다(6장)</td><td>답 완료</td></tr>
+<tr><td>③ 그 구조는 실제 <b>우회 기법</b>에 얼마나 버티는가</td>
+    <td>버팁니다. 그런데 <b>정확도가 아니라 속도를 표적으로 하는 공격</b>이 성립함을 새로 확인했습니다</td><td>답 완료</td></tr>
+<tr><td>④ <b>우회 변형을 미리 학습</b>시키면 못 본 변형까지 막아지는가</td>
+    <td>대체로 <b>본 것만 외웁니다.</b> 그리고 그 대가를 정확도가 아니라 <b>속도로</b> 지불합니다</td><td>답 완료</td></tr>
+<tr><td>⑤ 내용이 <b>암호화</b>되면 내용 기반 탐지는 어디서 무너지는가</td>
+    <td>탐지를 죽이는 것은 무작위성 자체가 아니라 <b>키에 의한 무작위화</b>임을 분리해 보였습니다</td><td>답 완료</td></tr>
+<tr><td>⑥ 1차와 2차의 <b>판단이 엇갈리는 것</b> 자체가 우회 시도의 신호가 되는가</td>
+    <td>신호는 나오지만 <b>단독 판단 근거로는 약합니다.</b> 보조 지표로만 보고할 예정입니다</td><td>부분 답</td></tr>
+</table>
+
+<div class="warn">
+<b>연구 질문 ①에 대한 서술 원칙.</b> 원래 질문은 <i>"이미지 기반이 텍스트 모델과 비슷하거나 더 나은가"</i>
+였고 답은 <b>"아니오"</b>였습니다. 결과를 본 뒤 질문을 슬쩍 바꾸면 <b>사후가설 설정</b>이 되므로,
+논문에는 <b>원래 질문과 부정적 답을 그대로 싣고</b>, 2단 구조는 <b>그 부정적 결과에서 파생된 질문</b>임을
+명시합니다. 이렇게 쓰면 오히려 방법론적 강점이 됩니다.
+</div>
+
+<h2 class="pagebreak">3. 지시 ① 평가지표 — 무엇을 어떻게 바꿨는가</h2>
+
+<p>기존에 쓰던 단일 요약 지표를 <b>완전히 제거</b>했습니다. 보고 항목만 지우면 되는 일이 아니라, 그 지표가
+코드 안에서 <b>자동 판단의 기준값</b>으로 쓰이던 곳이 5군데 있어 함께 옮겼습니다. 현재 자동 시험 168건이
+모두 통과합니다.</p>
+
+<p>새 지표 체계의 1차 근거는 보안 분야 최상위 학회 논문으로 교체했습니다.</p>
+
+<div class="note">Arp 외. <i>Dos and Don'ts of Machine Learning in Computer Security.</i> USENIX Security 2022.
+확장판: <i>Pitfalls in Machine Learning for Computer Security.</i> Communications of the ACM 67(11):104&ndash;112, 2024.
+&mdash; 보안 분야 기계학습 평가 방법론 비판의 표준 인용 문헌입니다. 원문 두 편을 직접 확보해 대조했습니다.</div>
+
+<table>
+<tr><th style="width:20%">지표</th><th style="width:48%">무엇을 보는가 · 왜 필요한가</th><th>상태</th></tr>
+<tr><td><b>클래스 균등 F1</b></td>
+    <td>공격 종류별 성능을 <b>같은 비중으로</b> 평균합니다. 데이터가 적은 공격 종류에서의 실패가 전체 평균에 묻히지 않습니다. 최근 논문들의 공통 보고 단위여서 선행연구와 직접 비교가 됩니다</td><td>유지</td></tr>
+<tr><td><b>정밀도–재현율 곡선 넓이</b></td>
+    <td>드문 사건을 얼마나 잘 골라내는지를 봅니다</td><td>⚠️ 조건부(4장)</td></tr>
+<tr><td><b>오탐률 1% 지점의 탐지율</b></td>
+    <td>실무 방화벽은 <b>오탐이 적은 구간에서만</b> 쓸 수 있습니다. "평균적으로 잘한다"가 아니라 <b>실제로 운영 가능한 지점에서</b> 얼마나 잡는지를 봅니다</td><td>신설</td></tr>
+<tr><td><b>저오탐 구간 곡선 넓이</b></td>
+    <td>위와 같은 취지를 곡선 넓이로 요약한 것</td><td>❌ 제외 권고(4장)</td></tr>
+<tr><td><b>경보 부하</b></td>
+    <td>실제 서비스에서 공격은 전체 요청의 극히 일부입니다. 그 비율을 가정했을 때 <b>100만 요청당 헛경보가 몇 건인지</b>를 셉니다. 담당자가 감당할 수 있는 양인지를 보는 지표입니다</td><td>신설</td></tr>
+<tr><td><b>확신도 교정 오차</b></td>
+    <td>모델이 "90% 확신한다"고 할 때 실제로 90% 맞는지를 봅니다. 저희 2단 구조는 <b>확신도로 2차 전달 여부를 결정</b>하므로 이 값이 구조의 전제입니다</td><td>신설</td></tr>
+</table>
+
+<div class="lead" style="font-size:9.2pt">
+<b>왜 "경보 부하"가 필요한지 보여주는 실례.</b> 정확도 0.997, 클래스 균등 F1 0.995, 곡선 넓이 1.000 인
+모델도 &mdash; 오탐률이 3%이고 실제 공격이 전체 요청의 0.1%뿐이라면 &mdash; <b>울린 경보 100건 중 진짜는 3건</b>
+(100만 요청당 헛경보 29,970건 대 진짜 1,000건)입니다. 기존 지표만 보고했다면 이 모델을 "거의 완벽"으로
+보고했을 것입니다.
+</div>
+
+<h2 class="pagebreak">4. 지표 선택을 최근 논문으로 역검증했습니다</h2>
+
+<p><b>왜 했는가.</b> 처음 근거로 삼은 논문들은 <b>지표 이름을 검색어로</b> 찾은 것이었습니다. 그러면
+"그 지표를 쓰는 논문을 찾았더니 그 지표를 쓰더라"는 순환 논증이 됩니다. 그래서 이번에는 순서를 뒤집어
+<b>연구 주제가 비슷한 논문을 먼저 찾고, 그들이 실제로 무엇을 보고하는지</b>를 확인했습니다.
+관련 논문 <b>32편을 주제별로 정리</b>했고, 그중 판단의 근거가 되는 <b>7편은 원문 전문을 직접 검색</b>해
+대조했습니다.</p>
+
+<table>
+<tr><th style="width:20%">지표</th><th style="width:52%">비슷한 주제의 최근 논문에서의 실태</th><th>판정</th></tr>
+<tr><td>클래스 균등 F1</td><td>사실상 전원이 씁니다. 웹 공격 탐지 논문 하나는 <b>클래스 균등 방식과 가중 방식을 함께</b> 보고합니다 &mdash; 저희가 하려던 형식 그대로입니다</td><td class="pos">유지</td></tr>
+<tr><td>오탐률 1% 지점 탐지율</td><td>2단 구조 선행연구가 <i>"오탐률 1.009%에서 정확도 89.22%"</i>처럼 <b>고정 오탐률 지점으로 보고</b>합니다. 저희와 같은 웹 요청 데이터에서도 그렇게 합니다</td><td class="pos">유지(근거 확보)</td></tr>
+<tr><td>경보 부하</td><td>가장 가까운 선행연구가 <b>똑같은 계산</b>을 이미 하고 있었습니다 &mdash; 실제 공격 발생률 3.3%를 놓고 경보량을 추정합니다. 이 계열의 원점 논문(1999)까지 확인했습니다</td><td class="pos">가장 강한 지지</td></tr>
+<tr><td>확신도 교정 오차</td><td>웹 공격 탐지 쪽에는 드물지만 <b>침입 탐지 분야 2025~2026년 논문에는 표준</b>으로 들어가 있습니다</td><td class="pos">유지</td></tr>
+<tr><td><b>정밀도–재현율 곡선 넓이</b></td><td>쓰는 논문이 있으나 <b>이 지표에는 구조적 함정이 있습니다</b>(아래)</td><td>⚠️ 조건부</td></tr>
+<tr><td><b>저오탐 구간 곡선 넓이</b></td><td>조사한 논문 <b>전부에서 사용 0건</b>이었고, 정보가 "오탐률 1% 지점 탐지율"과 상당히 겹칩니다</td><td class="neg">본문에서 제외</td></tr>
+</table>
+
+<h3>검증에서 나온 시정 사항</h3>
+
+<p><b>(1) 정밀도–재현율 곡선 넓이는 "공격 비율"에 따라 값이 변합니다.</b> 이 지표는 정밀도를 적분한 값이라,
+모델이 전혀 바뀌지 않아도 <b>시험 데이터에 공격이 몇 %인지에 따라 숫자가 움직입니다.</b> 그런데 저희
+코드는 "경보 부하"만 실제 배포 비율로 환산하고 이 지표는 시험 데이터 비율 그대로 계산하고 있었습니다.
+같은 보고서 안에서 두 지표가 서로 다른 전제를 쓰고 있었던 셈입니다. 게다가 저희 시험 데이터는
+<b>공격이 96.8%로 다수</b>여서, 이 지표가 원래 유용한 "드문 사건" 상황과 정반대입니다.
+&rarr; <b>보고할 때 그 데이터의 공격 비율을 반드시 함께 적고</b>, 데이터셋이 다른 것끼리의 비교에는
+공격 비율에 영향받지 않는 지표를 쓰기로 했습니다.</p>
+
+<p><b>(2) 확률 예측 오차 점수(Brier)를 추가합니다.</b> 확신도 교정을 다루는 최근 논문들이 공통적으로
+쓰고 있고, 저희가 쓰던 교정 오차 지표는 값의 구간을 몇 개로 나누느냐에 따라 결과가 달라지는 약점이
+있습니다. Brier 점수에는 그런 임의 선택이 없습니다. 구현은 한 곳만 고치면 됩니다.</p>
+
+<p><b>(3) 속도 개선 배수에 조건을 명시합니다.</b> 이것이 이번 검증에서 나온 가장 중요한 발견이라
+6장에서 따로 말씀드립니다.</p>
+
+<div class="warn">
+<b>검증 과정에서 저희 판단 하나가 틀렸음을 확인했습니다.</b> 처음에는 "오탐률 고정 지점 보고는 최근
+웹 공격 논문이 하지 않는 것이므로 저희만의 차별점"이라고 적었는데, <b>논문 원문을 열어보니 하고 있었습니다.</b>
+검색 요약만 보고 "선행연구가 하지 않는다"고 적었던 것이 원인입니다. 앞으로 논문 본문에서 선행연구의
+부재를 주장할 때는 <b>원문을 직접 확인한 것만</b> 쓰기로 하고, 이 원칙을 기록에 남겼습니다.
+</div>
+
+<h2 class="pagebreak">5. 지시 ② 데이터셋 — 무엇으로 바꾸는가</h2>
+
+<table>
+<tr><th style="width:15%">역할</th><th style="width:25%">데이터</th><th>내용과 선정 이유</th></tr>
+<tr class="hl"><td>주 데이터</td><td><b>SR-BH 2020</b><br><span class="muted">Computers &amp; Security 120 (2022) 102788</span></td>
+ <td>2020년 7월, <b>인터넷에 실제로 노출된 서버</b>에서 12일간 수집한 90.8만 요청. 자동 규칙으로 1차 표시한 뒤 <b>사람이 검수해 교정</b>한 라벨입니다. 2025~2026년 최신 논문들이 실제로 쓰고 있어 <b>직접 비교</b>가 됩니다. 원문 문자열이 그대로 들어 있어 저희 이미지 변환이 <b>수정 없이 동작</b>합니다</td></tr>
+<tr class="hl"><td>외부 검증</td><td><b>2025년 실운영 차단 기록</b><br><span class="muted">Data 10(11):186, 2025</span></td>
+ <td>2025년 운영 중인 서버가 <b>실제로 차단한</b> 악성 요청 30일분입니다. 정상 요청이 없어 오탐률은 계산할 수 없으므로 <b>탐지율 전용 외부 시험셋</b>으로만 씁니다</td></tr>
+<tr><td>비교용</td><td>기존 2010년 데이터</td>
+ <td>삭제하지 않고 <b>선행연구 대조표용</b>으로만 남깁니다. 최근 논문들이 아직 이 데이터로 성능을 보고하고 있어, 이것이 없으면 <b>숫자를 나란히 놓을 수가 없습니다</b></td></tr>
+</table>
+
+<div class="lead" style="font-size:9.3pt">
+<b>왜 2020년 데이터에 2025년 검증을 붙이는가.</b> 2010년을 2020년으로 바꾸는 것만으로는
+<i>"그것도 6년 전 아닌가"</i>라는 같은 지적을 다시 받게 됩니다. 대신 <b>2020년 데이터로 학습한 모델이
+2025년 실제 공격을 얼마나 잡는지</b>를 측정해 보고하면, 최신성 문제를 <b>데이터 연도가 아니라
+측정된 일반화 성능으로</b> 답하게 됩니다. 이를 새 연구 질문으로 추가할 계획입니다.
+</div>
+
+<div class="warn">
+<b>비용을 정직하게 말씀드립니다.</b> 데이터를 교체하면 지금까지의 <b>측정 수치는 전부 다시 내야 합니다</b>
+(결과 파일 141개). 코드·구조·방법론은 그대로 살고 <b>숫자만 재생산</b>되지만, 학습에 쓰는 그래픽카드가
+한 대뿐이라 <b>순차 실행</b>해야 합니다. 그래서 데이터와 지표를 <b>먼저 확정</b>한 뒤 재측정에 들어가는
+순서로 잡았고, 현재 데이터 내려받기 단계입니다.
+</div>
+
+<h2 class="pagebreak">6. 지금까지의 측정 결과</h2>
+
+<div class="note">아래 수치는 <b>모두 지시 이전의 옛 지표·옛 데이터 기준</b>이며, 위 계획에 따라 전면 재측정
+대상입니다. 방향성과 구조적 발견은 유지될 것으로 보지만 숫자 자체는 바뀔 수 있습니다.</div>
+
+<table>
+<tr><th style="width:36%">확인한 사실</th><th style="width:40%">근거 수치 (옛 기준)</th><th>성격</th></tr>
+<tr><td>이미지 단독은 텍스트 모델에 <b>통계적으로 유의하게 열세</b></td><td>5겹 교차검증 + 다중비교 보정 후 <i>p</i> = 0.0010~0.0247</td><td>음성 결과</td></tr>
+<tr><td>흑백을 <b>컬러 3채널로</b> 바꾼 개선은 진짜</td><td>+2.69%p, 보정 후 <i>p</i> = 0.0037~0.0201</td><td>확정</td></tr>
+<tr class="hl"><td>2단 구조는 <b>8%만 2차로 넘겨</b> 같은 정확도를 유지</td><td>2차 전달 8.0%, 지연 5.07배 감소 <b>⚠️ 조건 있음(아래)</b></td><td>제안의 핵심</td></tr>
+<tr><td>다만 <b>확신도로 넘길 대상을 고르는 방식은 최적과 거리가 멀다</b></td><td>이상적 선택 대비 <b>14.8배</b> 과다 전달</td><td>개선 여지 정량화</td></tr>
+<tr><td><b>속도를 표적으로 하는 공격</b>이 성립</td><td>2차 전달률 2.54% → 5.50%(2.17배). 정확도는 그대로인데 지연만 폭증</td><td>새 발견</td></tr>
+<tr><td>우회 변형 학습은 <b>본 것만 외운다</b></td><td>학습에 쓴 변형 −4.80%p vs 못 본 변형 −44.20%p</td><td>한계 규명</td></tr>
+<tr><td>방어의 대가는 정확도가 아니라 <b>속도로</b> 지불된다</td><td>정확도 −0.12%p인데 2차 전달률 34.97% → 69.52%</td><td>구조 고유 발견</td></tr>
+<tr><td>암호화 시점의 붕괴 원인은 <b>키에 의한 무작위화</b></td><td>고정 키 방식은 0.9445 유지 → 표준 암호화에서 0.3965로 붕괴</td><td>경계 규명</td></tr>
+<tr><td>더 큰 모델(트랜스포머 계열)은 <b>채택하지 않음</b></td><td>차이 +0.12%p, <i>p</i> = 1.0000(차이 없음)</td><td>부정 결과</td></tr>
+<tr><td>1차 모델 내부의 조기 종료도 <b>채택하지 않음</b></td><td>연산을 18% 줄였는데 실제 시간은 오히려 +3.3%</td><td>부정 결과</td></tr>
+</table>
+
+<div class="warn">
+<b>⚠️ 속도 5.07배에는 조건이 붙습니다 &mdash; 이번 검증의 가장 큰 발견입니다.</b><br>
+2단 구조의 실제 속도 이득은 <b>들어오는 요청 중 공격이 몇 %인지에 따라 달라집니다.</b> 1차 모델이
+확신하는 것을 걸러내는 구조이기 때문입니다. 그런데 저희가 측정한 데이터는 <b>공격이 96.8%</b>로,
+실제 웹 서비스(보통 수 % 이하)와 정반대입니다. 가장 가까운 선행연구도 <i>"현실적인 공격 비율에서
+추정해야 한다"</i>고 명시하고 3.3%를 사용합니다.<br>
+&rarr; 재측정 시 <b>배포 환경의 공격 비율(1%·0.1%·3.3%)에서 다시 계산해 함께 싣고</b>, 조건 없는
+"5.07배"는 쓰지 않기로 했습니다. 지표 선택이 아니라 <b>핵심 주장의 성립 조건</b>에 관한 문제여서
+가장 먼저 처리합니다.
+</div>
+
+<h2 class="pagebreak">7. 논문에 정직하게 함께 적을 한계</h2>
+<ul>
+<li>이미지 단독 방식은 텍스트 모델에 <b>진다</b> &mdash; 숨기지 않고 그대로 싣습니다.</li>
+<li>깨끗한 데이터에서는 두 모델이 <b>서로 보완하지 않습니다</b>(놓치는 것이 거의 동일).</li>
+<li>공격자가 저희 방어를 알고 <b>맞춰서 적응하는 공격은 아직 수행하지 못했습니다.</b></li>
+<li>1차 모델 내부의 조기 종료는 <b>시도했으나 효과가 없어 채택하지 않았습니다</b> &mdash; 그대로 보고합니다.</li>
+<li>1·2차의 판단 불일치를 우회 탐지 신호로 쓰는 아이디어는 <b>기준에 못 미쳐 보조 지표로만</b> 씁니다.</li>
+<li>속도 개선 배수는 위와 같이 <b>공격 비율 조건부</b>입니다.</li>
+</ul>
+<p class="note">부정적 결과를 남기는 편이 오히려 유리하다고 판단했습니다. 조사한 유사 선행연구 8편 중
+<b>통계적 유의성 검정을 한 논문이 0편</b>이어서, 검정과 부정 결과를 함께 싣는 것 자체가 차별점이 됩니다.</p>
+
+<h2>8. 남은 일정</h2>
+<table>
+<tr><th style="width:6%">순서</th><th>할 일</th><th style="width:14%">상태</th></tr>
+<tr><td>1</td><td>새 데이터 내려받기 · 형식과 라이선스 직접 확인</td><td>진행 중</td></tr>
+<tr><td>2</td><td>공격 유형 라벨을 기존 4개 분류로 대응시키는 규칙 구현</td><td>대기</td></tr>
+<tr><td>3</td><td>이미지 변환 절차를 새 데이터에 연결</td><td>대기</td></tr>
+<tr><td>4</td><td>모델 6종 본 측정 + 5겹 교차검증</td><td>대기</td></tr>
+<tr class="hl"><td>5</td><td><b>2단 구조 문턱값 재선택 + 속도 배수를 실제 공격 비율에서 재계산</b></td><td>대기(최우선)</td></tr>
+<tr><td>6</td><td>우회 공격 · 방어 재측정</td><td>대기</td></tr>
+<tr><td>7</td><td>2025년 데이터로 외부 검증(시간축 일반화)</td><td>대기</td></tr>
+<tr><td>8</td><td>2010년 데이터 대조표(선행연구 비교용)</td><td>대기</td></tr>
+</table>
+
+<h2>9. 여쭙고 싶은 것</h2>
+
+<div class="qa"><span class="qid">1</span><span class="qtitle">저오탐 구간 곡선 넓이를 본문에서 빼도 괜찮겠는지요.</span>
+<p>조사한 논문 어디에서도 쓰지 않았고 다른 지표와 정보가 겹칩니다. 다만 지표 수가 줄면 "부실해 보이는"
+인상을 줄 수 있어, 본문에서는 빼되 부록에 남기는 선으로 정리할까 합니다.</p></div>
+
+<div class="qa"><span class="qid">2</span><span class="qtitle">속도 배수를 어느 공격 비율 기준으로 보고할지요.</span>
+<p>1%·0.1%를 함께 싣는 것을 기본으로 하되, 선행연구와 직접 비교하려면 그쪽이 쓴 3.3%도 병기하는 편이
+낫다고 봅니다. 셋을 다 싣는 것이 번잡하다면 어느 쪽을 대표로 둘지 정해 주시면 좋겠습니다.</p></div>
+
+<div class="qa"><span class="qid">3</span><span class="qtitle">2025년 외부 검증을 새 연구 질문으로 세워도 되겠는지요.</span>
+<p>기존 질문에 딸린 실험으로 둘 수도 있으나, "시간이 지난 데이터로 학습한 탐지기가 최신 공격에
+통하는가"는 독립된 질문으로 세우는 편이 지시 ②에 대한 답으로도 분명해 보입니다.</p></div>
+
+</body>
+</html>
