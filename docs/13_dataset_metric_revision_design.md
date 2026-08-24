@@ -325,6 +325,82 @@ WADBERT 는 SR-BH2020 을 **정상 161,334 / 악성 345,942**(합 507,276)로 �
 전자를 따르면 **≈24,200 으로 줄어든다**(그래도 TPR@0.1%FPR 은 성립). **다운로드 직후 실측으로
 확정**할 것. 멀티라벨 특성상 "행 수"와 "라벨 수"를 다르게 센 것일 가능성이 크다.
 
+### 1.10 ⚠️ 독립 2차 검증 (2026-08-24, 같은 날 후속) — §1.9 가 보지 않은 3개 축
+
+§1.9 는 **캐스케이드·교정 이웃만** 봤고 8편 중 5편이 ⚪(원문 미확인)였다. 이번에는 축을 셋 더 열었다:
+(ㄱ) **RQ1 = 이미지화 표현** 이웃, (ㄴ) **RQ2·RQ3 = 회피·방어** 이웃, (ㄷ) **예산 기반 캐스케이드**.
+그리고 문헌만이 아니라 **우리 지표 정의를 `metrics.py` 코드와 직접 대조**했다 — 그쪽에서 더 큰 것이 나왔다.
+
+**(가) 새로 확인한 이웃 논문**
+
+| 논문 | 우리 RQ 와의 근접성 | 실제 보고 지표 | 등급 |
+|---|---|---|---|
+| **RiskGate-IDS** *Budget-aware two-stage NetFlow IDS* (**IJCIP**, ISSN 1874-5482, 2026, pii S187454822600048X) | 🔴 **RQ5 최근접(예산판)** — 2단 + 게이트 | **Stage-2 예산 30% 고정 하의 attack recall 0.9049** · micro-batch recall(0.5498→0.9048) · 처리량 1.59M flows/s. **AUC·교정 없음** | ⚪ (403, 스니펫 수치) |
+| **CALIBURN** (arXiv:2605.24696) | RQ5 운영 임계값 선택 | **AUC-PR 0.943** · **Brier score**(등장성 교정으로 30% 감소) · **경보 예산 α → FP 상한 임계값**(conformal risk control) | 🟡 초록 |
+| Lightweight Cascade zero-day (MDPI *Computers* 15(3):174) | RQ5 | 1차 저임계 → 2차 정밀도 회복 구조 | ⚪ (403) |
+| *An Early Exit DNN for Fast Inference IDS* (**ACM SAC 2025**) | RQ5 조기종료 | accuracy + **샘플당 지연**(92ms → 38ms) | ⚪ |
+| **AdvSQLi** (arXiv:2401.02615) | 🔴 **RQ2 최근접** — 실제 WAF-as-a-service 대상 SQLi 회피 | **attack success rate**(ML 탐지기 100%, F5 WAF 79%) | 🟡 초록 |
+| WAF-A-MoLE (arXiv:2001.01952) | RQ2 계보의 원점 | 회피율 · 변이(질의) 횟수 | ⚪ |
+| *Comparative Analysis of CNN and Transformers on Malicious Intent Detection in HTTP* (Springer, 2024) | 🔴 **RQ1 최근접** — 같은 **정확도–비용** 축 | accuracy + **처리 시간** | ⚪ |
+| 이미지화 계열(XSS ASCII→[120,120]→CNN 등, 2025) | RQ1 표현 | **Acc/P/R/F1 뿐** | ⚪ |
+| *Towards Better-Calibrated ML for NIDS* (IEEE 11257482, WiMob 2025) | 교정 | **ECE · Brier** | ⚪ (서지 확인) |
+
+**(나) §1.9 판정은 뒤집히지 않았다** — 새로 본 9편에서도 **pAUC 사용 0건**(부록 강등 권고 확정),
+TPR@FPR 은 웹공격 이웃 0건 유지, 경보 부하는 지지가 더 강해졌다(CALIBURN 의 "alert budget α"가
+같은 개념이다), ECE 는 NIDS 계열에서 재확인됐다.
+
+**(다) 새 발견 4건**
+
+1. ⚠️ **PR-AUC 가 5.07배와 똑같은 base-rate 결함을 갖는다 — 이번 검증의 최대 발견.**
+   AP/PR-AUC 는 **정밀도의 적분**이라 양성 유병률에 직접 의존한다(ROC-AUC 는 의존하지 않는다).
+   그런데 `metrics.py` 는 metric #5(경보 부하)만 배포 비율 1%·0.1% 로 환산하고, metric #2(PR-AUC)는
+   **test 셋 실측 비율 그대로** 계산한다(`_safe_pr_auc` → `average_precision_score`). **같은 모듈 안에서
+   두 헤드라인 지표가 서로 다른 유병률을 가정**하고 있다. `DEPLOYMENT_ATTACK_PREVALENCES` 주석이
+   "그 비율로 환산하지 않으면 Precision 이 실제보다 훨씬 좋아 보인다"고 스스로 적어 둔 그 함정에
+   PR-AUC 가 그대로 빠져 있다.
+   - 더구나 §1.2 표가 PR-AUC 의 역할로 적은 *"희귀 사건에서 ROC 보다 정보량 큼"* 은 **우리 트랙에서
+     성립하지 않는다.** 우리 트랙의 희귀 클래스는 공격이 아니라 **Normal** 이다(공격 96.8%/73.1%/64.1%).
+     역할 설명이 사실과 정반대다.
+   - SR-BH 2020(공격 약 42%)으로 갈아타면 PR-AUC 는 **모델이 그대로여도 값이 이동**한다 → 2기 수치와
+     3기 수치의 직접 비교가 불가능하다. 데이터셋 교체 후 "PR-AUC 가 떨어졌다"를 성능 저하로 읽으면 오독이다.
+   - **조치 3택(택1 아님, 병행 권고)**: (ㄱ) PR-AUC 를 보고할 때 **그 셋의 공격 비율을 반드시 병기**,
+     (ㄴ) **Normal 을 양성으로 둔 PR-AUC 를 병기**(희귀 클래스 기준의 정직한 판본),
+     (ㄷ) **데이터셋 간·시기 간 대조는 유병률 불변인 ROC 계열(TPR@FPR)로** 한다.
+   - 근거: **Davis & Goadrich, ICML 2006** / **Saito & Rehmsmeier, PLOS ONE 10(3):e0118432, 2015**.
+
+2. **Brier score 가 빠져 있다 — 비용 대비 이득이 가장 큰 보완.**
+   교정을 보고하는 이웃 2편(CALIBURN · WiMob 2025)이 **둘 다 Brier 를 쓴다.** 반면 ECE 는 구간(bin)
+   분할에 의존하는 **편향 추정량**이고 proper scoring rule 이 아니다 — `ECE_N_BINS=15` 라는 선택 하나로
+   값이 움직인다. Brier 는 구간이 없고 proper 하다. **ECE/MCE 를 유지한 채 Brier 를 병기**하면
+   "교정을 왜 그 방식으로 쟀나"라는 질문이 닫힌다. 구현은 `metrics.py` 의 `calibration_metrics` 한 곳
+   (확률 벡터와 one-hot 의 MSE).
+
+3. ⚠️ **τ 선택 방식에 경쟁 표준이 생겼다 — 심사 질문으로 들어올 수 있다.**
+   우리 τ 는 "val 에서 고르고 test 에 1회"다. 그런데 최근 이웃 둘은 **τ 하나를 고른 결과**가 아니라
+   **예산을 고정하고 그 지점의 성능을 보고**한다 — CALIBURN 은 경보 예산 α 를 주면 **FP 상한이 보장되는**
+   임계값을 conformal risk control 로 뽑고, RiskGate-IDS 는 **Stage-2 예산을 30% 로 고정**한 뒤 그
+   예산에서의 recall 을 보고한다.
+   → **RQ5 보고를 "에스컬레이션 예산 축(5%·10%·30%) 위의 곡선"으로 재구성**하면, §1.9 발견 ①
+   (5.07배의 base-rate 의존)도 같은 조치로 함께 해소된다. 보장(conformal)까지 도입할 필요는 없다 —
+   관련연구에 이 라인을 넣고 **"우리 τ 는 보장 없는 경험적 선택"임을 한계로 명시**하면 방어된다.
+
+4. **RQ2·RQ3 의 문헌 통화는 ASR 하나가 아니다.** 회피·방어 계열의 표준 조합은
+   **ASR + AUA(accuracy under attack) + AVGQ(성공까지의 평균 질의 수) + PDR(성능 하락률)** 이다.
+   §1.9 발견 ②(`any-misclass`→ASR 개명)에 더해 — **AUA 는 우리가 이미 재고 있는 값**이라 이름만 맞추면
+   되고, **AVGQ 는 우리 problem-space 변형의 공격자 비용**이라 비용 기반 공격(F7) 주장을 정량화해 준다.
+   (F7 은 "방어자 비용을 올리는 공격"이므로 **공격자 비용**을 함께 적어야 교환비가 성립한다.)
+
+**(라) 종합 판정 — 지표 선택은 대체로 옳다. 고칠 것은 셋뿐이다.**
+
+| 지표 | 2회 검증 후 판정 |
+|---|---|
+| Macro-F1 · 경보 부하 · ECE/MCE · benign-evasion | ✅ 근거 확보 (경보 부하는 이웃 실제 관행 + Axelsson 계보 양쪽) |
+| TPR@1%FPR | ✅ 유지 — 단 웹공격 이웃 0건이므로 **왜 보는지를 논문에서 방어**해야 함 |
+| **PR-AUC** | ⚠️ **유병률 병기 없이 쓰면 안 됨** (신규 — (다)-1) |
+| **pAUC** | ❌ **부록 강등** — 2회 검증 합계 17편에서 사용 0건, TPR@FPR 과 정보 중복 |
+| **Brier** | ➕ **신설 권고** (신규 — (다)-2) |
+| **AUA · AVGQ** | ➕ **신설 권고**, RQ2·RQ3 대조 성립용 (신규 — (다)-4) |
+
 ---
 
 ## 2. 데이터셋 재검토 (지시 ②)
@@ -505,7 +581,13 @@ WADBERT 2026 둘 다 CSIC 2010 + SR-BH 2020 병기). → **삭제하면 선행�
 - [ ] `any-misclass` → **ASR(Attack Success Rate)** 로 개명 + 정의 병기(§1.9 발견 ②)
 - [ ] **FE score(F1-Efficiency) 채택 결정** — 최근접 선행이 실제로 쓴다(§1.9 발견 ③).
       docs/11 §16.3 의 "미결"을 닫을 것. 구현은 `metrics.py` 한 곳
-- [ ] pAUC 를 헤드라인 → 부록으로 내릴지 결정(§1.9)
+- [ ] ⚠️ **PR-AUC 유병률 병기** — §1.10 발견 ①. 보고 시 그 셋의 공격 비율을 함께 적고,
+      Normal 을 양성으로 둔 판본을 병기한다. 데이터셋 간 대조는 TPR@FPR 로 한다
+- [ ] **Brier score 신설** — §1.10 발견 ②. `calibration_metrics` 한 곳. ECE/MCE 는 유지
+- [ ] **RQ5 보고를 에스컬레이션 예산 축(5%·10%·30%) 곡선으로 재구성** — §1.10 발견 ③.
+      C1 의 base-rate 취약성(§1.9 발견 ①)이 같은 조치로 함께 닫힌다
+- [ ] **AUA(accuracy under attack) · AVGQ(평균 질의 수) 신설** — §1.10 발견 ④. RQ2·RQ3 대조 성립용
+- [x] pAUC 를 헤드라인 → 부록으로 내릴지 결정 → **부록 강등 권고 확정**(§1.9 + §1.10 나, 이웃 17편 사용 0건)
 - [ ] ⚠️ **부트스트랩 95% CI 미구현** — §1.2 (나) 에 "신설"로 적혀 있으나 `src/` 전체에 `bootstrap`
       문자열이 0건이다(2026-08-23 확인). 문서만 앞서 나간 상태 → 구현하거나 문구를 내려야 한다
 - [x] ⚠️ `partial_roc_auc` 의 `nan` 반환 버그 → **완료(§1.8)**, 168 tests pass
@@ -551,6 +633,21 @@ WADBERT 2026 둘 다 CSIC 2010 + SR-BH 2020 병기). → **삭제하면 선행�
 10. Guo, C., Pleiss, G., Sun, Y., Weinberger, K.Q. *On Calibration of Modern Neural Networks.*
     **ICML 2017.** — reliability diagram + ECE 를 현대 신경망 평가 표준으로 만든 논문.
     "현대 심층망은 정확해졌지만 더 이상 교정돼 있지 않다"가 우리가 ECE 를 재는 직접 논거
+
+**§1.10 독립 2차 검증으로 추가된 5편** (2026-08-24)
+
+11. Davis, J., Goadrich, M. *The Relationship Between Precision-Recall and ROC Curves.* **ICML 2006.**
+    — PR 곡선이 유병률에 의존함을 보인 원점
+12. Saito, T., Rehmsmeier, M. *The Precision-Recall Plot Is More Informative than the ROC Plot When
+    Evaluating Binary Classifiers on Imbalanced Datasets.* **PLOS ONE 10(3):e0118432, 2015.**
+    — 11번과 함께 **PR-AUC 유병률 병기**의 근거(§1.10 다-1)
+13. *Budget-aware two-stage NetFlow intrusion detection for high-traffic critical information
+    infrastructure under domain shift* (RiskGate-IDS). **Int. J. Critical Infrastructure Protection, 2026**,
+    pii S187454822600048X — **Stage-2 예산 고정 하의 성능 보고** 관행(§1.10 다-3)
+14. *CALIBURN: Operationally Calibrated Streaming Intrusion Detection with Regime-Dependent Conformal
+    Risk Control.* **arXiv:2605.24696** — 경보 예산 α → FP 상한 임계값. **Brier** 사용
+15. *AdvSQLi: Generating Adversarial SQL Injections against Real-world WAF-as-a-service.*
+    **arXiv:2401.02615** — RQ2 최근접, **attack success rate** 가 통화임을 확인
 
 > 이 4편은 **9·10번이 ECE 의 진짜 출처**라는 점이 핵심이다(Arp et al. 에는 교정 논의가 없다 — §1.6 나).
 > 캐스케이드 도메인 판본인 CalexNet(arXiv:2509.08318)은 **이미 보유**하고 있으며 docs/12 §1 표에 등재돼 있다.
