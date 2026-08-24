@@ -72,7 +72,7 @@ WIN=$(cd "$ROOT/docs/reports" && pwd -W); TMPWIN=$(cd "$TMP" && pwd -W)
     --print-to-pdf="$WIN/current_baseline_2026-08-24.pdf" "file:///$TMPWIN/out.html"
 ```
 
-검증은 다른 문서와 같다 — **표 개수를 원본과 대조**한다(2026-08-24 기준 표 22개 · h2 11개 · 13쪽).
+검증은 다른 문서와 같다 — **표 개수를 원본과 대조**한다(2026-08-24 기준 표 **29개** · h2 11개 · **18쪽**).
 
 ## DOCX 재생성 (직접 고칠 때)
 

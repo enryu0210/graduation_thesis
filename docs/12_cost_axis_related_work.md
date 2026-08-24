@@ -63,6 +63,9 @@
 
 ### 1.3 ⭐ `docs/thetics/` 전체 인벤토리 (20편 — 2026-08-12 전수 대조 18편 + 2026-08-23 Arp et al. 2편)
 
+> ⚠️ **2026-08-24 갱신**: 이 표 이후 **13편이 더 들어왔다 → §1.4.** 현재 총 31편이다
+> (20편 중 Arp et al. 2편은 노트북에만 있던 것이라 §1.4 에서 데스크톱에 다시 받았다 — 중복 아님).
+
 ⚠️ **§1·§1.1 은 Phase 12 의 '비용 축' 수집분만 적은 것이었다.** 그 앞 Phase 에서 모은 논문은
 어느 문서에도 파일명이 없었고, `docs/thetics/` 가 gitignore 대상이라 **기기를 옮기면 조용히
 사라질 상태**였다(실제로 6편이 그랬다 — 아래 🆕 표시). 여기서 전수 기록해 상환한다(G5 부분 상환).
@@ -88,6 +91,42 @@
 > `feature_squeezing_ndss2018` · `s42400-023-00170-z`)은 **2026-08-12 부터 git 추적 대상**이다.
 > 교수님 제출 묶음으로 복사해 둔 것이고, 커밋해 두면 다른 기기에서 다시 받을 필요가 없다.
 > 나머지 13편은 여전히 `docs/thetics/`(gitignore)에만 있으므로 **이 표가 유일한 흔적**이다.
+
+---
+
+### 1.4 추가 확보 (2026-08-24) — Phase 13 지표 역검증에 쓴 논문 14편
+
+docs/13 §1.9~§1.11 의 지표 역검증에서 실제로 대조한 논문이다. **지표 1차 출처**(위)와
+**RQ 근접 이웃**(아래)으로 나눈다. ⚠️ 2026-08-23 에 노트북에서 받았다고 기록된 Arp et al. 2편은
+**이 기기(데스크톱)에 없었다** — gitignore 라 따라오지 않는다는 것이 또 확인됐다. 이번에 다시 받았다.
+
+| 파일명 | 서지 | 왜 넣었나 |
+|---|---|---|
+| `arp_dosdonts_usenixsec2022.pdf` ⭐ | Arp et al. *Dos and Don'ts of Machine Learning in Computer Security.* **USENIX Security 2022** (19p) | 현행 지표 체계의 1차 근거(P7 bounded AUC · P8 base rate) |
+| `arp_pitfalls_cacm2024.pdf` ⭐ | 같은 저자 확장판. *Pitfalls in ML for Computer Security.* **CACM 67(11):104–112, 2024** | 위의 저널 판(심사 대응용 권위) |
+| `axelsson_baserate_ccs1999.pdf` ⭐ | Axelsson. *The Base-Rate Fallacy and its Implications for the Difficulty of Intrusion Detection.* **ACM CCS 1999** (10p) | **경보 부하** 지표 계보의 원점 |
+| `naeini_ece_aaai2015.pdf` | Naeini, Cooper, Hauskrecht. *Obtaining Well Calibrated Probabilities Using Bayesian Binning.* **AAAI 2015** | **ECE** 정의의 원점 |
+| `guo_calibration_icml2017_1706.04599.pdf` ⭐ | Guo, Pleiss, Sun, Weinberger. *On Calibration of Modern Neural Networks.* **ICML 2017** | ECE·reliability diagram 을 표준으로 만든 논문 |
+| `saito_prplot_plosone2015.pdf` ⭐ | Saito & Rehmsmeier. **PLOS ONE 10(3):e0118432, 2015** | **PR-AUC 의 유병률 의존성** 근거(docs/13 §1.10 발견 ①) |
+| `calibration_metrics_review_2504.18278.pdf` | *A comprehensive review of classifier probability calibration metrics.* arXiv:2504.18278 (60p, 82개 지표) | ECE 의 한계와 대안(Brier) 검토용 |
+| `advsqli_2401.02615.pdf` ⭐ | *AdvSQLi: Generating Adversarial SQL Injections against Real-world WAF-as-a-service.* arXiv:2401.02615 = **IEEE TIFS 게재본** | 🔴 **RQ2 최근접.** ASR 이 통화임을 원문 확인(34회) |
+| `wafamole_2001.01952.pdf` | Demetrio et al. *WAF-A-MoLE: Evading WAFs through Adversarial ML.* arXiv:2001.01952 | RQ2 계보의 원점(변이 기반 우회) |
+| `caliburn_2605.24696.pdf` ⭐ | *CALIBURN: Operationally Calibrated Streaming IDS with Regime-Dependent Conformal Risk Control.* arXiv:2605.24696 (58p) | 🔴 **경보 예산 α → FP 상한 임계값.** τ 선택의 경쟁 표준 · Brier 사용 |
+| `wadbert_2601.21893.pdf` | *WADBERT: Dual-channel Web Attack Detection Based on BERT Models.* arXiv:2601.21893 | 같은 데이터셋(CSIC+SR-BH) 최신 SOTA. **F1 만 보고**함을 원문 확인 |
+| `wamm_2512.23610.pdf` | *Enhanced Web Payload Classification Using WAMM.* arXiv:2512.23610 | SR-BH 라벨 노이즈 감사 근거 |
+| `davis_goadrich_pr_roc_icml2006.pdf` ⭐ | Davis & Goadrich. *The Relationship Between Precision-Recall and ROC Curves.* **ICML 2006**, pp.233–240 | PR 곡선의 유병률 의존성 원점. ⚠️ 학교 미러는 전부 실패했고 **ACM DL 이 OA 라 `curl -A '<브라우저 UA>' 'dl.acm.org/doi/pdf/10.1145/1143844.1143874?download=true'` 로 받혔다** |
+| `uncertainty_ensemble_deepkernel_2410.07725.pdf` | *Towards Trustworthy Web Attack Detection: An Uncertainty-Aware Ensemble Deep Kernel Learning Model.* arXiv:2410.07725 | 웹공격 탐지 + 불확실성. **Macro-F1 + weighted 병기**를 원문 확인 |
+
+⭐ = 논문 본문에서 반드시 인용해야 하는 것.
+
+**확보 실패 (재시도 대상)**
+
+| 논문 | 사유 | 대안 |
+|---|---|---|
+| MDPI *Electronics* 14(21):4172 (멀티라벨 WAF) | Akamai 403 — curl·Chrome 헤드리스 모두 차단 | 브라우저 수동 다운로드 |
+| RiskGate-IDS (**IJCIP 2026**, pii S187454822600048X) · E-WebGuard (**C&S 148, 2025**) | Elsevier 유료 | ⚠️ **원문 미확인 → 이 논문들을 근거로 단정 금지**(docs/13 §1.11 바) |
+| *Towards Better-Calibrated ML Models for NIDS* (**IEEE WiMob 2025**, 11257482) | IEEE 유료 | 동상 |
+| McClish. *Analyzing a portion of the ROC curve.* **Med Decis Making 9(3), 1989** | 유료 | pAUC 부록 강등 시 인용 부담도 사라짐 |
 
 ---
 
