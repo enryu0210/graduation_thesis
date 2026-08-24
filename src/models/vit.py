@@ -2,7 +2,7 @@
 Phase 9 — 제안 모델 arm ②: Vision Transformer (페이로드 이미지 분류)
 
 목적:
-    제안 CNN(cnn.py)과 **완전히 같은 입력**(48×48 gray 1채널 / RGB 3채널 .npz)을 받아
+    얕은 CNN(cnn.py)과 **완전히 같은 입력**(48×48 gray 1채널 / RGB 3채널 .npz)을 받아
     같은 학습 루프·같은 지표로 평가되는 Transformer 계열 모델을 제공한다.
     즉 "이미지화 파이프라인은 그대로 두고 분류기만 CNN ↔ ViT 로 교체"하는 비교를 가능하게 한다.
 
@@ -18,7 +18,7 @@ Phase 9 — 제안 모델 arm ②: Vision Transformer (페이로드 이미지 �
     (raw_byte / char_class / byte_delta …)가 **코드 수정 없이** 그대로 적용된다.
 
 모델 용량 메모(참고):
-    제안 CNN 93,988 → hybrid 약 0.6M → vit 약 2.7M.
+    얕은 CNN 93,988 → hybrid 약 0.6M → vit 약 2.7M.
     ViT 계열이 파라미터가 훨씬 크므로, 성능이 같다면 CNN 이 낫다는 해석을 잊지 말 것.
 """
 
@@ -101,7 +101,7 @@ class PayloadHybridViT(nn.Module):
         → 토큰 평균(GAP) → FC
 
     왜 cls 토큰 대신 토큰 평균인가:
-        제안 CNN 이 GAP 로 요약하는 것과 동일한 방식이라 비교가 깔끔하고,
+        얕은 CNN 이 GAP 로 요약하는 것과 동일한 방식이라 비교가 깔끔하고,
         작은 데이터셋에서 cls 토큰보다 학습이 안정적인 편이다.
     """
 

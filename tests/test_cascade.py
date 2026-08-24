@@ -34,7 +34,7 @@ P2 = np.array([
 
 # ── cascade_apply: 게이트 규칙 ────────────────────────────────────────────────
 def test_tau_zero_is_stage1_alone():
-    # τ=0 이면 확신도가 0 미만인 샘플이 없으므로 아무도 넘어가지 않는다(= 제안 CNN 단독).
+    # τ=0 이면 확신도가 0 미만인 샘플이 없으므로 아무도 넘어가지 않는다(= 1차 CNN 단독).
     pred, _, escalate = cascade_apply(P1, P2, 0.0)
     assert not escalate.any()
     assert np.array_equal(pred, P1.argmax(axis=1))

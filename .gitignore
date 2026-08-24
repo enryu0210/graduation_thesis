@@ -40,3 +40,8 @@ Thumbs.db
 # reports 의 인용 논문 PDF 는 개별 파일로 추적한다. 압축본은 그 중복이라 제외.
 # (docs/reports/README.md "함께 두는 인용 논문 PDF" 절 참조)
 docs/reports/*.zip
+
+# --- Codex 우편함 (휘발성) ---
+# TASK.md/RESULT.md 는 다음 작업에서 덮어쓰이는 일회용 파일이다.
+# 남길 가치가 있는 경위는 docs/0N_*.md 나 커밋 메시지로 옮긴다.
+docs/handoff/
