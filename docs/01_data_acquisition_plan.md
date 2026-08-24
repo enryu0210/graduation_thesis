@@ -1,5 +1,11 @@
 # Phase 1 — 데이터셋 확보 및 검증 계획
 
+> ⚠️ **데이터셋 구성은 이 문서가 최신이 아니다.** 여기 적힌 Kaggle 페이로드 + CSIC 2010 조합은
+> Phase 13(2026-08-13)에서 **SR-BH 2020 주 트랙 + Data 2025 외부검증 + CSIC 2010 legacy** 로
+> 재확정됐다 → `docs/13_dataset_metric_revision_design.md` §2. 이 문서가 여전히 유효한 부분은
+> **확보·검증 절차**(체크섬·행 수 대조·`DATA_MANIFEST.md` 기록 규칙)이며 `src/data/validate.py` 가
+> 그것을 자동화한다. 시기별 정리는 `docs/CURRENT_BASELINE.md`.
+>
 > `web_attack_image_cnn_thesis_design.md`의 3번(데이터셋 설계) 항목을 실행 단계로 구체화한 문서입니다.
 > 이 문서는 VS Code의 Claude Code 터미널에 전달해 실제 다운로드/검증 스크립트를 작성·실행시키기 위한 **지시서(spec)** 이며, 코드 자체는 포함하지 않습니다.
 
