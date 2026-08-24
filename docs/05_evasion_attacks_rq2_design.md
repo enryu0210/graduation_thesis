@@ -206,7 +206,8 @@ python src/attacks/run_evasion.py --attack fgsm --model cnn --eps 0.01,0.03,0.05
   (docs/10 §7.2). 산출물 포맷을 맞출 필요 자체가 사라짐.
 - [ ] **RQ3 의 주 지표 이동** — 본 문서 §13.2 의 "benign-evasion 5모델 전부 ~0" 실측 때문에
   원 RQ3 는 바닥 효과에 걸린다. 주 지표를 any-misclass 로 옮기는 근거·판정 기준은 docs/10 §1.
-- [ ] (운영) 브랜치 정리 — 여전히 `phase1-data-acquisition`에 전 Phase가 쌓여 있음.
+- [x] (운영) 브랜치 정리 — **완료(2026-08-24)**. `phase1-data-acquisition` 을 `main` 으로
+  fast-forward 통합하고 옛 브랜치는 삭제했다. 이후 작업 브랜치는 **`main`**.
 
 ---
 

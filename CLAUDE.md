@@ -3,7 +3,7 @@
 ## 워크플로우
 - Phase 단위 진행. 각 Phase 의 결정/실측/리스크는 `docs/0N_*_design.md`(설계·의사결정 기록)에 남긴다.
 - 실측 지표 → `experiments/results/*.json`(⚠️ 전체 .gitignore, 재생성으로 확보 — 커밋 대상 아님), 그림 → `docs/figures/`(추적·커밋 대상).
-- 커밋/푸시 대상 브랜치는 `phase1-data-acquisition`(전 Phase 가 여기 쌓임, main 아님).
+- 커밋/푸시 대상 브랜치는 **`main`**. ⚠️ 2026-08-24 이전 문서·커밋에 나오는 `phase1-data-acquisition` 은 **삭제된 옛 이름**이다(전 Phase 가 그 브랜치에 쌓여 있다가 main 으로 fast-forward 통합됨).
 - git 커밋 메시지(한글 여러 줄)는 파일로 써서 `git commit -F <file>` 사용. Bash 도구에서 PowerShell here-string(`@'...'@`)은 메시지가 깨짐.
 - ⚠️ 노트북·데스크톱 양쪽에서 작업 → **착수 전 `git fetch` 필수**. 원격에 Phase 가 쌓여 있으면 문서 번호·모델 이름이 이미 선점됨(실제 사고: `docs/08` 과 모델명 `hybrid` 충돌 → push 거부 후 리베이스·개명 재작업).
 - 커밋 전 `python -m pytest tests/ -q` 실행(~3초, GPU 불필요).

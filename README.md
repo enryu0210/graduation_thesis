@@ -132,4 +132,5 @@ python src/eval/cross_validate.py --model cnn --track payload_4class_csicnorm --
 - **GPU 는 1대뿐** → 학습 작업은 **순차 실행**. 동시 실행하면 재현성이 나빠진다.
 - 한글 콘솔(cp949)에서 비-ASCII 출력이 깨진다 → `PYTHONIOENCODING=utf-8` 프리픽스 사용.
 - matplotlib 그림의 라벨·범례·제목은 **ASCII 만**(DejaVu Sans 에 한글 없음).
-- 커밋·푸시 대상 브랜치는 `phase1-data-acquisition`(main 아님).
+- 커밋·푸시 대상 브랜치는 **`main`** — 전 Phase 의 이력이 여기에 선형으로 쌓여 있다.
+  (2026-08-24 이전 문서에 나오는 `phase1-data-acquisition` 은 **삭제된 옛 이름**이다.)

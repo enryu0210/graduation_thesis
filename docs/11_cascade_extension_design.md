@@ -341,7 +341,8 @@ python src/attacks/run_evasion.py --model charcnn --track payload_4class_csicnor
 - [ ] **FE(F1 Efficiency) 지표 채택 여부** — Tasdemir 2023 의 지표로 우리 캐스케이드를 평가하면
       대조가 가장 깔끔해진다. 우리는 τ 스윕이 있어 **α 별 최적 τ 이동**까지 그릴 수 있다
       (저쪽은 고정 운영점이라 불가). 채택 시 `src/eval/metrics.py` 한 곳에만 추가(docs/12 §4.4).
-- [ ] (운영) 브랜치 정리 — 여전히 `phase1-data-acquisition` 에 전 Phase 누적.
+- [x] (운영) 브랜치 정리 — **완료(2026-08-24)**. `phase1-data-acquisition` 을 `main` 으로
+  fast-forward 통합하고 옛 브랜치는 삭제했다. 이후 작업 브랜치는 **`main`**.
 
 ---
 

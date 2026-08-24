@@ -203,8 +203,8 @@ char-CNN 6,010 samples/s(13.6배). 정확도-속도 Pareto front 위에 있다�
 - [ ] ablation: decoded vs raw, side 32/48/64, RGB 강화(설계 4장 Step 3)
 - [ ] `csic_binary` 일반화 트랙 평가(이미지화 단위 URL vs 전체요청 재검토 포함)
 - [ ] 최종 모델 확정 → Phase 5(RQ2 회피 공격)의 공격 대상 모델로 사용
-- [ ] (운영) 브랜치 정리 — 현재 Phase 2~4 가 모두 `phase1-data-acquisition` 브랜치에
-  커밋돼 있어 이름과 내용이 불일치. phase 별 브랜치 분리 또는 브랜치명 변경 검토 필요
+- [x] (운영) 브랜치 정리 — **완료(2026-08-24)**. `phase1-data-acquisition` 을 `main` 으로
+  fast-forward 통합하고 옛 브랜치는 삭제했다. 이후 작업 브랜치는 **`main`**.
 
 ---
 

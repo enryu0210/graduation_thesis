@@ -396,7 +396,8 @@ python src/attacks/compare_evasion.py --track payload_4class_csicnorm
   아직 충족되지 않은 상태다. 학습 불필요(추론만). 우선순위는 docs/11 §1.3-G1.
 - [ ] **C(일관성 정규화) 착수 여부** — A 의 효과가 <5pp 일 때만.
 - [ ] BiLSTM·TF-IDF 로 확장할지(현재 2종 고정) — 표현방식 축 결론이 흔들리면 추가.
-- [ ] (운영) 브랜치 정리 — 여전히 `phase1-data-acquisition` 에 전 Phase 누적.
+- [x] (운영) 브랜치 정리 — **완료(2026-08-24)**. `phase1-data-acquisition` 을 `main` 으로
+  fast-forward 통합하고 옛 브랜치는 삭제했다. 이후 작업 브랜치는 **`main`**.
 
 ---
 
