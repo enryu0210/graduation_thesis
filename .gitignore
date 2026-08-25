@@ -42,6 +42,10 @@ Thumbs.db
 docs/reports/*.zip
 
 # --- Codex 우편함 (휘발성) ---
-# TASK.md/RESULT.md 는 다음 작업에서 덮어쓰이는 일회용 파일이다.
+# TASK.md/RESULT.md/LAST_MESSAGE.md 는 다음 작업에서 덮어쓰이는 일회용 파일이다.
 # 남길 가치가 있는 경위는 docs/0N_*.md 나 커밋 메시지로 옮긴다.
-docs/handoff/
+# ⚠️ 반드시 `docs/handoff/*` 형태여야 한다. `docs/handoff/` 로 디렉터리 자체를 막으면
+#    git 이 폴더 안으로 들어가지 않아 아래 예외(!) 두 줄이 동작하지 않는다.
+docs/handoff/*
+!docs/handoff/README.md
+!docs/handoff/TASK.template.md
