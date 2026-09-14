@@ -585,6 +585,9 @@ MD5 `173ec515308bdce5aec19cfd5b792596`)의 **앞 16,384바이트를 HTTP Range �
 **다운로드 현황**: `src/data/download_srbh.py`(크기·MD5 검증, 검증 전 정본 교체 금지) 작성 완료.
 노트북 네트워크에서 Dataverse→S3 전송이 **약 9.5KB/s**(대조: PyPI 128KB/s)라 전체 수신에 ~13시간 →
 **브라우저로 받아 `data/raw/srbh2020/` 에 둔 뒤 스크립트로 검증**하는 경로로 전환(2026-09-14).
+→ 같은 날 **데스크톱**에서는 스크립트 직접 다운로드가 수 분 만에 끝났다(크기·MD5 일치,
+SHA256 `9c73c90ce6564ae48b14f7179cd864d037a6a130ef69c68c1626ec5d7ce4a910`). 전체 파일 헤더 38컬럼이 위 목록과 일치.
+⚠️ 원본은 gitignore 대상이라 **데스크톱에만 있다** — 다른 기기에서는 `python src/data/download_srbh.py` 로 재확보.
 
 ### 2.6 ⚠️ 알려진 리스크 — SR-BH 2020 의 라벨 노이즈
 
@@ -780,9 +783,10 @@ URI·쿠키·User-Agent 를 합치면 48×48 = 2,304바이트를 쉽게 넘는�
 - [x] 주 데이터셋 → **SR-BH 2020** + 외부검증 Data 2025 + legacy CSIC 2010(§2.4)
 
 **작업 대기 (순서대로)**
-- [ ] SR-BH 2020 Dataverse 다운로드 → 파일 포맷·용량·라이선스 **직접 확인**
-      (⚠️ 2026-08-13 이 기기에서 Dataverse API 조회가 네트워크 차단으로 실패 — 브라우저 또는 다른 기기에서 재확인)
-- [ ] `src/data/download_srbh.py` 신설 + `.gitignore` 에 `data/raw/srbh2020/` 추가 후 `git check-ignore -v` 확인
+- [x] SR-BH 2020 Dataverse 다운로드 → 파일 포맷·용량·라이선스 **직접 확인** → **완료(2026-09-14, 데스크톱, §2.5.1)**
+- [x] `src/data/download_srbh.py` 신설 + `.gitignore` 에 `data/raw/srbh2020/` 추가 후 `git check-ignore -v` 확인
+      → **완료**(2026-09-14 `git check-ignore -v` 로 `.gitignore:7` 적중 확인)
+- [ ] E7 라벨 구조 실측(`src/data/profile_srbh.py`, 248↔88 동시 발생 + 매핑 두 안 건수) → **Codex 지시서 준비됨**, 결과로 §2.5.1 열린 결정을 닫는다
 - [ ] SR-BH 라벨 노이즈 자체 감사(§2.6) → 48,522건 규모 재현 확인
 - [ ] CAPEC→4클래스 매핑 구현(§2.5 규칙 3건) + 제외 건수 보고
 - [x] `metrics.py`: TPR@FPR · pAUC · 경보부하 · ECE 추가 / MCC 제거 → **완료(§1.5)**, 166 tests pass
