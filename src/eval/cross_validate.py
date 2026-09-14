@@ -38,6 +38,10 @@ import numpy as np
 # 이웃 모듈(src/models) import 경로 — train.py 와 동일한 관례를 따른다.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "models"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "imaging"))
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from src.data.srbh_track import FIELD_COMBINATIONS, compose_fields
 
 import metrics as M  # noqa: E402
 
@@ -63,12 +67,29 @@ def label_fingerprint(y: np.ndarray) -> str:
 
 
 def load_image_pool(track: str, text: str, side: int, channels: str,
-                    encoders: tuple[str, ...] | None):
+                    encoders: tuple[str, ...] | None, *,
+                    fields: str | None = None, exclude_test: bool = False):
     """train/val/test npz 를 순서대로 이어붙여 (images uint8, y, classes) 풀을 만든다."""
     import data_image
 
+    if fields is not None:
+        from src.imaging.payload_to_image import payload_to_image, payload_to_rgb_image
+        from channel_encoders import DEFAULT_RGB_ENCODERS
+
+        texts, y, classes = load_text_pool(track, text, fields=fields, exclude_test=exclude_test)
+        started = time.perf_counter()
+        shape = (len(texts), side, side) + ((3,) if channels == "rgb" else ())
+        # 중간 이미지 리스트를 만들지 않아 전체 풀의 메모리 복제를 피한다.
+        images = np.empty(shape, dtype=np.uint8)
+        for i, payload in enumerate(texts):
+            images[i] = (payload_to_rgb_image(payload, side=side,
+                                               encoders=encoders or DEFAULT_RGB_ENCODERS)
+                         if channels == "rgb" else payload_to_image(payload, side=side))
+        print(f"  메모리 이미지 변환: {time.perf_counter() - started:.3f}초")
+        return images, y, classes
+
     xs, ys, classes = [], [], None
-    for split in SPLITS:
+    for split in (SPLITS[:2] if exclude_test else SPLITS):
         x, y, cls = data_image.load_split(track, split, text, side, channels, encoders)
         xs.append(x)
         ys.append(y)
@@ -79,19 +100,29 @@ def load_image_pool(track: str, text: str, side: int, channels: str,
     return np.concatenate(xs, axis=0), np.concatenate(ys, axis=0), list(classes)
 
 
-def load_text_pool(track: str, text: str):
+def load_text_pool(track: str, text: str, *, fields: str | None = None,
+                   exclude_test: bool = False):
     """train/val/test CSV 를 이어붙여 (texts list[str], y, classes) 풀을 만든다.
 
     라벨 정수화는 이미지 트랙과 동일한 sorted(unique) 규칙을 쓴다(data_text 위임).
     단 클래스 순서는 **풀 전체**로 정해야 split 별 결측 클래스 문제가 없다.
     """
     import pandas as pd
-    from data_text import load_text_split
+    from data_text import csv_path, load_text_split
+
+    if fields is not None and (track != "srbh_4class" or text != "raw"):
+        raise ValueError("필드 조합은 srbh_4class의 raw 입력에서만 허용됩니다.")
 
     texts: list[str] = []
     labels: list = []
-    for split in SPLITS:
-        t, lab = load_text_split(track, split, text)
+    for split in (SPLITS[:2] if exclude_test else SPLITS):
+        if fields is None:
+            t, lab = load_text_split(track, split, text)
+        else:
+            # NA 같은 리터럴과 숫자 형태 원문도 바이트 단위로 보존한다.
+            frame = pd.read_csv(csv_path(track, split), encoding="utf-8",
+                                dtype=str, keep_default_na=False)
+            t, lab = compose_fields(frame, fields), frame["label"]
         texts.extend(t)
         labels.append(lab)
     labels_all = pd.concat(labels, ignore_index=True)
@@ -279,6 +310,8 @@ def main() -> None:
                         choices=["payload_4class", "payload_4class_csicnorm", "csic_binary", "srbh_4class",
                                  "ustc_flow_binary"])
     parser.add_argument("--text", default="raw", choices=["raw", "decoded"])
+    parser.add_argument("--exclude-test", action="store_true", help="test를 읽지 않고 train+val만 사용")
+    parser.add_argument("--fields", choices=list(FIELD_COMBINATIONS), default=None)
     parser.add_argument("--side", type=int, default=48)
     parser.add_argument("--channels", default="gray", choices=["gray", "rgb"])
     parser.add_argument("--rgb-encoders", default="raw_byte,char_class,local_entropy")
@@ -294,6 +327,8 @@ def main() -> None:
     parser.add_argument("--patience", type=int, default=5)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+    if args.fields is not None and (args.track != "srbh_4class" or args.text != "raw"):
+        parser.error("--fields는 --track srbh_4class --text raw에서만 허용됩니다.")
 
     from sklearn.model_selection import StratifiedKFold
 
@@ -307,10 +342,12 @@ def main() -> None:
     # 1) 풀 구성
     if is_image:
         pool_x, y, classes = load_image_pool(args.track, args.text, args.side,
-                                             args.channels, encoders)
+                                             args.channels, encoders,
+                                             fields=args.fields, exclude_test=args.exclude_test)
         pool_texts = None
     else:
-        pool_texts, y, classes = load_text_pool(args.track, args.text)
+        pool_texts, y, classes = load_text_pool(args.track, args.text,
+                                                 fields=args.fields, exclude_test=args.exclude_test)
         pool_x = None
         if not is_tfidf:
             print("  바이트 시퀀스 인코딩 중...")
@@ -389,7 +426,7 @@ def main() -> None:
         channels=args.channels if is_image else "gray",
         encoders=encoders if is_image else None,
         patch=args.patch if args.model == "vit" else None,
-        lr=args.lr,
+        lr=args.lr, fields=args.fields, sealed_test=args.exclude_test,
     )
 
     payload = {
@@ -404,7 +441,9 @@ def main() -> None:
                    "channels": args.channels if is_image else None,
                    "rgb_encoders": list(encoders) if (is_image and args.channels == "rgb") else None,
                    "epochs": args.epochs, "batch_size": args.batch_size, "lr": args.lr,
-                   "val_ratio": args.val_ratio},
+                   "val_ratio": args.val_ratio, "fields": args.fields,
+                   "exclude_test": args.exclude_test,
+                   "pool_splits": list(SPLITS[:2] if args.exclude_test else SPLITS)},
         "summary": summary,
         "fold_results": fold_results,
     }

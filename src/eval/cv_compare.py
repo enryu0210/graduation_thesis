@@ -39,15 +39,15 @@ FIG_DIR = PROJECT_ROOT / "docs" / "figures" / "models"
 
 # 그림에 쓸 짧은 이름(matplotlib 은 ASCII 만 — DejaVu Sans 에 한글 없음).
 def short_name(tag: str) -> str:
-    return tag.replace("payload_4class_", "").replace("_raw", "")
+    return tag.replace("payload_4class_", "").replace("srbh_4class_", "").replace("_raw", "")
 
 
-def load_cv_results(metric: str) -> tuple[dict[str, np.ndarray], str]:
+def load_cv_results(metric: str, pattern: str = "cv_*.json") -> tuple[dict[str, np.ndarray], str]:
     """cv_*.json 을 모아 {tag: fold별 지표 배열} 로 만든다. fold 정렬 검증 포함."""
     runs: dict[str, np.ndarray] = {}
     fingerprints: dict[str, str] = {}
 
-    for path in sorted(glob.glob(str(RESULTS_DIR / "cv_*.json"))):
+    for path in sorted(glob.glob(str(RESULTS_DIR / pattern))):
         data = json.loads(Path(path).read_text(encoding="utf-8"))
         # 스모크(folds<5) 산출물이 섞이면 비교가 오염된다 → 걸러낸다.
         if data.get("folds", 0) < 5:
@@ -149,11 +149,13 @@ def main() -> None:
     parser.add_argument("--ref", default=None,
                         help="이 설정을 기준으로만 비교(생략 시 전체 쌍 비교)")
     parser.add_argument("--alpha", type=float, default=0.05)
+    parser.add_argument("--pattern", default="cv_*.json", help="결과 디렉터리 안의 glob 패턴")
+    parser.add_argument("--fig-name", default=None, help="그림 파일명에서 확장자를 뺀 이름")
     args = parser.parse_args()
 
     from scipy import stats
 
-    runs, fingerprint = load_cv_results(args.metric)
+    runs, fingerprint = load_cv_results(args.metric, args.pattern)
     print(f"\n=== RQ1 5-fold CV 비교: {args.metric} (설정 {len(runs)}개, 라벨지문 {fingerprint}) ===\n")
 
     # 1) 순위표 — 낮을수록 좋은 지표(ece, benign-evasion)는 정렬 방향을 뒤집는다.
@@ -194,7 +196,8 @@ def main() -> None:
     print("\n⚠️ fold=5 는 자유도가 4뿐이라 검정력이 낮다. '판정불가'는 '차이 없음'이 아니라")
     print("   '이 표본수로는 구분 못 함'을 뜻한다(추가 fold/반복이 필요).")
 
-    out = FIG_DIR / f"cv_ranking_{args.metric}.png"
+    fig_name = args.fig_name if args.fig_name is not None else f"cv_ranking_{args.metric}"
+    out = FIG_DIR / f"{fig_name}.png"
     plot_ranking(runs, args.metric, out)
     print(f"\n[그림] {out.relative_to(PROJECT_ROOT)}")
 

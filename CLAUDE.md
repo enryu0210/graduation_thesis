@@ -55,6 +55,9 @@
   lr 만 3e-4/1e-4 로 낮추면 MCC 가 최대 +23.9pp 이동(docs/08 §9.1 실측). ViT 계열 비교는 반드시 lr 을 맞춰서 할 것.
   → "같은 학습 루프를 썼으니 공정"은 성립하지 않음. 기본값이 한쪽 아키텍처에 맞춰져 있으면 나머지가 자동으로 불리해짐.
 - 통계 검증은 `src/eval/cross_validate.py`(5-fold, train/val/test 를 풀로 합쳐 재분할). fold 배정이 (라벨, seed)에만 의존 → 설정 간 paired 비교 성립, `label_fingerprint` 로 정렬 검증.
+  - **설계 선택(입력 필드·하이퍼파라미터 고르기)용 CV 는 `--exclude-test`**(train+val 만, tag `_sealed`). 기본 동작은 test 까지 합치므로 선택에 쓰면 이후 본 측정이 누수된다.
+  - `srbh_4class` 는 `--fields F1|F2|F3|F4|UC`(tag `_fF3` 등, F2=기본 입력이라 접미사 없음)로 입력 필드 조합을 바꾼다. 이미지는 npz 대신 메모리 변환(실행당 ~77초, npz 와 픽셀 동일 확인).
+  - ⚠️ `cv_compare.py` 는 기본으로 `cv_*.json` 전부를 모아 **라벨 지문이 다르면 멈춘다** → 트랙·봉인 여부가 다른 결과가 섞이면 `--pattern "cv_srbh_4class_*_sealed.json"` 으로 거르고, `--fig-name` 으로 추적 그림 `cv_ranking_{metric}.png` 덮어쓰기를 피할 것.
   ⚠️ 단일 split 은 실행 간 ±0.11pp 흔들림(cuDNN 비결정성) → 조합 우열 주장은 반드시 CV 로 판정.
 
 ## 실행 환경 (Windows)

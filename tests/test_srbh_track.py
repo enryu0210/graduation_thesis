@@ -6,6 +6,38 @@ import pytest
 from src.data import preprocess, srbh_track
 
 
+@pytest.mark.parametrize("name,expected", [
+    ("F1", "uri"), ("F2", "uri\nbody"), ("F3", "uri\nbody\ncookie"),
+    ("F4", "uri\nbody\ncookie\nua"), ("UC", "ua\ncookie"),
+])
+def test_compose_fields(name, expected):
+    frame = pd.DataFrame(dict(request_http_request=["uri"], request_body=["body"],
+                              request_cookie=["cookie"], request_user_agent=["ua"]))
+    assert srbh_track.compose_fields(frame, name) == [expected]
+
+
+def test_compose_empty_missing_and_nan():
+    frame = pd.DataFrame(dict(request_http_request=["", None], request_body=[float("nan"), ""]))
+    assert srbh_track.compose_fields(frame, "F2") == ["\n", "\n"]
+    with pytest.raises(ValueError):
+        srbh_track.compose_fields(frame, "F3")
+    with pytest.raises(ValueError):
+        srbh_track.compose_fields(frame, "unknown")
+
+
+def test_field_rules_match_measurement():
+    from src.analysis.measure_srbh_fields import build_combinations
+
+    frame = make_raw([("000",), ("66",)])
+    frame["request_referer"] = ""
+    frame["label"] = ["Normal", "SQLInjection"]
+    frame["row_id"] = [0, 1]
+    frame["text_raw"] = frame.request_http_request + "\n" + frame.request_body
+    measured = build_combinations(frame)
+    for name in ("F1", "F2", "F3", "F4"):
+        assert srbh_track.compose_fields(frame, name) == measured[name].tolist()
+
+
 def make_raw(rows):
     codes = ["000", "66", "242", "88", "248", "126", "16", "34", "49", "100", "153", "272", "310", "549"]
     raw = pd.DataFrame([

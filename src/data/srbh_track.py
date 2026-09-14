@@ -19,6 +19,27 @@ CLASS_CODES = {
 OUTPUT_COLUMNS = ["text_raw", "label", "row_id", *TEXT_FIELDS]
 
 
+FIELD_COMBINATIONS = {
+    "F1": ("request_http_request",),
+    "F2": ("request_http_request", "request_body"),
+    "F3": ("request_http_request", "request_body", "request_cookie"),
+    "F4": ("request_http_request", "request_body", "request_cookie", "request_user_agent"),
+    "UC": ("request_user_agent", "request_cookie"),
+}
+
+
+def compose_fields(frame: pd.DataFrame, combination: str) -> list[str]:
+    """빈 필드의 구분자까지 보존해 조합 간 바이트 표현을 고정한다."""
+    if combination not in FIELD_COMBINATIONS:
+        raise ValueError(f"알 수 없는 필드 조합: {combination}")
+    columns = FIELD_COMBINATIONS[combination]
+    missing = sorted(set(columns) - set(frame.columns))
+    if missing:
+        raise ValueError(f"필드 조합에 필요한 컬럼이 없습니다: {missing}")
+    values = frame[list(columns)].fillna("").astype(str)
+    return ["\n".join(row) for row in values.itertuples(index=False, name=None)]
+
+
 def _counts(frame: pd.DataFrame) -> dict:
     """제거로 클래스가 사라져도 0건을 명시해 단계 간 대조를 가능하게 한다."""
     return {"total": len(frame), "by_class": {

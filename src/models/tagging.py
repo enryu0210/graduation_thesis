@@ -11,7 +11,7 @@ Phase 11 — 산출물 tag 규칙 (단일 진실 소스)
     (train / cross_validate / cascade / run_evasion)이 되므로, 규칙 자체를 여기로 모은다.
 
 tag 형식:
-    {track}_{model}_{text}{채널}{패치}{lr}{방어}{_bal}
+    {track}_{model}_{text}{채널}{패치}{lr}{필드}{봉인}{보조가중치}{방어}{_bal}
     예) payload_4class_csicnorm_cnn_raw_rgb_def-advtrain_SA_r0.5_bal
         payload_4class_cnn_raw                      (기본값만 쓰면 접미사 없음)
 
@@ -88,7 +88,8 @@ def build_tag(track: str, model: str, text: str = "raw", *,
               patch: str | None = None, lr: float | None = None,
               balance: bool = False, defense: str = "none",
               mutation_split: str | None = None, aug_ratio: float | None = None,
-              aux_weight: float | None = None) -> str:
+              aux_weight: float | None = None,
+              fields: str | None = None, sealed_test: bool = False) -> str:
     """산출물/체크포인트 공통 tag 를 만든다.
 
     인자는 "이미 결정된 값"만 받는다(모델이 이미지인지 등의 판정은 호출부 책임).
@@ -101,7 +102,10 @@ def build_tag(track: str, model: str, text: str = "raw", *,
     ch_tag = data_image._channel_suffix(channels, encoders)
     patch_tag = f"_p{patch}" if patch else ""
     lr_tag = "" if (lr is None or lr == DEFAULT_LR) else f"_lr{lr:g}"
+    # F2는 기본 입력과 같으므로 별도 실험 이름을 만들지 않는다.
+    fields_tag = "" if fields in (None, "F2") else f"_f{fields}"
+    sealed_tag = "_sealed" if sealed_test else ""
     aw_tag = aux_weight_suffix(aux_weight)
     def_tag = defense_suffix(defense, mutation_split, aug_ratio)
     bal_tag = "_bal" if balance else ""
-    return f"{track}_{model}_{text}{ch_tag}{patch_tag}{lr_tag}{aw_tag}{def_tag}{bal_tag}"
+    return f"{track}_{model}_{text}{ch_tag}{patch_tag}{lr_tag}{fields_tag}{sealed_tag}{aw_tag}{def_tag}{bal_tag}"

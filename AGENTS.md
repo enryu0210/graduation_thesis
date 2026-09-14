@@ -145,6 +145,14 @@ git check-ignore -v <경로>
 **tag 규칙 변경 → 2곳**
 `src/models/train.py`, `src/eval/cross_validate.py`
 
+**SR-BH 필드 조합 규칙 → 2곳 (테스트로 고정)**
+`src/data/srbh_track.FIELD_COMBINATIONS`(CV 입력) 와 `src/analysis/measure_srbh_fields.COMBINATIONS`(E2 단계1 측정).
+`tests/test_srbh_track.py` 가 F1~F4 일치를 검사한다 — 한쪽을 바꾸면 다른 쪽도.
+
+**CV 로 설계를 고를 때** `cross_validate.py --exclude-test`(tag `_sealed`)를 쓰고, 비교는
+`cv_compare.py --pattern "<해당 결과 glob>" --fig-name <새 이름>` — 기본값은 모든 `cv_*.json` 을 모아 지문 불일치로 멈추고
+추적 그림을 덮어쓴다.
+
 ---
 
 ## 6. 데이터 — 없으면 재생성한다
