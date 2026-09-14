@@ -276,7 +276,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="RQ1 5-fold 교차검증 (설정 1개 실행)")
     parser.add_argument("--model", required=True, choices=sorted(ALL_MODELS))
     parser.add_argument("--track", default="payload_4class",
-                        choices=["payload_4class", "payload_4class_csicnorm", "csic_binary",
+                        choices=["payload_4class", "payload_4class_csicnorm", "csic_binary", "srbh_4class",
                                  "ustc_flow_binary"])
     parser.add_argument("--text", default="raw", choices=["raw", "decoded"])
     parser.add_argument("--side", type=int, default=48)

@@ -118,7 +118,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="RQ1 베이스라인: TF-IDF + 전통 ML")
     parser.add_argument("--track", default="payload_4class",
-                        choices=["payload_4class", "payload_4class_csicnorm", "csic_binary"])
+                        choices=["payload_4class", "payload_4class_csicnorm", "csic_binary", "srbh_4class"])
     parser.add_argument("--text", default="raw", choices=["raw", "decoded"])
     parser.add_argument("--clf", default="logreg", choices=["logreg", "rf"],
                         help="분류기: logreg(빠름·강력) | rf(RandomForest)")

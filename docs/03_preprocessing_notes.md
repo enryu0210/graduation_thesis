@@ -50,3 +50,20 @@
     - `data\processed\csic_binary_val.csv` (2,025 행)
     - `data\processed\csic_binary_test.csv` (2,025 행)
 
+
+## 트랙: srbh_4class
+
+> 2026-09-14 추가. 이 기기에 `payload_3class` 원본이 없어 `preprocess.py` 전체 실행 대신 `process_track('srbh_4class')` 출력을
+> 옮겨 적었다(전체 실행이면 이 절이 맨 앞에 생성된다). 로더 단계(매핑·E1-a·라벨 충돌 제거)의 건수는 docs/13 §2.5.3.
+
+- 시작 행 수: 439,414
+- 빈 문자열 제거: 2 행 → 남은 439,412
+- 완전 중복 제거(raw 기준): 173,473 행 (39.48%) → 남은 265,939
+- 분할 결과(행 수 및 클래스 분포):
+    - train: 186,157 (70.0%) | CodeInjection=6,905, CommandInjection=3,886, Normal=46,864, SQLInjection=128,502
+    - val: 39,891 (15.0%) | CodeInjection=1,480, CommandInjection=832, Normal=10,042, SQLInjection=27,537
+    - test: 39,891 (15.0%) | CodeInjection=1,480, CommandInjection=833, Normal=10,042, SQLInjection=27,536
+- 저장 파일 (컬럼에 `row_id`·URI·body·cookie·UA 원문 추가):
+    - `data\processed\srbh_4class_train.csv` (186,157 행)
+    - `data\processed\srbh_4class_val.csv` (39,891 행)
+    - `data\processed\srbh_4class_test.csv` (39,891 행)

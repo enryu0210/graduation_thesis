@@ -127,6 +127,10 @@ git check-ignore -v <경로>
 3. `src/models/baseline_tfidf.py`
 4. `src/eval/diagnose_payload_bias.py`
 5. `src/models/train.py`
+6. (CV·캐스케이드에서 쓸 트랙이면) `src/eval/cross_validate.py`, `src/models/cascade.py` — 트랙 choices 를 따로 들고 있다
+
+> `srbh_4class`(3기 주 트랙)는 위 7곳에 등록돼 있고 `src/attacks/run_evasion.py` 에는 **의도적으로 없다**
+> (`mutations.py` 가 `XSS` 라벨명에 묶여 `CodeInjection` 에서 조용히 오동작). 임의로 추가하지 말 것.
 
 > 비-CSV 트랙(예: `ustc_flow_binary`)은 preprocess/build_image_dataset 경로를 안 탄다
 > → `train.py` **한 곳만** 갱신. 위 "5곳"은 CSV 트랙 한정이다.
@@ -153,7 +157,18 @@ PYTHONIOENCODING=utf-8 python src/imaging/build_image_dataset.py --track payload
 ```
 
 ⚠️ `preprocess.py <단일트랙>` 은 `docs/03_preprocessing_notes.md` 를 **그 트랙만으로 덮어쓴다.**
-노트를 유지하려면 **인자 없이 전체 실행**할 것.
+노트를 유지하려면 **인자 없이 전체 실행**할 것. 원본이 일부 없는 기기에서는 전체 실행도 기록을 지우므로,
+검증용 트랙 생성은 노트를 쓰지 않는 `process_track` 직접 호출로 한다.
+
+**SR-BH 2020 트랙 `srbh_4class`** (순서 고정 — 앞 단계 산출물이 없으면 뒤 단계가 에러로 멈춘다):
+```bash
+PYTHONIOENCODING=utf-8 python src/data/download_srbh.py          # 원본 436MB, 크기·MD5 검증
+PYTHONIOENCODING=utf-8 python src/data/audit_srbh_labels.py      # E1-a 목록 data/processed/srbh_audit_flags.csv
+PYTHONIOENCODING=utf-8 python -c "import sys; sys.path.insert(0,'src/data'); import preprocess; print('\n'.join(preprocess.process_track('srbh_4class')))"
+PYTHONIOENCODING=utf-8 python src/imaging/build_image_dataset.py --track srbh_4class --channels rgb
+```
+- 입력 텍스트는 **URI + "\n" + body** 뿐이다. UA·Cookie 는 스캐너 지문이라 모델 입력에 넣지 말 것(CSV 컬럼으로만 보존).
+- 클래스: `Normal` / `SQLInjection` / `CodeInjection`(XSS 아님) / `CommandInjection`.
 
 ⚠️ 새 `data/raw/<dataset>/` 는 자동 무시되지 않는다 → `.gitignore` 에 수동 추가.
 대용량 커밋 사고를 막기 위한 것이고, 재현은 다운로드 스크립트로 보장한다.

@@ -34,6 +34,11 @@ from urllib.parse import unquote_plus, urlsplit
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+if __package__:
+    from .srbh_track import AUDIT_CSV, FILENAME, RAW_DIR, load_srbh_4class
+else:
+    from srbh_track import AUDIT_CSV, FILENAME, RAW_DIR, load_srbh_4class
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PAYLOAD_CSV = (
     PROJECT_ROOT / "data" / "raw" / "payload_3class"
@@ -200,8 +205,13 @@ def save_track(name: str, out: pd.DataFrame) -> list[str]:
     """분할된 데이터를 data/processed/{name}_{split}.csv 로 저장한다."""
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     saved: list[str] = []
+    # SR-BH의 추적·후속 실험용 필드만 보존하고 기존 트랙의 CSV 형식은 유지한다.
+    columns = ["text_raw", "text_decoded", "label"] + [
+        name for name in ("row_id", "request_http_request", "request_body",
+                          "request_cookie", "request_user_agent") if name in out.columns
+    ]
     for split in ("train", "val", "test"):
-        part = out[out["split"] == split][["text_raw", "text_decoded", "label"]]
+        part = out[out["split"] == split][columns]
         path = PROCESSED_DIR / f"{name}_{split}.csv"
         part.to_csv(path, index=False, encoding="utf-8")
         saved.append(f"    - `{path.relative_to(PROJECT_ROOT)}` ({len(part):,} 행)")
@@ -212,6 +222,7 @@ def save_track(name: str, out: pd.DataFrame) -> list[str]:
 # 트랙 정의 및 실행
 # ---------------------------------------------------------------------------
 TRACKS = {
+    "srbh_4class": load_srbh_4class,
     "payload_4class": load_payload_4class,
     "payload_4class_csicnorm": load_payload_4class_csicnorm,
     "csic_binary": load_csic_binary,
@@ -219,6 +230,7 @@ TRACKS = {
 
 # 트랙별로 필요한 원본 파일(존재 확인용). csicnorm 은 두 원본을 모두 필요로 한다.
 REQUIRED_FILES = {
+    "srbh_4class": [RAW_DIR / FILENAME, AUDIT_CSV],
     "payload_4class": [PAYLOAD_CSV],
     "payload_4class_csicnorm": [PAYLOAD_CSV, CSIC_CSV],
     "csic_binary": [CSIC_CSV],

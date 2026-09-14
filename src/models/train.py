@@ -358,7 +358,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="RQ1 학습·평가 (RGB CNN + 텍스트 베이스라인)")
     parser.add_argument("--model", required=True, choices=sorted(IMAGE_MODELS | TEXT_MODELS))
     parser.add_argument("--track", default="payload_4class",
-                        choices=["payload_4class", "payload_4class_csicnorm", "csic_binary",
+                        choices=["payload_4class", "payload_4class_csicnorm", "csic_binary", "srbh_4class",
                                  "ustc_flow_binary"])
     parser.add_argument("--text", default="raw", choices=["raw", "decoded"])
     parser.add_argument("--balance", action="store_true",

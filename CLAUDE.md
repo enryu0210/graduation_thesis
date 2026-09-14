@@ -24,12 +24,19 @@
   - `python src/data/preprocess.py`  (seed=42 결정론, CSV 3분할 생성)
   - `python src/imaging/build_image_dataset.py --track <트랙>`  (.npz 생성)
 - 트랙: `payload_4class`(RQ1 주), `payload_4class_csicnorm`(Normal=CSIC 실트래픽, RQ2용), `csic_binary`.
+- **3기 주 트랙 `srbh_4class`**(SR-BH 2020, docs/13 §2.5.3) — 재생성 순서가 고정이다:
+  `download_srbh.py` → `audit_srbh_labels.py`(E1-a 목록 `data/processed/srbh_audit_flags.csv`) → `process_track('srbh_4class')` → `build_image_dataset.py --track srbh_4class --channels rgb`.
+  ⚠️ 감사 CSV 없이 트랙을 만들면 에러로 멈춘다(라벨 노이즈가 조용히 섞이는 것 방지). 클래스명은 `CodeInjection`(XSS 아님 — 실데이터는 PHP 코드 주입 탐침).
+  ⚠️ 입력은 **URI+body 만**. UA·Cookie 는 스캐너 지문(공격 95% 가 같은 UA)이라 넣으면 shortcut → CSV 컬럼으로만 보존(E2 용).
+  ⚠️ `run_evasion.py` 에는 이 트랙이 **의도적으로 없다**(`mutations.py` 가 `XSS` 라벨명에 묶임).
+  ⚠️ `payload_3class` 원본이 없는 기기에서 `preprocess.py` 를 인자 없이 돌리면 docs/03 의 기존 트랙 기록이 "[건너뜀]"으로 지워진다 → `process_track` 직접 호출.
 - RGB(교수 요구): `build_image_dataset.py --channels rgb [--rgb-encoders raw_byte,char_class,local_entropy]`.
   채널 인코더는 `src/imaging/channel_encoders.py` 레지스트리(교체 가능 — G/B ablation용). npz 는 `_rgb` 접미사, CNN in_channels 자동 추론.
 - 흐름 트랙 `ustc_flow_binary`(RQ4b, 악성/정상 이진): `python src/data/download_ustc.py`(USTC-TFC2016, dpkt+py7zr 필요)
   → `python src/imaging/build_flow_dataset.py [--channels rgb]`. flow_to_image 가 세션→앞2304B→48x48, IP/MAC 무력화.
 - ⚠️ `preprocess.py <단일트랙>` 은 `docs/03_preprocessing_notes.md` 를 그 트랙만으로 덮어씀 → 노트 유지하려면 인자 없이 전체 실행.
 - ⚠️ 새 트랙 추가 시 `--track` choices 를 5곳에서 함께 갱신: preprocess.py(TRACKS/REQUIRED_FILES), build_image_dataset.py, baseline_tfidf.py, diagnose_payload_bias.py, train.py.
+  + CV·캐스케이드에 쓸 트랙이면 `cross_validate.py`·`cascade.py` choices 도(둘 다 트랙 목록을 따로 들고 있다 — `srbh_4class` 는 7곳 등록).
 - ⚠️ 비-CSV 트랙(예: `ustc_flow_binary`)은 preprocess/build_image_dataset(CSV 경로)를 안 거침 → `--track` choices 를 train.py 한 곳만 갱신(위 "5곳"은 CSV 트랙 한정).
 - ⚠️ 새 `data/raw/<dataset>/` 는 자동 무시 안 됨 → `.gitignore` 에 수동 추가(대용량 커밋 사고 방지). 재현은 다운로드 스크립트로 보장.
 - ⚠️ `.gitignore` 는 **인라인 주석 불가**(줄 전체가 패턴). `experiments/checkpoints/  # 주석` 형태라 규칙이 무효였고 `.pt` 가 노출돼 있었음(2026-07 수정). 규칙 추가 후 `git check-ignore -v <경로>` 로 반드시 확인.

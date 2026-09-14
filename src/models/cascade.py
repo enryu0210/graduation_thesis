@@ -494,7 +494,7 @@ def main() -> None:
     p = argparse.ArgumentParser(
         description="하이브리드 캐스케이드(RGB CNN 1차 + char-CNN 2차) 평가")
     p.add_argument("--track", default="payload_4class_csicnorm",
-                   choices=["payload_4class", "payload_4class_csicnorm", "csic_binary",
+                   choices=["payload_4class", "payload_4class_csicnorm", "csic_binary", "srbh_4class",
                             "ustc_flow_binary"])
     p.add_argument("--stage1", default="cnn", choices=STAGE1_MODELS,
                    help="1차 필터. cnn=일반 RGB CNN, cnn_ee=다단 조기종료 CNN(Phase 12/M4). "
