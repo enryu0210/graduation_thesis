@@ -41,9 +41,16 @@ GPU 유무 안내, 사전 점검(TASK.md 존재·git 상태).
 ### 호출 방법 B — 직접 (래퍼가 안 될 때)
 
 ```bash
-codex exec -C "C:/dev/졸업논문" -s workspace-write -o docs/handoff/RESULT.md - < docs/handoff/TASK.md
-codex exec -C "C:/dev/졸업논문" -s read-only      -o docs/handoff/RESULT.md - < docs/handoff/TASK.md
+# 저장소 루트는 기기마다 다르다 — 경로를 박지 말고 그때그때 구한다
+PYTHONIOENCODING=utf-8 codex exec -C "$(git rev-parse --show-toplevel)" -s workspace-write -o docs/handoff/LAST_MESSAGE.md - < docs/handoff/TASK.md
+PYTHONIOENCODING=utf-8 codex exec -C "$(git rev-parse --show-toplevel)" -s read-only      -o docs/handoff/RESULT.md - < docs/handoff/TASK.md
 ```
+
+⚠️ **래퍼가 즉시 `error: unexpected argument '...' found` 로 끝나면 방법 B 를 쓴다**(2026-09-14 실제).
+래퍼는 지시서를 명령줄 인자로 넘기는데, Windows PowerShell 5.1 이 지시서 안의 큰따옴표(예: `python -c "..."`)에서 인자를 쪼갠다.
+stdin 으로 넘기는 방법 B 는 이 문제가 없다.
+⚠️ `requires a newer version of Codex` → CLI 업그레이드(`npm i -g @openai/codex`). `out of credits` → 충전 전까지 Codex 불가
+(작업 도중 끊기면 반쯤 된 변경이 작업 트리에 남는다 — RESULT.md 가 없으므로 diff 를 직접 검토할 것).
 
 ## RESULT.md 를 읽을 때 의심할 것
 

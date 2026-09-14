@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>진행 보고 2026-09-14 — 새 데이터셋 정제와 입력 필드 선택 실험</title>
+<style>
+  /* A4 인쇄 기준. 이 파일은 Chrome --headless --print-to-pdf 로 PDF 화된다. */
+  @page { size: A4; margin: 17mm 15mm 15mm 15mm; }
+
+  html { font-size: 10.2pt; }
+  body {
+    font-family: "Malgun Gothic", "맑은 고딕", "Noto Sans KR", sans-serif;
+    line-height: 1.55; color: #1a1a1a; margin: 0;
+  }
+
+  /* ── 표지 ── */
+  .cover { border-bottom: 3px solid #1f3a5f; padding-bottom: 10px; margin-bottom: 18px; }
+  .cover .kicker { font-size: 9pt; color: #5a6b80; letter-spacing: .04em; }
+  .cover h1 { font-size: 17pt; margin: 6px 0 4px; color: #1f3a5f; line-height: 1.35; }
+  .cover .sub { font-size: 10pt; color: #444; margin-bottom: 8px; }
+  .cover .meta { font-size: 8.8pt; color: #666; }
+
+  h2 {
+    font-size: 12.5pt; color: #1f3a5f; margin: 22px 0 8px;
+    border-left: 5px solid #1f3a5f; padding-left: 9px;
+    page-break-after: avoid;
+  }
+  h3 { font-size: 10.8pt; margin: 15px 0 5px; color: #26456e; page-break-after: avoid; }
+  p { margin: 6px 0; }
+  ul, ol { margin: 6px 0 6px 0; padding-left: 20px; }
+  li { margin: 3px 0; }
+
+  table { border-collapse: collapse; width: 100%; margin: 9px 0 11px; font-size: 8.9pt; page-break-inside: avoid; }
+  th, td { border: 1px solid #c8d0da; padding: 4px 6px; text-align: left; vertical-align: top; }
+  th { background: #eaeff5; color: #1f3a5f; font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.hl td { background: #fff6e0; font-weight: 600; }
+  caption { caption-side: bottom; font-size: 8.2pt; color: #667; text-align: left; padding-top: 4px; }
+
+  .lead {
+    background: #f4f7fb; border: 1px solid #d3dded; border-left: 5px solid #1f3a5f;
+    padding: 10px 13px; margin: 12px 0; font-size: 9.6pt;
+  }
+  .warn {
+    background: #fdf4f4; border: 1px solid #e8cccc; border-left: 5px solid #a83232;
+    padding: 9px 12px; margin: 10px 0; font-size: 9.2pt;
+  }
+  .note { font-size: 8.6pt; color: #555; margin: 5px 0 10px; }
+
+  code { font-family: Consolas, "D2Coding", monospace; font-size: 0.9em; background: #f0f2f5; padding: 1px 3px; }
+  .pos { color: #1a6b3c; font-weight: 600; }
+  .neg { color: #a83232; font-weight: 600; }
+  .muted { color: #777; }
+
+  figure { margin: 12px 0; page-break-inside: avoid; }
+  figure img { width: 100%; border: 1px solid #dde3ea; }
+  figcaption { font-size: 8.3pt; color: #556; margin-top: 4px; }
+
+  /* 2단 구조 도식 — 이미지 없이 CSS 로만 그린다(폰트 깨짐·경로 의존 없음) */
+  .flow { display: flex; align-items: stretch; gap: 8px; margin: 10px 0; font-size: 8.8pt; }
+  .flow .box { border: 1.5px solid #1f3a5f; border-radius: 4px; padding: 7px 9px; flex: 1; background: #f7f9fc; }
+  .flow .box b { color: #1f3a5f; }
+  .flow .arrow { align-self: center; color: #1f3a5f; font-size: 14pt; font-weight: bold; }
+  .flow .box.alt { border-color: #a06a1f; background: #fdf8ef; }
+  .flow .box.alt b { color: #a06a1f; }
+
+  .pagebreak { page-break-before: always; }
+  .qa { border-top: 1px solid #d8dee6; padding-top: 8px; margin-top: 12px; page-break-inside: avoid; }
+  .qa .qid { display: inline-block; background: #1f3a5f; color: #fff; font-size: 8.4pt;
+             padding: 1px 7px; border-radius: 3px; margin-right: 6px; }
+  .qa .qtitle { font-weight: 600; font-size: 10pt; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="kicker">학부 졸업논문 · 진행 보고</div>
+  <h1>웹 공격 문자열을 이미지로 바꿔 탐지하는 2단 구조 연구</h1>
+  <div class="sub">새 주 데이터셋(2020년 실서버 수집) 확보·정제와, 이미지에 넣을 입력 필드를 고르는 실험 결과</div>
+  <div class="meta">보고일 2026-09-14 · 보고 범위 2026-08-24 ~ 2026-09-14</div>
+</div>
+
+<div class="lead">
+  <b>세 줄 요약</b>
+  <ol style="margin:6px 0 0; padding-left: 18px;">
+    <li><b>데이터 확보·정제 완료</b> — 2020년 실서버 데이터셋(SR-BH 2020, 907,815건)을 받아 무결성을 검증하고,
+        14개 공격 라벨을 기존 4분류(정상·SQL 주입·코드 주입·명령 주입)로 접어 <b>학습용 데이터 265,939건</b>을 만들었습니다.</li>
+    <li><b>라벨 오류를 직접 감사</b>했습니다 — "정상"으로 라벨된 요청 중 <b>30,280건(5.8%)이 실제 공격</b>이었습니다.
+        선행 논문이 보고한 오류가 실재함을 저희 손으로 확인했고, 이 요청들은 학습 데이터에서 빼되 <b>별도 평가 세트</b>로 남겼습니다.</li>
+    <li><b>입력 필드 선택 실험</b>(시험 데이터를 봉인한 5겹 교차검증)에서 <b>URI+본문+쿠키</b> 조합이 가장 좋았습니다(Macro-F1 0.932).
+        다만 <b>정상 클래스가 실제 사용자가 아닌 스캐너의 탐색 요청 위주</b>라는 한계가 새로 드러나, 해석 범위를 좁혀 보고하겠습니다.</li>
+  </ol>
+</div>
+
+<h2>1. 데이터 확보와 무결성 검증</h2>
+<p>지난 보고에서 확정한 주 데이터셋을 공개 저장소(Harvard Dataverse, CC0 라이선스)에서 받았습니다.
+파일 크기와 체크섬(MD5)이 배포처 값과 일치함을 확인한 뒤에만 사용하도록 다운로드 도구에 검증 단계를 넣었습니다.</p>
+<table>
+  <tr><th>항목</th><th>확인 결과</th></tr>
+  <tr><td>규모</td><td class="num">907,815건 (논문 기재 907,814건보다 1건 많음 — 정상 건수는 논문과 일치)</td></tr>
+  <tr><td>구성</td><td>요청·응답 필드 24개 + 라벨 14개(라벨마다 0/1 컬럼, 한 요청에 여러 라벨 가능)</td></tr>
+  <tr><td>원문 보존</td><td>URI·본문·쿠키·User-Agent 원문 문자열이 살아 있어 <b>이미지 변환이 그대로 가능</b></td></tr>
+  <tr><td>이상값</td><td>라벨 값 이상 0건, 라벨 없는 요청 0건, "정상"과 공격 라벨이 동시에 붙은 요청 0건</td></tr>
+</table>
+
+<h2>2. 라벨 구조 확인과 4분류 매핑</h2>
+<p>논문에는 라벨이 13개로 소개되어 있었는데, 실제 배포본에는 <b>"명령 주입(248)"</b> 라벨이 하나 더 있었습니다.
+이 라벨은 "OS 명령 주입(88)"의 상위 범주라 매핑 규칙을 흔들 수 있어 먼저 실측했습니다. 전체에서 <b>단 1건</b>뿐이어서,
+"상위 범주도 해당 클래스로 본다"는 규칙으로 통일해 명령 주입에 합쳤습니다(결과 차이 1건).</p>
+<table>
+  <tr><th>원 라벨</th><th>본 연구 클래스</th><th class="num">건수</th></tr>
+  <tr><td>정상</td><td>정상</td><td class="num">525,195</td></tr>
+  <tr><td>SQL 주입</td><td>SQL 주입</td><td class="num">249,227</td></tr>
+  <tr><td>코드 주입</td><td>코드 주입</td><td class="num">13,838</td></tr>
+  <tr><td>OS 명령 주입 · 명령 주입</td><td>명령 주입</td><td class="num">5,794</td></tr>
+  <tr><td>대상 클래스가 2개 이상 붙은 요청</td><td>모호 → 제외</td><td class="num">2,381</td></tr>
+  <tr><td>나머지 9개 라벨만 붙은 요청(경로 조작 등)</td><td>대상 아님 → 제외 (정상으로 넣지 않음)</td><td class="num">111,380</td></tr>
+</table>
+<div class="warn"><b>"코드 주입"은 XSS가 아닙니다.</b> 원문을 확인해 보니 스크립트 삽입(XSS)이 아니라
+<b>서버 측 PHP 코드 실행을 시험하는 스캐너 요청</b>이 대부분이었습니다. 논문에서는 이 클래스를 XSS와 동일시하지 않고
+"코드 주입"으로 표기하겠습니다.</div>
+
+<h2>3. 라벨 오류 자체 감사</h2>
+<p>최근 논문(arXiv:2512.23610)이 이 데이터셋의 "정상" 라벨 중 <b>48,522건이 실제로는 공격</b>이라고 보고했습니다.
+저희 핵심 지표(공격을 정상으로 놓치는 비율, 오탐률)는 이런 오류가 있으면 <b>실제보다 좋게</b> 나오므로,
+인용하기 전에 직접 확인했습니다. 결과를 보고 기준을 바꾸지 않도록 <b>탐지 규칙 16개를 실행 전에 고정</b>했습니다.</p>
+<table>
+  <tr><th>항목</th><th>결과</th></tr>
+  <tr class="hl"><td>"정상" 중 공격 규칙에 걸린 요청</td><td class="num">30,280건 / 525,195건 (5.77%)</td></tr>
+  <tr><td>선행 논문 보고치 대비</td><td>48,522건의 62% — <span class="pos">오류의 실재와 수만 건 규모는 재현</span>, 숫자 자체는 미재현(선행은 LLM 판정으로 더 넓게 잡음)</td></tr>
+  <tr><td>수동 확인</td><td>걸린 요청 37건을 원문으로 확인 → <b>37건 모두 실제 공격</b>(예: 경로 중간에 <code>;cat /etc/passwd;</code>, <code>sleep(15)</code> 주입)</td></tr>
+  <tr><td>처리</td><td>학습·평가 데이터에서 <b>분할 전에 제거</b>. 버리지 않고 "기존 방화벽 규칙과 사람 검수를 통과한 실제 공격" 평가 세트로 활용 예정</td></tr>
+</table>
+<p class="note">37건은 작은 표본이라 "정확도 100%"라고 주장하지 않고, "확인한 표본에서 오탐 없음"까지만 씁니다.</p>
+
+<h2>4. 학습용 데이터 구성 결과</h2>
+<table>
+  <tr><th>단계</th><th class="num">남은 건수</th></tr>
+  <tr><td>원본 → 4분류 매핑(모호·대상 외 제외)</td><td class="num">794,054</td></tr>
+  <tr><td>라벨 오류 감사 요청 제거</td><td class="num">763,774</td></tr>
+  <tr><td>같은 입력이 서로 다른 라벨로 나오는 요청 제거(고유 입력 336개)</td><td class="num">439,414</td></tr>
+  <tr class="hl"><td>완전 중복 제거 후 최종</td><td class="num">265,939</td></tr>
+</table>
+<table>
+  <tr><th>분할</th><th class="num">정상</th><th class="num">SQL 주입</th><th class="num">코드 주입</th><th class="num">명령 주입</th><th class="num">계</th></tr>
+  <tr><td>학습 70%</td><td class="num">46,864</td><td class="num">128,502</td><td class="num">6,905</td><td class="num">3,886</td><td class="num">186,157</td></tr>
+  <tr><td>검증 15%</td><td class="num">10,042</td><td class="num">27,537</td><td class="num">1,480</td><td class="num">832</td><td class="num">39,891</td></tr>
+  <tr><td>시험 15%</td><td class="num">10,042</td><td class="num">27,536</td><td class="num">1,480</td><td class="num">833</td><td class="num">39,891</td></tr>
+</table>
+<ul>
+  <li><b>정상 요청은 반복이 극심합니다.</b> 원본 정상 약 49만 건이 고유 요청으로는 약 6.7만 건입니다(가장 흔한 "메인 페이지 요청" 하나가 약 30만 건).</li>
+  <li><b>시험 데이터의 정상은 10,042건</b>으로, 지난 보고에서 원본 건수로 추정한 약 7.9만 건보다 적습니다.
+      오탐률 1% 기준 지표는 문제없고, 0.1% 기준은 오탐 10건 규모로 겨우 성립합니다.</li>
+  <li><b>시험 데이터의 공격 비율은 74.8%</b>입니다. 실제 서비스(공격이 드묾)와 반대이므로, 지난 보고대로 속도 이득은 공격 비율 조건을 함께 적어 재계산합니다.</li>
+  <li><b>명령 주입이 SQL 주입의 1/43</b>입니다. 소수 클래스 하나가 평균 지표를 흔들 수 있어, 우열 판단은 반드시 교차검증으로 합니다.</li>
+</ul>
+
+<div class="pagebreak"></div>
+<h2>5. 입력 필드 선택 실험</h2>
+<p>이 데이터는 실제 HTTP 요청이라, 이미지(48×48 = 2,304바이트)에 <b>어떤 필드를 넣을지</b>를 먼저 정해야 합니다.
+결과를 보기 전에 실행 목록과 채택 규칙을 문서에 고정했고, <b>시험 데이터 15%는 열지 않은 채</b>
+학습+검증 데이터(226,048건)만으로 5겹 교차검증을 했습니다(나중 본 측정이 이 선택에 오염되지 않게).</p>
+
+<h3>5.1 사전 측정 — 잘림은 일어나지 않음</h3>
+<p>URI·본문·쿠키·User-Agent를 모두 이어도 <b>최대 1,054바이트</b>로, 2,304바이트를 넘는 요청이 <b>0건</b>이었습니다.
+"긴 요청의 뒷부분이 잘려 공격이 사라진다"는 우려는 이 데이터에서는 해당하지 않습니다.
+또 URI·본문 밖(쿠키·헤더)에만 공격 흔적이 있는 요청은 1% 미만이었습니다.</p>
+
+<h3>5.2 본 실험 — 이미지 CNN, 입력 조합 5종</h3>
+<table>
+  <tr><th>입력</th><th class="num">Macro-F1 (평균±표준편차)</th><th class="num">오탐 1%일 때 탐지율</th><th class="num">명령 주입 F1</th></tr>
+  <tr><td>URI</td><td class="num">0.844 ± 0.008</td><td class="num">0.876</td><td class="num">0.541</td></tr>
+  <tr><td>URI + 본문 (현재)</td><td class="num">0.895 ± 0.014</td><td class="num">0.867</td><td class="num">0.757</td></tr>
+  <tr class="hl"><td>URI + 본문 + 쿠키</td><td class="num">0.932 ± 0.018</td><td class="num">0.850</td><td class="num">0.852</td></tr>
+  <tr><td>URI + 본문 + 쿠키 + User-Agent</td><td class="num">0.923 ± 0.025</td><td class="num">0.831</td><td class="num">0.839</td></tr>
+  <tr><td><i>대조군: User-Agent + 쿠키만</i></td><td class="num">0.540 ± 0.054</td><td class="num">0.113</td><td class="num">0.157</td></tr>
+  <caption>5겹 교차검증, 모든 설정이 같은 분할을 공유(대응표본). 유의성은 대응표본 t-검정 + Holm 보정.</caption>
+</table>
+<ul>
+  <li><b>채택: URI + 본문 + 쿠키.</b> 필드가 더 적은 두 조합보다 유의하게 높았습니다(보정 p = 0.020, 0.005).</li>
+  <li><b>지름길 점검:</b> 쿠키·User-Agent만으로 학습한 대조 모델이 0.540에 그쳐, 사전에 정한 "0.90 이상이면 지름길로 보고 기각" 조건에 해당하지 않았습니다.</li>
+</ul>
+<div class="warn">
+  <b>함께 보고할 주의점</b>
+  <ul style="margin:4px 0 0;">
+    <li><b>오탐을 1%로 묶었을 때의 탐지율은 필드를 더할수록 오히려 낮아집니다</b>(0.876 → 0.831). 채택 기준(Macro-F1)과 운영 지표가 엇갈리므로 두 결과를 모두 싣겠습니다.</li>
+    <li>향상의 대부분은 <b>명령 주입 구분</b>에서 나왔습니다. 쿠키 자체의 내용이 아니라 "쿠키가 있는가"가 신호일 가능성이 있어, 쿠키를 비운 입력으로 추가 확인하겠습니다.</li>
+    <li>가벼운 대리 모델(TF-IDF)로 미리 본 결과는 <b>반대 방향</b>이었습니다. 대리 결과로 정했다면 틀렸을 것이라, 판정은 본 실험으로만 한다는 원칙을 유지합니다.</li>
+  </ul>
+</div>
+
+<h2>6. 새로 드러난 한계</h2>
+<div class="warn">
+  <b>학습 데이터의 "정상"은 실제 사용자 트래픽이 아닙니다.</b>
+  실제 사용자 브라우저에서 온 정상 요청 약 37.9만 건은 고유 요청으로 3,666개뿐이었고,
+  중복을 뺀 뒤 남은 정상 요청의 약 98%는 <b>공격 스캐너가 사이트를 돌며 보낸 정상 형태의 요청</b>이었습니다.
+  따라서 모델이 배우는 경계는 "공격 대 실사용자"보다 <b>"스캐너의 공격 요청 대 스캐너의 탐색 요청"</b>에 가깝습니다.
+</div>
+<p>이에 따라 논문에서 오탐률을 <b>"실운영 오경보율"로 쓰지 않고</b> "스캐너 탐색 트래픽 기준"으로 한정하며,
+실사용자 출처 요청만 따로 떼어 오탐률을 병기하겠습니다.</p>
+
+<h2>7. 다음 계획</h2>
+<ol>
+  <li>텍스트 모델(문자 단위 CNN)로 같은 입력 조합 5종 교차검증 — 이미지 모델 결과와 병기 (GPU 약 4~5시간)</li>
+  <li>학습 데이터 입력을 "URI + 본문 + 쿠키"로 전환하고, 쿠키를 비운 입력으로 지름길 여부 추가 확인</li>
+  <li>이미지 모델·텍스트 모델·2단 구조 전체를 새 데이터에서 다시 측정(연구 질문 1·5부터)</li>
+  <li>라벨 오류 감사로 걸러낸 "실제 공격" 세트에서 탐지율 측정</li>
+</ol>
+
+<h2>8. 여쭙고 싶은 것</h2>
+<div class="qa">
+  <span class="qid">Q1</span><span class="qtitle">정상 트래픽의 한계를 어떻게 다룰까요?</span>
+  <p>(가) 현재 데이터 안에서 실사용자 출처 정상 요청(고유 3,666개)의 오탐률을 따로 보고하는 선에서 한계로 명시한다 /
+     (나) 다른 공개 데이터의 실사용자 정상 트래픽을 보강한다. (나)는 데이터 출처가 섞이는 새 문제가 생겨, 저희는 (가)를 우선 생각하고 있습니다.</p>
+</div>
+<div class="qa">
+  <span class="qid">Q2</span><span class="qtitle">채택 기준 지표와 운영 지표가 엇갈릴 때</span>
+  <p>입력 필드 실험처럼 Macro-F1(클래스 구분)과 저오탐 탐지율(운영)이 반대로 움직일 때, 논문의 주 결론은 어느 쪽을 기준으로 삼는 것이 좋을지 의견을 여쭙고 싶습니다.</p>
+</div>
+
+</body>
+</html>
