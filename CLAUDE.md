@@ -27,7 +27,8 @@
 - **3기 주 트랙 `srbh_4class`**(SR-BH 2020, docs/13 §2.5.3) — 재생성 순서가 고정이다:
   `download_srbh.py` → `audit_srbh_labels.py`(E1-a 목록 `data/processed/srbh_audit_flags.csv`) → `process_track('srbh_4class')` → `build_image_dataset.py --track srbh_4class --channels rgb`.
   ⚠️ 감사 CSV 없이 트랙을 만들면 에러로 멈춘다(라벨 노이즈가 조용히 섞이는 것 방지). 클래스명은 `CodeInjection`(XSS 아님 — 실데이터는 PHP 코드 주입 탐침).
-  ⚠️ 입력은 **URI+body 만**. UA·Cookie 는 스캐너 지문(공격 95% 가 같은 UA)이라 넣으면 shortcut → CSV 컬럼으로만 보존(E2 용).
+  ⚠️ 현재 트랙 `text_raw` 는 **URI+body(F2)**. 단 E2 단계2(RGB CNN CV)에서 **F3(+cookie) 채택**이 확정됐고 트랙 전환은 코드 작업 대기다(docs/13 §4.1.2).
+  "UA 는 지름길"은 원본 행 기준 관찰이었고 중복 제거 후엔 성립하지 않았다(정정 기록 있음). F3 는 Macro-F1 은 높지만 TPR@1%FPR 은 F2 보다 낮다 → 병기.
   ⚠️ `run_evasion.py` 에는 이 트랙이 **의도적으로 없다**(`mutations.py` 가 `XSS` 라벨명에 묶임).
   ⚠️ `payload_3class` 원본이 없는 기기에서 `preprocess.py` 를 인자 없이 돌리면 docs/03 의 기존 트랙 기록이 "[건너뜀]"으로 지워진다 → `process_track` 직접 호출.
 - RGB(교수 요구): `build_image_dataset.py --channels rgb [--rgb-encoders raw_byte,char_class,local_entropy]`.

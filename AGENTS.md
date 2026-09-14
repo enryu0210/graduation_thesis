@@ -175,7 +175,8 @@ PYTHONIOENCODING=utf-8 python src/data/audit_srbh_labels.py      # E1-a 목록 d
 PYTHONIOENCODING=utf-8 python -c "import sys; sys.path.insert(0,'src/data'); import preprocess; print('\n'.join(preprocess.process_track('srbh_4class')))"
 PYTHONIOENCODING=utf-8 python src/imaging/build_image_dataset.py --track srbh_4class --channels rgb
 ```
-- 입력 텍스트는 **URI + "\n" + body** 뿐이다. UA·Cookie 는 스캐너 지문이라 모델 입력에 넣지 말 것(CSV 컬럼으로만 보존).
+- 현재 입력 텍스트는 **URI + "\n" + body**(F2)다. E2 단계2 에서 F3(+cookie) 채택이 확정됐지만 트랙 전환은 **별도 지시가 있을 때만** 한다
+  (전환하면 라벨 충돌·중복 제거 건수가 모두 바뀐다). 다른 조합은 `cross_validate.py --fields` 로만 실험한다.
 - 클래스: `Normal` / `SQLInjection` / `CodeInjection`(XSS 아님) / `CommandInjection`.
 
 ⚠️ 새 `data/raw/<dataset>/` 는 자동 무시되지 않는다 → `.gitignore` 에 수동 추가.
