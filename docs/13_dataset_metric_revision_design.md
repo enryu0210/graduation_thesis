@@ -634,6 +634,34 @@ SHA256 `9c73c90ce6564ae48b14f7179cd864d037a6a130ef69c68c1626ec5d7ce4a910`). 전�
 3. ⚠️ 노이즈는 **정상 클래스에 악성이 섞인** 방향 → benign-evasion 과 FPR 을 **낙관적으로** 왜곡한다.
    우리 헤드라인이 정확히 그 지표들이므로 이 감사는 **선택이 아니라 필수**다.
 
+### 2.6.1 자체 감사 실측 — 시그니처 v1 로 **30,280건(5.77%)** (2026-09-14)
+
+`src/data/audit_srbh_labels.py` → `experiments/results/srbh_label_audit.json` + `data/processed/srbh_audit_flags.csv`
+(둘 다 gitignore, 원본 행 번호 `row_id` = 헤더 제외 0-based). 정규식 16개(`SIGNATURES_V1`)는 **실행 전에 지시서에 고정**했고
+결과를 본 뒤 고치지 않았다. 스캔 필드 5개(URI·body·cookie·UA·referer)는 `normalize_text` 디코딩본에서 검색.
+
+| 항목 | 값 |
+|---|---|
+| Normal 스캔 / 적중 | 525,195 / **30,280 (5.77%)** — WAMM 48,522(9.2%)의 **62%** |
+| 적중 필드 | URI 가 압도적(예: `shell_chain` 13,538 / 13,806). UA·referer **만** 적중 542건, body 4건, cookie 0건 |
+| 패턴별 (0 아닌 것) | `shell_chain` 13,806 · `time_based` 7,123 · `comment_terminator` 4,744 · `script_tag` 2,335 · `js_sink` 2,335 · `subshell` 2,272 |
+| 참고: 공격 라벨에서의 적중률 | SQLi 68.2% · CmdI 31.0% · **CodeInj 1.7%** |
+
+**정밀도 점검(Claude, 수동)** — 적중 표본 **37건**(행 번호순 앞 표본 + `random_state=0` 무작위 25건 + UA/referer 전용 무작위 12건)을
+원문으로 확인한 결과 **37건 전부 실제 공격**이었다. 전형은 스캐너가 WordPress 경로 중간에 주입한 페이로드다
+(`/blog/wp-includes%7Ccat+%2Fetc%2Fpasswd%23/…`, `/blog' / sleep(15) / '`, `'"<script>alert(1);</script>`,
+User-Agent 끝의 `";cat /etc/passwd;"`). → **"적중 = 라벨 오류" 판정은 표본 한도 안에서 신뢰할 만하다.**
+⚠️ 37건은 작다 — 정밀도를 수치로 주장하려면 Wilson CI 가 필요하고, 지금은 "표본에서 오탐 0"까지만 쓴다.
+
+**해석**
+1. 30,280건은 WAMM 규모의 **하한 쪽 재현**이다. 정규식은 고정 시그니처라 WAMM(LLM 판정)이 잡은 나머지를 못 잡는 것이 자연스럽다
+   → "라벨 노이즈가 실재하고 규모가 수만 건"은 **우리 손으로 확인됨**. 48,522 라는 숫자 자체는 재현하지 못했다(인용 시 병기).
+2. ⚠️ **감사 클래스는 믿지 말 것.** `comment_terminator`(SQLi 로 분류) 적중은 실제로 `<!--#EXEC cmd="ls /"-->` **SSI 주입**이다.
+   E1 의 "클래스 일치율"(보조 지표)은 이 배정을 그대로 쓰면 틀린다 → 쓰기 전에 클래스 재판정 필요.
+3. ⚠️ **CodeInj 라벨에서 시그니처 적중률이 1.7%** 뿐이다. CAPEC-242 로 라벨된 요청이 `<script>` 류가 아니라는 뜻이다
+   → §2.5 의 "`242`=XSS 를 포함하는 상위 범주" 서술이 실데이터에서 **XSS 가 거의 없는 쪽**일 수 있다. 트랙 생성 후 클래스별 대표 원문 확인 필요.
+4. 이 30,280건이 E1-a 다 → §4.1.1 규칙대로 **4클래스 트랙 분할 전에 제거**한다.
+
 ---
 
 ## 3. 새 지표·데이터셋이 기존 RQ 에 미치는 영향
@@ -815,7 +843,7 @@ URI·쿠키·User-Agent 를 합치면 48×48 = 2,304바이트를 쉽게 넘는�
 - [x] `src/data/download_srbh.py` 신설 + `.gitignore` 에 `data/raw/srbh2020/` 추가 후 `git check-ignore -v` 확인
       → **완료**(2026-09-14 `git check-ignore -v` 로 `.gitignore:7` 적중 확인)
 - [x] E7 라벨 구조 실측(`src/data/profile_srbh.py`) → **완료(§2.5.2)**. 248 은 1건 → CmdI 에 합침
-- [ ] SR-BH 라벨 노이즈 자체 감사(§2.6) → 48,522건 규모 재현 확인
+- [x] SR-BH 라벨 노이즈 자체 감사(§2.6) → **완료(§2.6.1)**: 30,280건(WAMM 의 62%, 표본 37건 전부 실제 공격). 48,522 자체는 미재현
 - [ ] CAPEC→4클래스 매핑 구현(§2.5 규칙 3건) + 제외 건수 보고
 - [x] `metrics.py`: TPR@FPR · pAUC · 경보부하 · ECE 추가 / MCC 제거 → **완료(§1.5)**, 166 tests pass
 - [x] 신설 지표 4종 **출처 원문 대조** → ECE 오귀속 정정 + 서지 2편 보강 + ECE 논거 하향 → **완료(§1.6)**
