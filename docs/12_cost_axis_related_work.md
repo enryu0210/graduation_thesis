@@ -51,6 +51,12 @@
 > 전환돼("ACM is now Open Access" 배너) 두 편 모두 로그인 없이 받혔다. 받는 법:
 > `https://dl.acm.org/doi/pdf/<DOI>?download=true` 를 **브라우저로** 열면 즉시 내려받아진다
 > (curl 은 봇 차단으로 403 — MDPI 도 동일하므로 브라우저 경로를 쓸 것).
+>
+> ⚠️ **다만 "curl 403 = 브라우저 필수"는 너무 거친 규칙이다**(2026-09-15 추가). 403 의 원인이
+> 두 종류다. UNIR 리포지터리는 User-Agent 만 바꾸면 여전히 403 이지만 `Referer` ·
+> `Accept-Language` · `Sec-Fetch-*` · `sec-ch-ua` 까지 채우면 **통과한다**(§1.6.1 에서 실제로 통했다).
+> 반면 MDPI 는 Akamai 인터스티셜이라 헤더로는 뚫리지 않는다. → **헤더 보강을 먼저 시도하고,
+> 그래도 막히면 브라우저.** 브라우저는 파일을 다운로드 폴더에 떨구므로 옮기는 수고가 따로 든다.
 
 ### 1.2 확보 실패 — 수동 다운로드 필요
 
@@ -159,8 +165,8 @@ docs/13 §6 의 인용 문헌 15편을 §1~§1.5 와 전수 대조한 결과, **
 
 | 서지 | 우리 논문에서 쓰는 곳 | 폴더 |
 |---|---|---|
-| **Riera, Català, et al.** *A new multi-label dataset for Web attacks CAPEC classification using machine learning techniques.* **Computers & Security 120:102788, 2022.** doi:10.1016/j.cose.2022.102788 | ⭐ **주 데이터셋 SR-BH 2020 의 원 논문.** docs/13 §2.2 채택 근거 · §2.5 CAPEC→4클래스 매핑의 출처 · §2.6 라벨 노이즈 논의의 전제 | `05_웹공격탐지_데이터셋/` |
-| **Lucz, Forstner.** *A Thirty-Day Dataset of Malicious HTTP Requests Blocked by OWASP ModSecurity on a Production Web Server.* **Data 10(11):186, 2025.** doi:10.3390/data10110186 | **외부 시간축 검증셋(Data 2025)의 원 논문.** docs/13 §2.3 채택 근거 · 일반화 주장의 유일한 외부 근거 | `05_웹공격탐지_데이터셋/` |
+| **Sureda Riera, Bermejo Higuera, Bermejo Higuera, Martínez Herraiz, Sicilia Montalvo.** *A new multi-label dataset for Web attacks CAPEC classification using machine learning techniques.* **Computers & Security 120:102788, 2022.** doi:10.1016/j.cose.2022.102788 | ⭐ **주 데이터셋 SR-BH 2020 의 원 논문.** docs/13 §2.2 채택 근거 · §2.5 CAPEC→4클래스 매핑의 출처 · §2.6 라벨 노이즈 논의의 전제 | `srbh2020_riera2022_capec_dataset.pdf` |
+| **Lucz, Forstner.** *A Thirty-Day Dataset of Malicious HTTP Requests Blocked by OWASP ModSecurity on a Production Web Server.* **Data 10(11):186, 2025.** doi:10.3390/data10110186 | **외부 시간축 검증셋(Data 2025)의 원 논문.** docs/13 §2.3 채택 근거 · 일반화 주장의 유일한 외부 근거 | `data2025_lucz_forstner_modsec_30day.pdf` |
 
 **나머지 13편은 등재돼 있음을 확인했다** — Arp et al. 2편 · Axelsson · Naeini · Guo ·
 Davis & Goadrich · Saito · CALIBURN · AdvSQLi · WADBERT · WAMM 은 §1.4 에, McClish ·
@@ -174,15 +180,51 @@ docs/thetics/ 에 실제로 있는 파일 : 18편, 주제별 5개 폴더 없음(
 ```
 
 즉 **§1.5 의 폴더 구조는 데스크톱에만 존재한다.** 이 문서를 보고 `01_평가지표_방법론/` 같은
-경로를 찾으면 노트북에서는 헛수고다. 두 데이터셋 원 논문도 **아직 어느 기기에도 PDF 가 없다**
-(등재만 했고 확보는 미완) → 아래 "해야 할 것"에 남긴다.
+경로를 찾으면 노트북에서는 헛수고다. 두 데이터셋 원 논문은 **같은 날 노트북에 확보했다**(§1.6.1)
+— 평면 구조라 `docs/thetics/` 바로 아래 둔다.
 
 **해야 할 것**
-- [ ] Riera et al. 2022 PDF 확보 — Elsevier 유료일 가능성이 높다(C&S). 학교 프록시 또는
-      저자 저장소(UPC/UOC 리포지터리) 경로를 먼저 볼 것
-- [ ] Lucz & Forstner 2025 PDF 확보 — **MDPI Data 는 오픈액세스**라 받을 수 있다.
-      ⚠️ MDPI 는 curl 을 403 으로 막으므로 **브라우저로** 받을 것(§1.1 의 교훈)
-- [ ] 두 편을 `05_웹공격탐지_데이터셋/` 에 넣고 **데스크톱·노트북 양쪽에** 둘 것
+- [x] Riera et al. 2022 PDF 확보 → **완료(2026-09-15, §1.6.1)**. "Elsevier 유료" 예상은 **틀렸다**
+- [x] Lucz & Forstner 2025 PDF 확보 → **완료(2026-09-15, §1.6.1)**. curl 차단 예상은 **맞았다**
+- [ ] 두 편을 **데스크톱에도** 둘 것 — `docs/thetics/` 는 미추적이라 커밋으로 옮겨지지 않는다.
+      URL 은 §1.6.1 에 적어 두었다
+
+---
+
+### 1.6.1 두 편 확보 완료 (2026-09-15, 노트북) — 예상이 반씩 빗나갔다
+
+| 파일명 (`docs/thetics/` 바로 아래, 평면) | 쪽수 / 크기 | 경로 |
+|---|---|---|
+| `srbh2020_riera2022_capec_dataset.pdf` | 18p / 3,157,849 B | UNIR 기관 리포지터리 **오픈액세스** |
+| `data2025_lucz_forstner_modsec_30day.pdf` | 11p / 234,732 B | MDPI(CC BY 4.0), **브라우저로** 수령 |
+
+```
+# Riera 2022 — 학교 프록시 불필요. 아래 직링크에 전문이 공개돼 있다
+https://reunir.unir.net/handle/123456789/14058
+https://reunir.unir.net/bitstream/handle/123456789/14058/new_multi-label_dataset.pdf?sequence=2&isAllowed=y
+
+# Lucz & Forstner 2025 — 논문 페이지에서 Download ▾ → Download PDF
+https://www.mdpi.com/2306-5729/10/11/186
+```
+
+- **Riera 는 유료가 아니었다.** C&S(Elsevier)라 유료로 단정했으나 저자 소속 UNIR 의 리포지터리에
+  전문이 있었다. → **Elsevier·Springer 라도 저자 소속 기관 리포지터리를 먼저 볼 것.**
+- **Lucz 는 예상대로 curl 로 못 받았다.** MDPI 는 Akamai 인터스티셜(`bm-verify` 리다이렉트
+  HTML 1,432 B)을 돌려준다. 헤더를 아무리 채워도 뚫리지 않아 브라우저가 유일한 경로다.
+
+**⚠️ 원문을 열어보니 서지가 틀려 있었다 — 등재와 확보는 다른 일이다**
+
+등재 당시 저자를 `Riera, Català, et al.` 로 적었는데 **Català 라는 저자는 없다.** 원문 1쪽의
+저자는 Tomás **Sureda Riera** · Juan-Ramón **Bermejo Higuera** · Javier **Bermejo Higuera** ·
+José-Javier **Martínez Herraiz** · Juan-Antonio **Sicilia Montalvo** 5인이다.
+docs/13 §2.2 와 CURRENT_BASELINE §5.2 는 **처음부터 맞게** 적혀 있었고, 틀린 곳은 위 표 한 줄뿐이었다.
+
+> **교훈** : PDF 를 받기 전에 등재한 서지는 **받은 뒤 원문 1쪽과 대조한다.** 2차 자료(검색 결과·
+> 다른 논문의 참고문헌)에서 옮겨 적으면 저자명이 조용히 섞인다. §1.6 이 "등재 누락"을 상환하면서
+> 정작 **등재한 내용 자체는 검증하지 않았다** — 같은 표에서 두 번째 결함이 나온 셈이다.
+
+⚠️ 제1저자 성은 스페인식 복성 **Sureda Riera** 다. 약식 인용은 `Sureda Riera et al.` 가 정확하지만
+현행 문서 전체가 `Riera et al.` 로 통일돼 있어 **그대로 둔다** — 혼용만 하지 말 것.
 
 ---
 
