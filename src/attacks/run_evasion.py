@@ -315,7 +315,13 @@ def build_cascade_predict(track: str, stage2: str, side: int, max_len: int,
 # 지표 (docs/05 §2.2)
 # ---------------------------------------------------------------------------
 def benign_evasion(pred: np.ndarray, mask: np.ndarray, normal_idx: int) -> float:
-    """mask(적용 대상) 샘플 중 Normal 로 예측된 비율(= 주 지표 회피 성공률, docs/05 §2.2 ①)."""
+    """적용 대상 공격 샘플 중 Normal 로 판정된 비율: ASR(Attack Success Rate).
+
+    탐지 우회 성공률이므로 산출 키를 asr_* 로 유지한다. 공격 클래스 사이의
+    오분류까지 세는 any_misclass 는 ASR 이 아니다. 근거는 docs/05 §2.2 ①,
+    docs/13 §1.9 발견 ②의 정정(§1.13), AdvSQLi(arXiv:2401.02615) 등
+    회피 문헌의 ASR 용례다.
+    """
     if mask.sum() == 0:
         return float("nan")
     return float((pred[mask] == normal_idx).mean())
@@ -326,10 +332,18 @@ def any_misclass(pred: np.ndarray, mask: np.ndarray, y_true: np.ndarray) -> floa
 
     주 지표(benign-evasion)가 0 이어도 탐지기가 공격 클래스 사이에서 얼마나 흔들리는지
     보여준다. WAF 우회는 아니지만 표현방식별 강건성 비교의 핵심 렌즈다.
+    공격 클래스 사이의 오분류도 포함하므로 이것은 ASR 이 아니다.
     """
     if mask.sum() == 0:
         return float("nan")
     return float((pred[mask] != y_true[mask]).mean())
+
+
+def accuracy_under_attack(pred: np.ndarray, mask: np.ndarray, y_true: np.ndarray) -> float:
+    """적용 대상 중 정답 비율(AUA)을 직접 세어 보수 계산의 반올림 오차를 피한다."""
+    if mask.sum() == 0:
+        return float("nan")
+    return float((pred[mask] == y_true[mask]).mean())
 
 
 def attach_escalation_rates(predict, single_rows, stacked_rows) -> bool:
@@ -368,30 +382,59 @@ def run_single(predict, te_txt, te_lab, y_true, base_pred, normal_idx, seed):
             # 보조 지표(any-misclassification) — 변형 전/후를 함께 기록해 '동요'를 정량화
             "anymis_clean": any_misclass(base_pred, applied, y_true),
             "anymis_mutated": any_misclass(pred, applied, y_true),
+            "aua_clean": accuracy_under_attack(base_pred, applied, y_true),
+            "aua_mutated": accuracy_under_attack(pred, applied, y_true),
         })
         rows[-1]["asr_delta"] = rows[-1]["asr_mutated"] - rows[-1]["asr_clean"]
         rows[-1]["anymis_delta"] = rows[-1]["anymis_mutated"] - rows[-1]["anymis_clean"]
+        rows[-1]["aua_delta"] = rows[-1]["aua_mutated"] - rows[-1]["aua_clean"]
     return rows
 
 
 def run_stacked(predict, te_txt, te_lab, y_true, base_pred, normal_idx, budget, seed):
-    """예산 k=1..budget 조합 ASR 곡선을 계산한다(주·보조 지표 동시)."""
+    """예산 k=1..budget 곡선과 최소 성공 예산 요약을 (rows, budget_summary)로 반환한다."""
     attack_mask = np.asarray([bool(l in PS.ATTACK_LABELS) for l in te_lab])
     rows = []
+    applied_any = np.zeros(len(te_lab), dtype=bool)
+    minimum_budget = np.full(len(te_lab), np.inf)
     for k in range(1, budget + 1):
         mutated, applied = PS.mutate_stacked(te_txt, te_lab, k, random.Random(seed))
         pred = predict(mutated)
+        applied_any |= applied
+        succeeded = applied & (pred == normal_idx)
+        # k마다 독립 샘플링하여 성공은 단조적이지 않다. 성공한 k들의 최솟값을 보존한다.
+        minimum_budget[succeeded] = np.minimum(minimum_budget[succeeded], k)
         rows.append({
             "budget_k": k,
             "n_applied": int(applied.sum()),
             "asr_mutated": benign_evasion(pred, applied, normal_idx),
             "anymis_mutated": any_misclass(pred, applied, y_true),
+            "aua_mutated": accuracy_under_attack(pred, applied, y_true),
         })
     # k=0(=clean) 기준점도 앞에 붙여 곡선이 baseline 에서 출발하게 한다.
     rows.insert(0, {"budget_k": 0, "n_applied": int(attack_mask.sum()),
                     "asr_mutated": benign_evasion(base_pred, attack_mask, normal_idx),
-                    "anymis_mutated": any_misclass(base_pred, attack_mask, y_true)})
-    return rows
+                    "anymis_mutated": any_misclass(base_pred, attack_mask, y_true),
+                    "aua_mutated": accuracy_under_attack(base_pred, attack_mask, y_true)})
+    # clean(k=0)은 곡선 기준점이다. AMB는 변형 평가(k>=1)의 적용 대상만 집계한다.
+    successful_budgets = minimum_budget[np.isfinite(minimum_budget)]
+    n_succeeded = int(successful_budgets.size)
+    n_applied = int(applied_any.sum())
+    budget_summary = {
+        "amb_mean": float(successful_budgets.mean()) if n_succeeded else None,
+        "amb_median": float(np.median(successful_budgets)) if n_succeeded else None,
+        "n_succeeded": n_succeeded,
+        "n_never_succeeded": n_applied - n_succeeded,
+        "n_applied": n_applied,
+        "success_rate_within_budget": n_succeeded / n_applied if n_applied else None,
+        "definition": (
+            "최소 성공 예산 — 문헌 AVGQ 와 다르다. k마다 기법을 독립적으로 선택하므로 "
+            "반복 질의 탐색의 성공까지 질의 수가 아니다. k=1..budget 중 적용된 변형이 "
+            "Normal 판정을 얻은 k들의 최솟값을 샘플별로 구한다. k=0은 제외하며, "
+            "한 번 이상 적용된 샘플을 분모로 삼고 미성공 샘플은 평균·중앙값에서 제외한다."
+        ),
+    }
+    return rows, budget_summary
 
 
 def fig_single(rows, out_path: Path, title: str, clean_ref: float):
@@ -538,7 +581,7 @@ def main() -> None:
               f"AM {r['anymis_clean']:.4f}→{r['anymis_mutated']:.4f} (Δ+{r['anymis_delta']:.4f})")
 
     # 예산 조합 곡선
-    stacked = run_stacked(predict, te_txt, te_lab, y_true, base_pred, normal_idx,
+    stacked, budget_summary = run_stacked(predict, te_txt, te_lab, y_true, base_pred, normal_idx,
                           args.budget, args.seed)
     print("  [예산 곡선 — benign-evasion / any-misclass]")
     for r in stacked:
@@ -579,7 +622,8 @@ def main() -> None:
     with open(RESULTS_DIR / f"evasion_{tag}_single.json", "w", encoding="utf-8") as f:
         json.dump({**meta, "results": single}, f, ensure_ascii=False, indent=2)
     with open(RESULTS_DIR / f"evasion_{tag}_stacked.json", "w", encoding="utf-8") as f:
-        json.dump({**meta, "budget": args.budget, "results": stacked},
+        json.dump({**meta, "budget": args.budget, "results": stacked,
+                   "budget_summary": budget_summary},
                   f, ensure_ascii=False, indent=2)
 
     clean_ref = stacked[0]["asr_mutated"]  # k=0 기준(전체 공격 clean benign-evasion)
