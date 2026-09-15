@@ -133,6 +133,74 @@ def load_text_pool(track: str, text: str, *, fields: str | None = None,
 
 
 # --------------------------------------------------------------------------
+# SR-BH 필드 조합의 추가 보고
+# --------------------------------------------------------------------------
+def load_pool_strata(track: str, exclude_test: bool = False) -> np.ndarray:
+    """텍스트가 필드 조합마다 달라지므로 원래 split과 row_id로 출처를 연결한다."""
+    import pandas as pd
+    from data_text import csv_path
+    from src.analysis.srbh_normal_strata import STRATA
+
+    path = PROJECT_ROOT / "data" / "processed" / f"{track}_normal_strata.csv"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Normal 출처 층 CSV가 없습니다: {path}. "
+            "python src/analysis/srbh_normal_strata.py로 먼저 생성하세요.")
+    sources = pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8")
+    required = {"split", "row_id", "normal_source"}
+    if not required <= set(sources.columns):
+        raise ValueError(f"Normal 출처 층 CSV 필수 컬럼 누락: {sorted(required - set(sources.columns))}")
+    if sources.duplicated(["split", "row_id"]).any():
+        raise ValueError("Normal 출처 층 CSV의 (split,row_id)가 중복되었습니다.")
+    lookup = sources.set_index(["split", "row_id"])["normal_source"]
+    strata = []
+    for split in (SPLITS[:2] if exclude_test else SPLITS):
+        frame = pd.read_csv(csv_path(track, split), dtype=str, keep_default_na=False,
+                            encoding="utf-8", usecols=["row_id", "label"])
+        keys = pd.MultiIndex.from_arrays([[split] * len(frame), frame["row_id"]])
+        aligned = lookup.reindex(keys).to_numpy()
+        normal = frame["label"].eq("Normal").to_numpy()
+        missing = normal & ~np.isin(aligned, STRATA)
+        if missing.any():
+            row_ids = frame.loc[missing, "row_id"].head(5).tolist()
+            raise ValueError(f"{split} Normal 출처 층 누락 또는 잘못된 값: "
+                             f"{int(missing.sum())}행, row_id 예시={row_ids}")
+        strata.extend(np.where(normal, aligned, ""))
+    return np.asarray(strata)
+
+
+def count_input_conflicts(texts, labels) -> dict:
+    """같은 라벨의 반복은 허용하고 서로 다른 라벨이 공유하는 입력만 센다."""
+    import pandas as pd
+
+    frame = pd.DataFrame({"text": texts, "label": labels})
+    label_counts = frame.groupby("text", sort=False)["label"].nunique()
+    conflicting = label_counts.index[label_counts >= 2]
+    return {"n_conflicting_texts": int(len(conflicting)),
+            "n_conflicting_rows": int(frame["text"].isin(conflicting).sum())}
+
+
+def fold_strata_report(y_true, y_pred, classes, strata) -> dict:
+    """기존 예측을 클래스명으로 되돌려 공통 층별 계산에 전달한다."""
+    from src.analysis.srbh_normal_strata import fpr_by_stratum
+
+    names = np.asarray(classes)
+    return fpr_by_stratum(names[y_true], names[y_pred], strata)
+
+
+def pool_strata_reports(fold_results) -> dict:
+    """fold 평균 대신 도수를 합쳐 작은 층의 Wilson 구간을 다시 계산한다."""
+    from src.analysis.srbh_normal_strata import STRATA
+
+    pooled = {}
+    for name in (*STRATA, "all"):
+        n = sum(result["fpr_by_stratum"][name]["n"] for result in fold_results)
+        alarms = sum(result["fpr_by_stratum"][name]["false_alarms"] for result in fold_results)
+        pooled[name] = {"n": n, "false_alarms": alarms, "fpr": M.wilson_ci(alarms, n)}
+    return pooled
+
+
+# --------------------------------------------------------------------------
 # 메모리 절약형 Dataset (uint8/int16 보관 → 배치에서 변환)
 # --------------------------------------------------------------------------
 def make_lazy_image_dataset(images: np.ndarray, labels: np.ndarray):
@@ -212,7 +280,7 @@ def inner_train_val_split(y_trainval: np.ndarray, val_ratio: float, seed: int):
 
 
 def run_fold_torch(model_name: str, pool_x, y, classes, tr_idx, va_idx, te_idx,
-                   args, is_image: bool) -> dict:
+                   args, is_image: bool, pool_strata=None) -> dict:
     """torch 모델(cnn/charcnn/bilstm) 한 fold 학습 → test fold 지표 반환."""
     import torch
     from torch.utils.data import DataLoader
@@ -254,6 +322,9 @@ def run_fold_torch(model_name: str, pool_x, y, classes, tr_idx, va_idx, te_idx,
     result["throughput_samples_per_sec"] = float(len(y_true) / infer_sec) if infer_sec > 0 else None
     result["best_val_macro_f1"] = float(best_val_f1)
     result["best_epoch"] = int(best_epoch)
+    if pool_strata is not None:
+        result["fpr_by_stratum"] = fold_strata_report(
+            y_true, y_pred, classes, pool_strata[te_idx])
 
     # fold 마다 GPU 메모리를 반납하지 않으면 5폴드 누적으로 OOM 이 난다.
     del model, train_ds, val_ds, test_ds, train_loader, val_loader, test_loader
@@ -263,7 +334,7 @@ def run_fold_torch(model_name: str, pool_x, y, classes, tr_idx, va_idx, te_idx,
 
 
 def run_fold_tfidf(model_name: str, texts: list[str], y, classes, tr_idx, te_idx,
-                   args) -> dict:
+                   args, pool_strata=None) -> dict:
     """TF-IDF + 전통 ML 한 fold 학습 → test fold 지표 반환(조기종료 없음 → val 불필요)."""
     from sklearn.feature_extraction.text import TfidfVectorizer
     from baseline_tfidf import build_classifier
@@ -292,6 +363,9 @@ def run_fold_tfidf(model_name: str, texts: list[str], y, classes, tr_idx, te_idx
     result = M.compute_metrics(y[te_idx], y_pred, classes, y_score=y_score)
     result["throughput_samples_per_sec"] = float(len(te_idx) / infer_sec) if infer_sec > 0 else None
     result["fit_seconds"] = float(fit_sec)
+    if pool_strata is not None:
+        result["fpr_by_stratum"] = fold_strata_report(
+            y[te_idx], y_pred, classes, pool_strata[te_idx])
     return result
 
 
@@ -349,9 +423,20 @@ def main() -> None:
         pool_texts, y, classes = load_text_pool(args.track, args.text,
                                                  fields=args.fields, exclude_test=args.exclude_test)
         pool_x = None
-        if not is_tfidf:
-            print("  바이트 시퀀스 인코딩 중...")
-            pool_x = encode_byte_matrix_int16(pool_texts, args.max_len)
+
+    pool_strata = None
+    if args.track == "srbh_4class" and args.fields is not None:
+        # 학습 전에 누락을 발견해야 긴 CV 실행 뒤 보고서가 비는 일을 막는다.
+        pool_strata = load_pool_strata(args.track, args.exclude_test)
+        conflict_texts = pool_texts
+        if is_image:
+            conflict_texts, _, _ = load_text_pool(
+                args.track, args.text, fields=args.fields, exclude_test=args.exclude_test)
+        input_conflicts = count_input_conflicts(conflict_texts, y)
+
+    if not is_image and not is_tfidf:
+        print("  바이트 시퀀스 인코딩 중...")
+        pool_x = encode_byte_matrix_int16(pool_texts, args.max_len)
 
     fp = label_fingerprint(y)
     print(f"  풀 크기={len(y):,} classes={classes} 라벨지문={fp}")
@@ -369,12 +454,13 @@ def main() -> None:
         print(f"\n--- fold {k}/{args.folds} (train+val={len(trval_idx):,} test={len(te_idx):,}) ---")
 
         if is_tfidf:
-            res = run_fold_tfidf(args.model, pool_texts, y, classes, trval_idx, te_idx, args)
+            res = run_fold_tfidf(args.model, pool_texts, y, classes, trval_idx, te_idx, args,
+                                 pool_strata=pool_strata)
         else:
             tr_rel, va_rel = inner_train_val_split(y[trval_idx], args.val_ratio, args.seed + k)
             res = run_fold_torch(args.model, pool_x, y, classes,
                                  trval_idx[tr_rel], trval_idx[va_rel], te_idx,
-                                 args, is_image=is_image)
+                                 args, is_image=is_image, pool_strata=pool_strata)
         res["fold"] = k
         res["elapsed_sec"] = round(time.perf_counter() - t0, 1)
         fold_results.append(res)
@@ -447,6 +533,9 @@ def main() -> None:
         "summary": summary,
         "fold_results": fold_results,
     }
+    if pool_strata is not None:
+        payload["fpr_by_stratum_pooled"] = pool_strata_reports(fold_results)
+        payload["input_conflicts"] = input_conflicts
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out = RESULTS_DIR / f"cv_{tag}.json"
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
