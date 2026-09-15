@@ -38,6 +38,14 @@ powershell -File scripts/codex/run_codex.ps1 -ReadOnly    # 검증만 재실행 
 래퍼가 해주는 것: `PYTHONIOENCODING=utf-8` 주입, 경로 기본값, RESULT.md 회수,
 GPU 유무 안내, 사전 점검(TASK.md 존재·git 상태).
 
+> ⚠️ **(2026-09-15 확인, 미수정) 지시서에 큰따옴표 `"` 가 있으면 래퍼가 실패한다.**
+> 래퍼는 지시서 전문을 명령줄 인자 하나로 넘기는데(`$codexArgs += $prompt`), Windows PowerShell 5.1 은
+> 인자 안의 `"` 를 이스케이프하지 않아 인자가 쪼개진다 → `error: unexpected argument '…' found`, 종료코드 2, 1초 만에 끝남(코드 변경 없음).
+> 코드 인용이 든 지시서는 거의 항상 `"` 를 포함하므로 **당분간 아래 stdin 방식을 쓸 것.**
+>
+> ⚠️ stdin 방식에서 `-o docs/handoff/RESULT.md` 를 주면 Codex 가 작업 중 쓴 상세 RESULT.md 를
+> **최종 메시지(요약)로 덮어쓴다** → 명령 출력이 사라진다. `-o docs/handoff/LAST_MESSAGE.md` 로 받을 것.
+
 ### 호출 방법 B — 직접 (래퍼가 안 될 때)
 
 ```bash

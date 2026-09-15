@@ -174,7 +174,14 @@ PYTHONIOENCODING=utf-8 python src/data/download_srbh.py          # 원본 436MB,
 PYTHONIOENCODING=utf-8 python src/data/audit_srbh_labels.py      # E1-a 목록 data/processed/srbh_audit_flags.csv
 PYTHONIOENCODING=utf-8 python -c "import sys; sys.path.insert(0,'src/data'); import preprocess; print('\n'.join(preprocess.process_track('srbh_4class')))"
 PYTHONIOENCODING=utf-8 python src/imaging/build_image_dataset.py --track srbh_4class --channels rgb
+# (평가 보조, 트랙 생성 후) — 트랙 CSV 를 읽기만 하고 바꾸지 않는다
+PYTHONIOENCODING=utf-8 python src/analysis/build_srbh_e1.py       # E1-a 세트 data/processed/srbh_e1a.csv (+ 트랙 중복 표시 overlap_split)
+PYTHONIOENCODING=utf-8 python src/analysis/srbh_normal_strata.py  # Normal 출처 층 data/processed/srbh_4class_normal_strata.csv
 ```
+- ⚠️ `download_srbh.py` 는 기존 파일 검증 실패 시 **자동 재다운로드**한다(노트북 네트워크에서 ~13시간). 검증만 하려면
+  `python -c "import sys; sys.path.insert(0,'src/data'); import download_srbh as d; d.verify_file(d.RAW_DIR/d.FILENAME)"`.
+- E1-a 는 트랙 SQLi 텍스트와 760행이 겹친다(docs/13 §4.1.1) — E1 헤드라인은 `overlap_split == ""` 행만. 겹친 행을 **지우지 말 것**.
+- E5 게이트 신호는 `src/models/gate_signals.py`(확률 행렬 입력, `cascade.py` 와 독립). msp 게이트는 `cascade.cascade_apply` 와 동일해야 한다(테스트 고정).
 - 현재 입력 텍스트는 **URI + "\n" + body**(F2)다. E2 단계2 에서 F3(+cookie) 채택이 확정됐지만 트랙 전환은 **별도 지시가 있을 때만** 한다
   (전환하면 라벨 충돌·중복 제거 건수가 모두 바뀐다). 다른 조합은 `cross_validate.py --fields` 로만 실험한다.
 - 클래스: `Normal` / `SQLInjection` / `CodeInjection`(XSS 아님) / `CommandInjection`.
