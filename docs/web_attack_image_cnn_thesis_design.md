@@ -99,13 +99,38 @@ RQ1 은 원래 *"이미지 기반 CNN 이 텍스트 모델과 **유사하거나 
 
 ## 3. 데이터셋 설계
 
+> ⚠️ **2026-09-15 갱신 — 주 데이터셋이 교체됐다.** 정본은 **docs/13 §2.4**이고 아래는 그 요약이다.
+> 어긋나면 docs/13 을 따른다. 교체 사유: 교수 지적(2026-08-13) — CSIC 2010 은 15년 된
+> **합성** 트래픽이라 최신성·현실성 양쪽에서 방어가 어렵다(docs/13 §2.1).
+
+**현행 (3기 — SR-BH 2020 기반)**
+
+| 역할 | 데이터셋 | 연도 | 용도 |
+|---|---|---|---|
+| **주 트랙** | **SR-BH 2020** (트랙 `srbh_4class`) | 2020 | RQ1·RQ2·RQ3·RQ5·RQ6 전부의 새 측정 기반. 실제 운영 서버의 ModSecurity+CRS 기록을 검수·교정한 **실트래픽** |
+| **외부 검증** | Data 2025 (Zenodo) | 2025 | 시간축 일반화. ⚠️ **정상 트래픽이 없어 recall 전용** |
+| **legacy 대조** | CSIC 2010 | 2010 | 선행연구(E-WebGuard·WADBERT) 직접 대조용 — **부록·비교표로 강등** |
+| 페이로드 보강 | Kaggle SQLi-XSS-CmdI + PayloadsAllTheThings | — | RQ2 회피 변형 생성 재료로 유지 |
+| 흐름 (RQ4b) | USTC-TFC2016 | 2016 | F1 0.9999 **포화** → 부록 강등(G6 결정 유지) |
+
+- **클래스**: 4클래스 유지(Normal / SQLi / **CodeInjection** / CmdI). CAPEC 라벨을 접는 매핑
+  규칙 3건과 제외 건수는 docs/13 §2.5. ⚠️ CAPEC-242 는 XSS 보다 넓은 **코드 주입 일반**이라
+  클래스명을 `XSS` 가 아니라 **`CodeInjection`** 으로 쓴다(이름을 XSS 로 두면 과대주장).
+- **입력 필드**: **F3 = URI + body + cookie** (docs/13 §4.1.2 단계2 에서 사전 고정 절차로 채택).
+  ⚠️ 코드 전환은 **작업 대기** 상태이고 현 트랙은 아직 F2 다.
+- **⚠️ Normal 의 출처 한계**: 중복 제거 후 트랙의 Normal 중 실사용자 트래픽은 약 5%뿐이고
+  나머지는 **스캐너가 크롤링하며 보낸 정상 형태 요청**이다. 따라서 FPR 을 "실운영 오경보율"로
+  서술하면 과대주장이 된다 → "스캐너 탐색 트래픽 기준"으로 한정하고 실사용자 부분집합 FPR 을
+  별도 층으로 병기한다(docs/13 §4.1.2).
+
+**2기까지의 구성 (`payload_4class*` 트랙 — 기존 결과의 근거로 유지)**
+
 | 용도 | 소스 | 비고 |
 |---|---|---|
 | 공격 페이로드 (SQLi/XSS/CmdI) | Kaggle SQLi-XSS-CommandInjection dataset (약 5만 건) | 이미 3개 클래스로 라벨링됨 |
 | 웹 트래픽 (HTTP 요청) | CSIC 2010 HTTP dataset | 정상/이상 요청 모두 포함 |
 | 페이로드 다양성 보강 | PayloadsAllTheThings, OWASP XSS filter evasion cheat sheet | 특정 패턴 과적합 방지 |
-| 정상(benign) 트래픽 | CSIC 2010 정상 요청 | **주 트랙은 `payload_4class_csicnorm`**(Normal=실트래픽) |
-| 흐름 (RQ4b) | USTC-TFC2016 | ⚠️ F1 0.9999 **포화** → 부록 강등 검토(G6) |
+| 정상(benign) 트래픽 | CSIC 2010 정상 요청 | 2기 주 트랙은 `payload_4class_csicnorm`(Normal=실트래픽) |
 
 **전처리 체크리스트**
 - URL/HTML 엔티티 디코딩 정규화 — 단, 이 단계가 RQ2 난이도를 좌우하므로 "디코딩 적용 vs 미적용"
@@ -156,8 +181,19 @@ RQ1 은 원래 *"이미지 기반 CNN 이 텍스트 모델과 **유사하거나 
 
 ### 6.1 RQ1 — 정확도–비용 Pareto 위치
 - 지표(**Phase 13 개편, docs/13 §1.2 가 최신**): Precision/Recall/**Macro-F1** · PR-AUC ·
-  **TPR@1%FPR·TPR@0.1%FPR** · **pAUC(FPR≤0.01)** · **경보부하(base rate 환산)** · **ECE**
-  + attack-focused(benign-evasion/FPR). Accuracy·전구간 ROC-AUC 는 부록.
+  **TPR@1%FPR·TPR@0.1%FPR** · **경보부하(base rate 환산)** · **ECE/MCE + Brier**
+  + attack-focused(benign-evasion/FPR). Accuracy·전구간 ROC-AUC·**pAUC** 는 부록.
+  ⚠️ **2026-09-15 갱신 3건** (근거: docs/13 §1.9·§1.10 선행 대조 검증):
+  - **pAUC 는 헤드라인 → 부록 강등 확정.** 이웃 논문 17편에서 사용 **0건**이고 TPR@FPR 과
+    정보가 상당히 겹친다. 헤드라인에 둘 다 둘 이유가 없다.
+  - **PR-AUC 는 유병률 병기 없이 쓰지 말 것.** AP 는 정밀도의 적분이라 양성 유병률에 직접
+    의존한다. 더구나 우리 트랙의 희귀 클래스는 공격이 아니라 **Normal** 이므로
+    "희귀 사건에서 ROC 보다 낫다"는 역할 설명이 우리 경우엔 반대다.
+    → 그 셋의 공격 비율·표본 수를 병기하고, **Normal 을 양성으로 둔 판본을 함께** 싣는다.
+    데이터셋 간·시기 간 대조는 유병률 불변인 **TPR@FPR** 로 한다.
+  - **Brier 신설**(ECE/MCE 는 유지). ECE 는 bin 선택(`ECE_N_BINS=15`)에 값이 의존하는
+    편향 추정량이고 proper scoring rule 이 아니다. 교정을 보고하는 이웃 2편이 둘 다 Brier 를 쓴다.
+  - **FE score(F1 Efficiency) 채택** — RQ5 비용 대조용. 정의·해석은 docs/12 §4.4.
   ⚠️ **MCC 는 제거됨**(2026-08-13 교수 지시). 기준 지표는 Macro-F1 로 이관(docs/13 §1.4).
   아래 §4 의 F2 등 **과거 실측 수치는 MCC 로 측정된 기록**이므로 그대로 읽고, 새 측정과 섞지 말 것.
   ⚠️ **지표별 1차 출처가 다르다** — TPR@FPR·pAUC 는 Arp et al. P7(+McClish 1989), 경보부하는
