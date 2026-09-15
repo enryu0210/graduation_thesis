@@ -50,6 +50,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from statistics import NormalDist
 
 import numpy as np
 
@@ -82,7 +83,9 @@ from sklearn.preprocessing import label_binarize
 #    "오탐 0건" 지점을 집어온다 → 사실상 "무오탐 탐지율"이 되고 표본 하나에 크게 흔들린다.
 #    실측 예: payload_4class_csicnorm test 의 Normal 은 722개 → 해상도 0.139%
 #             → TPR@1%FPR 은 계산 가능하지만 **TPR@0.1%FPR 은 측정 불가**.
-#             SR-BH 2020 으로 교체하면 test Normal 이 약 78,779개가 되어 둘 다 성립한다.
+#             srbh_4class test Normal 실측은 10,042개(공격 74.8%, docs/13 §2.5.3).
+#             해상도 1/10,042 ≈ 0.00996% 이므로 TPR@0.1%FPR 도 성립한다.
+#             기존 전망은 트랙 생성 실측과 크게 달랐으므로 원본 규모로 해상도를 추정하지 않는다.
 #    → 저 FPR 지표를 보고할 때는 반드시 Normal 표본 수를 함께 싣는다.
 TARGET_FPRS = (0.01, 0.001)
 
@@ -97,7 +100,8 @@ PAUC_MAX_FPR = 0.01
 # 경보 부하를 계산할 때 가정하는 **배포 환경의 공격 비율**(base rate).
 # ⚠️ 우리 데이터셋의 공격 비율은 수집 방식 때문에 인위적으로 부풀려진 값이다. 트랙별 실측
 #    (docs/03 분포 기준): payload_4class_csicnorm 96.8% · payload_4class 73.1% ·
-#    csic_binary 64.1%. (SR-BH 2020 으로 교체하면 약 42% 가 된다 — 그때 이 주석을 갱신할 것.)
+#    csic_binary 64.1% · srbh_4class 74.8%(docs/13 §2.5.3 트랙 생성 실측).
+#    SR-BH 공격 비율의 기존 전망도 실측과 크게 달랐으므로 생성된 트랙의 분포를 기준으로 삼는다.
 #    실제 웹 트래픽에서 공격은 극소수이므로, 그 비율로 환산하지 않으면 Precision 이
 #    실제보다 훨씬 좋아 보인다(base rate fallacy). 정확한 값을 알 수 없으니 두 가정을 병기한다.
 # 근거: Axelsson. *The base-rate fallacy and its implications for the difficulty of
@@ -166,6 +170,25 @@ def compute_metrics(
         result["roc_auc_ovr"] = _safe_roc_auc(y_true, y_score, n_classes)
         # PR-AUC(Average Precision, macro): 다수 음성(TN) 상황에서 ROC보다 정보량이 큰 불균형 지표.
         result["pr_auc_macro"] = _safe_pr_auc(y_true, y_score, n_classes)
+        result["pr_auc_context"] = None
+        if normal_idx is not None:
+            is_attack = (y_true != normal_idx).astype(int)
+            n_attack = int(is_attack.sum())
+            n_normal = len(y_true) - n_attack
+            score = attack_score(y_score, normal_idx)
+            # 양쪽 표본이 있어야 희귀 클래스의 탐지 성능으로 해석할 수 있다.
+            has_both = n_attack > 0 and n_normal > 0
+            result["pr_auc_context"] = {
+                "attack_prevalence": float(n_attack / len(y_true)) if len(y_true) else None,
+                "pr_auc_attack_positive": _safe_pr_auc(
+                    is_attack, np.column_stack((1.0 - score, score)), 2
+                ) if has_both else None,
+                "pr_auc_normal_positive": _safe_pr_auc(
+                    1 - is_attack, np.column_stack((score, 1.0 - score)), 2
+                ) if has_both else None,
+                "n_normal": n_normal,
+                "n_attack": n_attack,
+            }
         # 교정(ECE): 확신도 자체의 신뢰도. 캐스케이드 tau 게이트의 전제(docs/13 §1.2).
         result["calibration"] = calibration_metrics(y_true, y_score)
         # 운영 지점(TPR@FPR, pAUC): "공격 vs 정상" 이진 접기 위에서만 정의된다.
@@ -302,7 +325,10 @@ def calibration_metrics(y_true: np.ndarray, y_score: np.ndarray,
         나눠 |구간 정확도 - 구간 평균확신도| 를 표본 수로 가중 평균한 것이 ECE.
         MCE 는 그 최대값(최악 구간) — 평균이 가려버리는 국소 실패를 드러낸다.
 
-    반환: {ece, mce, n_bins, bins[{lo,hi,count,avg_confidence,accuracy,gap}]}
+    Brier 는 합산 판본(범위 0~2): mean(sum_k (p_ik - y_ik)^2) 이다.
+    클래스 수 K 로 나누는 판본과 다르며, 구간 선택 없이 확률 벡터 전체를 평가한다.
+
+    반환: {ece, mce, brier, n_bins, bins[{lo,hi,count,avg_confidence,accuracy,gap}]}
     """
     y_true = np.asarray(y_true)
     y_score = np.asarray(y_score, dtype=float)
@@ -330,7 +356,107 @@ def calibration_metrics(y_true: np.ndarray, y_score: np.ndarray,
         bins.append({"lo": float(lo), "hi": float(hi), "count": count,
                      "avg_confidence": avg_conf, "accuracy": acc, "gap": float(gap)})
 
-    return {"ece": float(ece), "mce": float(mce), "n_bins": n_bins, "bins": bins}
+    one_hot = (np.arange(y_score.shape[1])[None, :] == y_true[:, None]).astype(float)
+    brier = float(np.mean(np.sum((y_score - one_hot) ** 2, axis=1))) if n_total else None
+    return {"ece": float(ece), "mce": float(mce), "brier": brier,
+            "n_bins": n_bins, "bins": bins}
+
+
+def fe_score(f1: float, latency_ms: float, reference_latency_ms: float,
+             alpha: float = 0.98) -> float | None:
+    """F1 과 속도 점수를 결합한다: FE = α·F1 + (1−α)·l (Tasdemir Eq.5).
+
+    원문의 '정규화 추론시간'을 문자 그대로 읽으면 느릴수록 FE 가 커지는 모호함이 있다.
+    Fig.2 는 α 를 1.00 → 0.98 로 낮추면 느린 transformer 순위가 내려간다고 설명한다.
+    이에 정합하도록 l 을 '빠를수록 1 에 가까운 속도 점수'로 해석하고,
+    l = reference_latency_ms / latency_ms 를 채택한다. 원문 l ∈ (0,1] 에서
+    0 이 배제된 것도 나눗셈 형태를 시사한다. reference 는 비교 대상 중 최소 지연이다.
+    reference 보다 빠르면 원문 정의역 (0,1] 을 지켜 비교가 깨지지 않도록 1 로 clip 한다.
+    비양수·비유한 지연은 None, 정의역 밖 F1·α 는 ValueError 로 보고한다.
+    """
+    if not np.isfinite(f1) or not 0 <= f1 <= 1:
+        raise ValueError("F1 은 0~1 사이의 유한한 값이어야 합니다.")
+    if not np.isfinite(alpha) or not 0 <= alpha <= 1:
+        raise ValueError("alpha 는 0~1 사이의 유한한 값이어야 합니다.")
+    if (not np.isfinite(latency_ms) or not np.isfinite(reference_latency_ms)
+            or latency_ms <= 0 or reference_latency_ms <= 0):
+        return None
+    speed_score = min(1.0, reference_latency_ms / latency_ms)
+    return float(alpha * f1 + (1.0 - alpha) * speed_score)
+
+
+def bootstrap_ci(y_true, y_pred, metric_fn, n_resamples=1000,
+                 confidence=0.95, seed=42, y_score=None) -> dict:
+    """짝지은 표본을 복원추출해 지표의 백분위수 신뢰구간을 계산한다.
+
+    metric_fn 은 (정답, 예측), 점수가 있으면 (정답, 예측, 점수)를 받는다.
+    예외·비유한 결과는 해당 재표집만 버리고 n_valid 로 유효 개수를 보고한다.
+    원본 지표가 계산 불가하면 point=None, 유효 재표집이 없으면 lo/hi=None 이다.
+    빈 입력·길이 불일치·잘못된 설정은 ValueError 로 알린다.
+    백분위수 구간은 점추정값 포함을 항상 보장하지 않으므로 임의로 확장하지 않는다.
+    """
+    y_true, y_pred = np.asarray(y_true), np.asarray(y_pred)
+    if y_true.ndim != 1 or y_pred.ndim != 1 or not len(y_true) or len(y_true) != len(y_pred):
+        raise ValueError("정답과 예측은 길이가 같은 비어 있지 않은 1차원 배열이어야 합니다.")
+    if not isinstance(n_resamples, (int, np.integer)) or n_resamples <= 0:
+        raise ValueError("n_resamples 는 양의 정수여야 합니다.")
+    if not 0 < confidence < 1:
+        raise ValueError("confidence 는 0 과 1 사이여야 합니다.")
+    if seed is None:
+        raise ValueError("재현성을 위해 seed 를 지정해야 합니다.")
+    if y_score is not None:
+        y_score = np.asarray(y_score)
+        if y_score.ndim == 0 or len(y_score) != len(y_true):
+            raise ValueError("점수의 표본 수는 정답과 같아야 합니다.")
+
+    def evaluate(indices):
+        # 사용자 지표의 한 클래스 누락 등 실패가 나머지 재표집을 중단하지 않게 한다.
+        try:
+            args = (y_true[indices], y_pred[indices])
+            if y_score is not None:
+                args += (y_score[indices],)
+            return _finite_or_none(metric_fn(*args))
+        except Exception:
+            return None
+
+    point = evaluate(np.arange(len(y_true)))
+    rng = np.random.default_rng(seed)
+    values = []
+    for _ in range(n_resamples):
+        value = evaluate(rng.integers(0, len(y_true), size=len(y_true)))
+        if value is not None:
+            values.append(value)
+    tail = (1.0 - confidence) / 2.0
+    lo, hi = np.quantile(values, [tail, 1.0 - tail]) if values else (None, None)
+    return {"point": point, "lo": _finite_or_none(lo), "hi": _finite_or_none(hi),
+            "n_resamples": int(n_resamples), "confidence": float(confidence),
+            "n_valid": len(values)}
+
+
+def wilson_ci(successes: int, n: int, confidence: float = 0.95) -> dict:
+    """단일 비율의 Wilson score 구간을 반환한다(빈 표본은 point/lo/hi=None).
+
+    작은 표본과 경계 비율에서도 구간 폭을 유지하기 위해 Wald 대신 Wilson 을 쓴다.
+    잘못된 도수나 신뢰수준은 ValueError 로 보고한다.
+    """
+    if (not isinstance(n, (int, np.integer)) or not isinstance(successes, (int, np.integer))
+            or n < 0 or not 0 <= successes <= n):
+        raise ValueError("도수는 0 <= successes <= n 을 만족하는 정수여야 합니다.")
+    if not 0 < confidence < 1:
+        raise ValueError("confidence 는 0 과 1 사이여야 합니다.")
+    result = {"point": None, "lo": None, "hi": None,
+              "n": int(n), "confidence": float(confidence)}
+    if n == 0:
+        return result
+    point = successes / n
+    z = NormalDist().inv_cdf(0.5 + confidence / 2.0)
+    denominator = 1.0 + z * z / n
+    center = (point + z * z / (2.0 * n)) / denominator
+    margin = z * np.sqrt(point * (1.0 - point) / n + z * z / (4.0 * n * n)) / denominator
+    # 경계 도수에서는 부동소수점 상쇄 오차 대신 정확한 끝점을 보존한다.
+    result.update(point=float(point), lo=0.0 if successes == 0 else float(max(0.0, center - margin)),
+                  hi=1.0 if successes == n else float(min(1.0, center + margin)))
+    return result
 
 
 def alert_load(tpr: float | None, fpr: float | None,
@@ -517,6 +643,9 @@ def _safe_roc_auc(y_true: np.ndarray, y_score: np.ndarray, n_classes: int) -> fl
 
 def _safe_pr_auc(y_true: np.ndarray, y_score: np.ndarray, n_classes: int) -> float | None:
     """PR-AUC(Average Precision, OvR macro)를 계산하되 불가 시 None.
+
+    ⚠️ 유병률 의존 — `pr_auc_context` 를 함께 보고할 것
+    (Davis & Goadrich ICML 2006 / Saito & Rehmsmeier PLOS ONE 2015).
 
     불균형 보안 데이터에서 ROC-AUC 보완 지표(docs/07 리서치 근거). 이진은 양성 열만,
     다중 클래스는 각 클래스를 one-vs-rest 로 이진화해 macro 평균한다.
