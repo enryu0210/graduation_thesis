@@ -36,7 +36,7 @@
 ## 2. 검증 명령 (전문 그대로 복사해 쓸 것)
 
 ```bash
-# 필수 — 모든 코드 변경 후. 2026-08-25 기준 168 passed, 약 5초. GPU 불필요.
+# 필수 — 모든 코드 변경 후. 2026-09-15 기준 345 passed, 약 20초. GPU 불필요.
 PYTHONIOENCODING=utf-8 python -m pytest tests/ -q
 ```
 
@@ -47,7 +47,7 @@ PYTHONIOENCODING=utf-8 python -m pytest tests/test_cascade.py -q
 
 - **`PYTHONIOENCODING=utf-8` 를 빼지 말 것.** Windows 한글 콘솔(cp949)에서 파이썬의
   비-ASCII 출력이 `UnicodeEncodeError` 로 죽는다. 코드 문제가 아니라 콘솔 문제다.
-- 테스트가 **168개보다 줄었으면** 뭔가 수집되지 않은 것이다. 통과 개수를 RESULT 에 적어라.
+- 테스트가 **345개보다 줄었으면** 뭔가 수집되지 않은 것이다. 통과 개수를 RESULT 에 적어라.
 - 기존에 실패하던 테스트는 없다. 실패가 보이면 **네 변경 때문**이라고 가정하고 조사할 것
   ("원래 깨져 있던 것" 으로 넘기지 말 것).
 
@@ -152,6 +152,10 @@ git check-ignore -v <경로>
 **CV 로 설계를 고를 때** `cross_validate.py --exclude-test`(tag `_sealed`)를 쓰고, 비교는
 `cv_compare.py --pattern "<해당 결과 glob>" --fig-name <새 이름>` — 기본값은 모든 `cv_*.json` 을 모아 지문 불일치로 멈추고
 추적 그림을 덮어쓴다.
+⚠️ `cv_compare.py` 의 Holm 보정은 **패턴에 걸린 설정 전부의 쌍**에 걸린다. 사전 고정 절차가 일부 쌍(예: E2 의 F1~F4 6쌍, UC 제외)만
+보정 모집단으로 정했으면 도구 출력이 아니라 그 쌍만으로 재계산해 판정한다.
+⚠️ `srbh_4class --fields` CV 는 Normal 출처 층 CSV(`data/processed/srbh_4class_normal_strata.csv`)가 **없으면 학습 전에 멈춘다**
+(층별 FPR `fpr_by_stratum_pooled`·입력 충돌 수 `input_conflicts` 를 산출에 싣기 때문). 먼저 `srbh_normal_strata.py` 를 돌릴 것.
 
 ---
 
