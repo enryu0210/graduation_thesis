@@ -85,6 +85,35 @@ def save_fold_probabilities(path: Path, classes, y, fold_probabilities) -> None:
     np.savez_compressed(path, **arrays)
 
 
+def embeddings_tag(tag, enabled):
+    """기존 확률을 보존하도록 표현을 저장하는 실행만 별도 이름을 쓴다."""
+    return tag + "_emb" if enabled else tag
+
+
+def save_fold_embeddings(path, classes, y, fold_probabilities):
+    """풀 인덱스와 표현의 대응을 확인해 라우터의 행 순서 오류를 막는다."""
+    labels = np.asarray(y, dtype=np.int64)
+    arrays = {"classes": np.asarray(classes, dtype=str), "y": labels,
+              "label_fingerprint": np.asarray(label_fingerprint(labels))}
+    for k, fold in enumerate(fold_probabilities, 1):
+        for split in ("val", "test"):
+            indices = np.asarray(fold[f"{split}_idx"])
+            emb = np.asarray(fold[f"{split}_emb"], dtype=np.float32)
+            if (indices.ndim != 1 or not len(indices)
+                    or not np.issubdtype(indices.dtype, np.integer)
+                    or (indices < 0).any() or (indices >= len(labels)).any()
+                    or len(np.unique(indices)) != len(indices)
+                    or emb.shape != (len(indices), 128) or not np.isfinite(emb).all()):
+                raise ValueError(f"fold {k} {split} 인덱스와 표현이 잘못되었습니다.")
+            arrays[f"{split}_idx_{k}"] = indices.astype(np.int64)
+            arrays[f"{split}_emb_{k}"] = emb
+        if np.intersect1d(fold["val_idx"], fold["test_idx"]).size:
+            raise ValueError(f"fold {k} val과 test가 겹칩니다.")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("xb") as saved:
+        np.savez_compressed(saved, **arrays)
+
+
 def load_image_pool(track: str, text: str, side: int, channels: str,
                     encoders: tuple[str, ...] | None, *,
                     fields: str | None = None, exclude_test: bool = False):
@@ -348,8 +377,17 @@ def run_fold_torch(model_name: str, pool_x, y, classes, tr_idx, va_idx, te_idx,
     if args.save_probs:
         # fit이 복원한 best 가중치로만 평가하며 test 확률은 기존 추론값을 재사용한다.
         _, _, val_score = T.evaluate(model, val_loader, device)
-        fold_probabilities.append({"val_idx": va_idx, "val_probs": val_score,
-                                   "test_idx": te_idx, "test_probs": y_score})
+        fold = {"val_idx": va_idx, "val_probs": val_score,
+                "test_idx": te_idx, "test_probs": y_score}
+        if getattr(args, "save_embeddings", False):
+            from src.eval.extract_embeddings import extract_loader_embeddings
+            # 두 loader 모두 shuffle=False이므로 확률과 같은 행 순서가 유지된다.
+            for split, loader in (("val", val_loader), ("test", test_loader)):
+                emb, probs = extract_loader_embeddings(model, loader, device)
+                if not np.allclose(probs, fold[f"{split}_probs"], atol=1e-5, rtol=0):
+                    raise ValueError(f"{split} 표현과 확률의 대응이 다릅니다.")
+                fold[f"{split}_emb"] = emb
+        fold_probabilities.append(fold)
 
     # fold 마다 GPU 메모리를 반납하지 않으면 5폴드 누적으로 OOM 이 난다.
     del model, train_ds, val_ds, test_ds, train_loader, val_loader, test_loader
@@ -412,6 +450,7 @@ def main() -> None:
     parser.add_argument("--exclude-test", action="store_true", help="test를 읽지 않고 train+val만 사용")
     parser.add_argument("--fields", choices=list(FIELD_COMBINATIONS), default=None)
     parser.add_argument("--save-probs", action="store_true", help="torch 모델의 fold별 val/test 확률 저장")
+    parser.add_argument("--save-embeddings", action="store_true", help="CNN GAP 표현을 확률과 함께 저장")
     parser.add_argument("--side", type=int, default=48)
     parser.add_argument("--channels", default="gray", choices=["gray", "rgb"])
     parser.add_argument("--rgb-encoders", default="raw_byte,char_class,local_entropy")
@@ -427,6 +466,8 @@ def main() -> None:
     parser.add_argument("--patience", type=int, default=5)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+    if args.save_embeddings and (not args.save_probs or args.model != "cnn"):
+        parser.error("--save-embeddings는 --model cnn --save-probs와 함께 사용해야 합니다.")
     if args.save_probs and args.model in TFIDF_MODELS:
         parser.error("--save-probs는 torch 모델에서만 허용됩니다.")
     if args.fields is not None and (args.track != "srbh_4class" or args.text != "raw"):
@@ -437,6 +478,22 @@ def main() -> None:
     encoders = tuple(name.strip() for name in args.rgb_encoders.split(","))
     is_image = args.model in IMAGE_MODELS
     is_tfidf = args.model in TFIDF_MODELS
+
+    # 기존 tag 규칙은 그대로 쓰되 긴 학습 전에 새 산출물의 충돌을 확인한다.
+    from tagging import build_tag
+    tag = build_tag(
+        args.track, args.model, args.text,
+        channels=args.channels if is_image else "gray",
+        encoders=encoders if is_image else None,
+        patch=args.patch if args.model == "vit" else None,
+        lr=args.lr, fields=args.fields, sealed_test=args.exclude_test,
+    )
+    tag = embeddings_tag(tag, args.save_embeddings)
+    if args.save_embeddings:
+        targets = [RESULTS_DIR / f"{prefix}_{tag}.{ext}"
+                   for prefix, ext in (("cv", "json"), ("cvprobs", "npz"), ("cvemb", "npz"))]
+        if any(path.exists() for path in targets):
+            parser.error("표현 저장 실행의 산출물이 이미 있습니다. 덮어쓰지 않습니다.")
 
     print(f"=== 5-fold CV: model={args.model} track={args.track} "
           f"channels={args.channels if is_image else '-'} ===")
@@ -536,15 +593,6 @@ def main() -> None:
     # ⚠️ Phase 11 방어 arm 의 CV 는 아직 미지원이다 — cross_validate 는 npz 풀에서 fold 를
     #    나누는데, 증강은 원문 텍스트가 필요해 풀 구성 자체가 달라진다(docs/10 §7.4, §10).
     #    지원 전까지는 방어 arm 판정을 단일 split 효과 크기로만 한다(docs/10 §6).
-    from tagging import build_tag
-    tag = build_tag(
-        args.track, args.model, args.text,
-        channels=args.channels if is_image else "gray",
-        encoders=encoders if is_image else None,
-        patch=args.patch if args.model == "vit" else None,
-        lr=args.lr, fields=args.fields, sealed_test=args.exclude_test,
-    )
-
     payload = {
         "model": args.model,
         "tag": tag,
@@ -573,6 +621,9 @@ def main() -> None:
     if args.save_probs:
         save_fold_probabilities(RESULTS_DIR / f"cvprobs_{tag}.npz", classes, y,
                                 fold_probabilities)
+
+    if args.save_embeddings:
+        save_fold_embeddings(RESULTS_DIR / f"cvemb_{tag}.npz", classes, y, fold_probabilities)
 
     print(f"\n=== {tag} 완료 → {out.name} ===")
     for key, s in summary.items():

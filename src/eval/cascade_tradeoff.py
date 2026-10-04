@@ -170,8 +170,11 @@ def measure_devices(net1, net2, x_img, x_seq, devices, batches, seed, op, reweig
 
 def result_tag(args, encoders):
     """체크포인트 축과 표본·측정 축을 모두 반영하여 다른 실행의 덮어쓰기를 막는다."""
-    base = cascade.checkpoint_tag(args.track, "cnn", args.text, args.balance,
+    stage1_balance = args.balance and not getattr(args, "stage1_no_balance", False)
+    base = cascade.checkpoint_tag(args.track, "cnn", args.text, stage1_balance,
                                   args.channels, encoders)
+    if stage1_balance != args.balance:
+        base += "_s2bal"
     limit = "all" if args.limit is None else str(args.limit)
     return (f"{base}_len{args.max_len}_n{limit}_s{args.seed}"
             f"_d{'-'.join(args.devices)}_b{'-'.join(map(str, args.batches))}")
@@ -205,6 +208,7 @@ def parse_args():
     parser.add_argument("--rgb-encoders", default="raw_byte,char_class,local_entropy")
     parser.add_argument("--text", choices=("raw",), default="raw")
     parser.add_argument("--balance", action="store_true", help="균형 학습 체크포인트 사용(실행 시 명시)")
+    parser.add_argument("--stage1-no-balance", action="store_true", help="1차만 class weight 비균형 체크포인트 사용")
     parser.add_argument("--max-len", type=int, default=2304)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--smoke", action="store_true")
@@ -212,6 +216,10 @@ def parse_args():
     parser.add_argument("--batches", default="1,32,128,1024")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+    if args.stage1_no_balance and not args.balance:
+        parser.error("--stage1-no-balance는 --balance와 함께 사용해야 합니다.")
+    args.stage1_balance = args.balance and not args.stage1_no_balance
+    args.stage2_balance = args.balance
     args.devices = list(dict.fromkeys(name.strip() for name in args.devices.split(",")))
     try:
         args.batches = list(dict.fromkeys(int(value) for value in args.batches.split(",")))
@@ -232,6 +240,14 @@ def main():
     args = parse_args()
     try:
         encoders = tuple(name.strip() for name in args.rgb_encoders.split(","))
+        if args.stage1_no_balance and not args.smoke:
+            # 새 설정의 결과만 보호해 기존 CLI의 저장 동작은 유지한다.
+            tag = result_tag(args, encoders)
+            targets = [PROJECT_ROOT / f"experiments/results/tradeoff_{tag}.json",
+                       PROJECT_ROOT / f"experiments/results/tradeoff_probs_{tag}.npz",
+                       PROJECT_ROOT / f"docs/figures/cascade/tradeoff_budget_{tag}.png"]
+            if any(path.exists() for path in targets):
+                raise FileExistsError("새 측정 산출물이 이미 있습니다. 덮어쓰지 않습니다.")
         device = torch.device("cuda" if "cuda" in args.devices and torch.cuda.is_available() else "cpu")
         print(f"입력 준비 및 기존 체크포인트 추론: {device}", flush=True)
         x_img_val, x_seq_val, y_val, classes = cascade.build_inputs(
@@ -242,7 +258,7 @@ def main():
         if classes != list(test_classes) or not len(y_val) or not len(y_test) or "Normal" not in classes:
             raise ValueError("분할별 클래스가 다르거나 빈 입력 또는 Normal 클래스가 없습니다.")
         strata, strata_reason = load_strata(args.track, args.limit, y_test, classes)
-        net1 = cascade.load_net("cnn", len(classes), args.track, args.text, args.balance,
+        net1 = cascade.load_net("cnn", len(classes), args.track, args.text, args.stage1_balance,
                                 device, args.channels, 3 if args.channels == "rgb" else 1, encoders)
         net2 = cascade.load_net("charcnn", len(classes), args.track, args.text, args.balance, device)
         p1_val = cascade.predict_probs(net1, x_img_val, device, 512).astype(np.float32)
