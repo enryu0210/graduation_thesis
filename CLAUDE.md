@@ -20,6 +20,8 @@
   - 비용 기반 공격(F7) → "새 공격면 **발견**" ❌ / "DeepSloth(ICLR'21) slowdown 공격의 **problem-space 도메인 이전**" ✅
   - 표현 불일치(M1) → "새 발상" ❌ / "Feature Squeezing(NDSS'18) 대비 **추가 비용 정확히 0**" ✅
   - 속도 배수는 **2차 기준 모델을 명시**해 병기(우리 5.07배 vs Tasdemir 20배는 기준이 BERT라 직접 비교 불가).
+  - ⚠️ **C1 은 "조건부 이득"으로 하향됐다**(2026-10-04, docs/14 §8.3): 5.07배는 2기 트랙 값이고, SR-BH 에서는 넘김 50% 운영점 · 헤드라인(CPU·배치1) 1.22배 · 배포 공격 비율에서 0.99배. 5.07배를 3기 수치 없이 쓰지 말 것.
+  - 게이트 신호 교체(msp_T·margin·entropy)는 과잉 넘김을 4~5% 밖에 못 줄인다(G1, H-E5-1 기각, docs/14 §8.4) → 넘김 개선은 G2·G3·T4 로.
 - ⚠️ `docs/thetics/` 는 **.gitignore 대상**(PDF 미추적) → **수집 목록의 유일한 추적본은 `docs/12` §1**. 논문을 추가하면 docs/12 도 함께 갱신.
 
 ## 데이터 파이프라인
@@ -30,7 +32,7 @@
 - **3기 주 트랙 `srbh_4class`**(SR-BH 2020, docs/13 §2.5.3) — 재생성 순서가 고정이다:
   `download_srbh.py` → `audit_srbh_labels.py`(E1-a 목록 `data/processed/srbh_audit_flags.csv`) → `process_track('srbh_4class')` → `build_image_dataset.py --track srbh_4class --channels rgb`.
   ⚠️ 감사 CSV 없이 트랙을 만들면 에러로 멈춘다(라벨 노이즈가 조용히 섞이는 것 방지). 클래스명은 `CodeInjection`(XSS 아님 — 실데이터는 PHP 코드 주입 탐침).
-  ⚠️ 현재 트랙 `text_raw` 는 **URI+body(F2)**. 단 E2 단계2(RGB CNN CV)에서 **F3(+cookie) 채택**이 확정됐고(char-CNN 은 F2~F4 판정불가 → F2, 병기) 트랙 전환은 코드 작업 대기다(docs/13 §4.1.2).
+  ⚠️ 현재 트랙 `text_raw` 는 **URI+body(F2)**. E2 단계2(RGB CNN CV)는 F3(+cookie)가 높았지만, 쿠키 내용을 지운 F3M 과 F3 의 차이가 유의하지 않아(T0-a, Holm p 0.17) **F2 유지로 확정**(2026-10-04, docs/14 §8.2). F3 의 이득은 출처(내용 vs 존재·길이) 판정불가로 기록.
   "UA 는 지름길"은 원본 행 기준 관찰이었고 중복 제거 후엔 성립하지 않았다(정정 기록 있음). F3 는 Macro-F1 은 높지만 TPR@1%FPR 은 F2 보다 낮다(**RGB CNN 한정** — char-CNN 은 반대) → 병기.
   ⚠️ 실사용자 층 FPR 이 스캐너 층의 약 8배(char-CNN F2 2.73% vs 0.36%) — 3기 FPR 은 층 병기 없이 쓰지 말 것.
   ⚠️ `run_evasion.py` 에는 이 트랙이 **의도적으로 없다**(`mutations.py` 가 `XSS` 라벨명에 묶임).
@@ -61,7 +63,8 @@
   → "같은 학습 루프를 썼으니 공정"은 성립하지 않음. 기본값이 한쪽 아키텍처에 맞춰져 있으면 나머지가 자동으로 불리해짐.
 - 통계 검증은 `src/eval/cross_validate.py`(5-fold, train/val/test 를 풀로 합쳐 재분할). fold 배정이 (라벨, seed)에만 의존 → 설정 간 paired 비교 성립, `label_fingerprint` 로 정렬 검증.
   - **설계 선택(입력 필드·하이퍼파라미터 고르기)용 CV 는 `--exclude-test`**(train+val 만, tag `_sealed`). 기본 동작은 test 까지 합치므로 선택에 쓰면 이후 본 측정이 누수된다.
-  - `srbh_4class` 는 `--fields F1|F2|F3|F4|UC`(tag `_fF3` 등, F2=기본 입력이라 접미사 없음)로 입력 필드 조합을 바꾼다. 이미지는 npz 대신 메모리 변환(실행당 ~77초, npz 와 픽셀 동일 확인).
+  - `srbh_4class` 는 `--fields F1|F2|F3|F3M|F4|UC`(tag `_fF3` 등, F2=기본 입력이라 접미사 없음)로 입력 필드 조합을 바꾼다. `F3M` = F3 에서 쿠키 값만 같은 길이의 `x` 로 지운 절제 입력(T0-a, docs/14 §8.2 — F3 와 유의차 없어 트랙 F2 유지).
+  - `--save-probs` 는 fold 별 내부 val·fold-test softmax 를 풀 절대 인덱스와 함께 `cvprobs_{tag}.npz` 로 남긴다(게이트 비교 G1 용, `src/eval/gate_cv.py` 가 두 파일을 정렬 검증해 읽는다). 이미지는 npz 대신 메모리 변환(실행당 ~77초, npz 와 픽셀 동일 확인).
   - ⚠️ `srbh_4class --fields` CV 는 `srbh_normal_strata.py` 산출 층 CSV 가 없으면 학습 전에 멈춘다(층별 FPR·입력 충돌 수를 싣기 때문, 새 기기에서 먼저 실행).
   - ⚠️ `cv_compare.py` 의 Holm 은 패턴에 걸린 **전 쌍**에 보정한다 → 사전 고정 절차가 일부 쌍만 정했으면(E2: F1~F4 6쌍) 그 쌍으로 재계산해 판정.
   - ⚠️ `cv_compare.py` 는 기본으로 `cv_*.json` 전부를 모아 **라벨 지문이 다르면 멈춘다** → 트랙·봉인 여부가 다른 결과가 섞이면 `--pattern "cv_srbh_4class_*_sealed.json"` 으로 거르고, `--fig-name` 으로 추적 그림 `cv_ranking_{metric}.png` 덮어쓰기를 피할 것.
@@ -80,8 +83,10 @@
 - 장시간 작업(CV 등)은 완료 감지를 `until [ -f <산출 JSON> ]; do sleep 20; done` 로 걸 것(래퍼 종료와 무관하게 동작).
 - ⚠️ Bash 도구에서 `git show <ref>:<path>` 는 `:` 가 `;` 로 변환돼 실패 → `git diff <a> <b> -- <path>` 사용.
 - `nvidia-smi` 는 PATH 에 없음 → GPU 확인은 `torch.cuda.is_available()` 또는 PowerShell `Get-CimInstance Win32_VideoController`.
+- ⚠️ CPU 강제는 Bash 에서 `CUDA_VISIBLE_DEVICES=` 이지만 **PowerShell 에서 빈 값 대입은 변수 삭제**라 GPU 가 그대로 보인다 → PowerShell 은 `$env:CUDA_VISIBLE_DEVICES='-1'`.
 - 클래스 불균형 트랙 학습: `train.py --balance`(train 만 언더샘플링, val/test 실분포 유지).
-- 모든 모델 평가는 `src/eval/metrics.py` 로 일원화(계산 방식 차이 배제). 지표: Acc·Macro-F1·MCC·PR-AUC·ROC-AUC + attack_focused(benign-evasion/FPR). 불균형 보안 데이터 헤드라인은 MCC·PR-AUC·benign-evasion(문헌 근거 docs/07).
+- 모든 모델 평가는 `src/eval/metrics.py` 로 일원화(계산 방식 차이 배제). 지표: Acc·Macro-F1·PR-AUC·ROC-AUC·TPR@FPR + attack_focused(benign-evasion/FPR).
+  ⚠️ **MCC 는 3기에 교수 지시로 완전 제거**됐다(`metrics.py` 머리 주석, 근거·반대 근거 docs/13 §1.1). 기준 지표는 Macro-F1. 지시서에 MCC 를 요구하면 Codex 가 `KeyError` 로 멈춘다(2026-10-04 실제 발생). 아래 2기 서술의 MCC 수치는 기록으로만 읽을 것.
 
 ## 모델 용어 (2026-08-02 변경 — 혼동 사고 후 확정)
 - **제안 모델 = 캐스케이드**(1차 RGB CNN + 2차 char-CNN). 논문이 주장하는 대상은 이것.
