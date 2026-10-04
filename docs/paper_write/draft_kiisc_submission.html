@@ -78,6 +78,9 @@
   ol.refs li { margin-bottom: 2pt; }
   ul.contrib { margin: 2pt 0 2pt 0; padding-left: 12pt; }
   ul.contrib li { margin-bottom: 1pt; }
+  .pair { display: flex; gap: 4mm; }
+  .pair > div { flex: 1; }
+  .body p.sub { text-align: center; font-family: "Malgun Gothic", sans-serif; font-size: 8pt; text-indent: 0; margin: 1pt 0 0; }
 </style>
 </head>
 <body>
@@ -88,12 +91,12 @@
 
   <div class="abstract-block">
     <h2>요 약</h2>
-    <p>웹 요청을 48×48 바이트 이미지로 바꾸어 얕은 CNN 으로 분류하는 방식은 문자 수준 CNN 보다 정확도가 유의하게 낮았다. 본 논문은 이 음성 결과에서 출발하여, 값싼 이미지 CNN 이 모든 요청을 먼저 보고 확신도가 낮은 요청만 문자 수준 CNN 으로 넘기는 표현 이질적 캐스케이드를 다룬다. 공개 페이로드 모음 기반의 이전 데이터셋에서 이 구조는 요청의 8%만 넘기고 2차 모델 대비 5.07배 낮은 지연을 보였다. 그러나 실트래픽 기반 SR-BH 2020 에서 다시 측정하자 2차 모델 수준의 Macro-F1(0.981)에 이르려면 요청의 50%를 넘겨야 했고, 요청을 하나씩 처리하는 CPU 조건에서 속도 이득은 1.22배, 배포 환경 수준의 공격 비율(3.3% 이하)에서는 0.99배로 사라졌다. 정상 요청이 공격 요청보다 더 많이 넘겨지기 때문이다. 넘김 판단도 측정하였다. 5-fold 교차검증에서 확신도 게이트는 이상적 라우터보다 평균 10.5배 많이 넘겼고, 온도 보정·마진·엔트로피로 신호를 바꾸어도 4~5%만 줄었다(Holm 보정 p=0.96). 예측 클래스마다 임계값을 따로 두자 과잉 넘김 배율이 18.7% 줄었으나, 측정 전에 정한 채택 기준(20% 이상, p&lt;0.05)에는 미달하였다(p=0.42). 다만 실용 운영점에서는 Macro-F1 손실 없이 넘김률이 24.9%에서 17.3%로 다섯 fold 모두에서 줄었고, 줄어든 넘김의 대부분이 정상 요청이어서 배포 공격 비율의 추정 속도 배수가 1.34배에서 1.75배로 올랐다(탐색적 분석). 캐스케이드의 속도 이득은 장치·배치 크기·공격 비율을 함께 밝힐 때에만 의미가 있다.</p>
+    <p>웹 요청을 48×48 바이트 이미지로 바꾸어 얕은 CNN 으로 분류하는 방식은 문자 수준 CNN 보다 정확도가 유의하게 낮았다. 본 논문은 이 음성 결과에서 출발하여, 값싼 이미지 CNN 이 모든 요청을 먼저 보고 확신도가 낮은 요청만 문자 수준 CNN 으로 넘기는 표현 이질적 캐스케이드를 실트래픽 기반 SR-BH 2020 에서 다시 평가한다. 공개 페이로드 모음 기반의 이전 데이터셋에서 이 구조는 2차 모델보다 5.07배 빨랐다. 그러나 SR-BH 에서 언더샘플링으로 학습한 1차를 쓰면 2차 수준의 Macro-F1 에 이르려고 요청의 50%를 넘겨야 했고, 요청을 하나씩 처리하는 CPU 조건의 속도 이득은 1.22배, 배포 수준의 공격 비율(3.3%)에서는 0.99배로 사라졌다. 정상 요청이 공격 요청보다 더 많이 넘겨졌기 때문이다. 1차를 전체 학습 집합과 클래스 가중치로 학습하자 넘김이 29.8%로 줄고, 같은 조건의 속도 배수가 1.63배와 1.42배로 올랐다. 넘김 판단은 개선하지 못했다. 5-fold 교차검증에서 확신도 게이트는 이상적 라우터보다 평균 10.5배 많이 넘겼고, 확신도 신호 교체(4~5%), 예측 클래스별 임계값(18.7%, p=0.42), 1차 내부 표현을 쓰는 학습형 라우터(5.9%, p=0.69) 모두 측정 전에 정한 채택 기준에 미달하였다. 또한 시험 집합의 넘김률 기준을 통과한 게이트가 정상 요청의 넘김을 늘려 배포 조건의 속도를 오히려 낮춘 사례를 보이고, 게이트를 평가할 때 정상 요청의 넘김률과 공격 비율로 재가중한 속도 배수를 함께 보고할 것을 제안한다. 1차가 강하게 확신하고 틀린 요청 110건 가운데 70.9%는 라벨 불일치로 판정되어(대조 집합 31.8%), 데이터셋 라벨 잡음이 넘김 판단 평가의 목표 자체에 섞여 있음을 보였다.</p>
   </div>
 
   <div class="abstract-block en">
     <h2>ABSTRACT</h2>
-    <p>Classifying web requests as 48×48 byte images with a shallow CNN was significantly less accurate than a character-level CNN. Starting from this negative result, we study a representation-heterogeneous cascade in which a cheap image CNN screens every request and defers only low-confidence requests to a character-level CNN. On an earlier payload-collection dataset the cascade deferred 8% of requests and was 5.07 times faster than the second-stage model. Re-measured on the SR-BH 2020 dataset, however, the cascade had to defer 50% of requests to reach the second-stage Macro-F1 (0.981); with single-request CPU inference the speedup was 1.22×, and at deployment-like attack rates (3.3% or lower) it fell to 0.99×, because benign requests are deferred more often than attacks. In 5-fold cross-validation the confidence gate deferred 10.5 times more requests than an oracle router on average, and replacing the signal with temperature-scaled confidence, margin, or entropy reduced this by only 4–5% (Holm-adjusted p=0.96). Class-wise thresholds on the predicted class reduced the ratio by 18.7%, short of the pre-registered acceptance criterion (≥20% and p&lt;0.05; p=0.42). In an exploratory analysis at a practical operating point, however, they lowered the deferral rate from 24.9% to 17.3% in all five folds without loss of Macro-F1, mostly by deferring fewer benign requests, which raised the estimated speedup at a 3.3% attack rate from 1.34× to 1.75×. Cascade speedups are meaningful only when device, batch size, and attack rate are reported together.</p>
+    <p>Classifying web requests as 48×48 byte images with a shallow CNN was significantly less accurate than a character-level CNN. Starting from this negative result, we re-evaluate on the SR-BH 2020 dataset a representation-heterogeneous cascade in which a cheap image CNN screens every request and defers only low-confidence requests to a character-level CNN. On an earlier payload-collection dataset the cascade was 5.07 times faster than the second-stage model. On SR-BH, with a first stage trained on an undersampled set, the cascade had to defer 50% of requests to reach the second-stage Macro-F1; the speedup was 1.22× for single-request CPU inference and vanished (0.99×) at a deployment-like attack rate of 3.3%, because benign requests were deferred more often than attacks. Training the first stage on the full training set with class weights reduced deferral to 29.8% and raised the speedups to 1.63× and 1.42×. The deferral decision itself could not be improved. In 5-fold cross-validation the confidence gate deferred 10.5 times more requests than an oracle router, and replacing the confidence signal (4–5%), class-wise thresholds (18.7%, p=0.42), and a learned router using the first stage's internal representation (5.9%, p=0.69) all failed pre-registered acceptance criteria. We further show gates that passed a test-prevalence deferral criterion yet slowed the cascade at deployment attack rates by deferring more benign requests, and recommend reporting benign deferral rates and prevalence-reweighted speedups when evaluating gates. Finally, 70.9% of 110 confidently misclassified requests were judged to be mislabeled (31.8% in a control set), indicating that label noise contaminates the target against which deferral is evaluated.</p>
     <p class="keywords"><b>Keywords:</b> Web attack detection, Cascade inference, Learning to defer, Byte image, Inference latency</p>
   </div>
 </header>
@@ -108,11 +111,11 @@
 <p>본 논문은 실트래픽 기반 SR-BH 2020 데이터셋[6]에서 이 두 가지를 측정한다. 기여는 다음과 같다.</p>
 <ul class="contrib">
   <li>이미지 단독 탐지가 텍스트 모델에 진다는 음성 결과를 두 데이터셋에서 통계 검정과 함께 보고하고, 캐스케이드가 이 결과에서 파생된 설계임을 밝힌다.</li>
-  <li>캐스케이드의 속도–정확도 교환을 장치 2종 × 배치 크기 4종과 공격 비율 3종에서 다시 측정한다. 이전 데이터셋의 5.07배는 SR-BH 에서 최대 1.79배, 요청 단위 CPU 처리와 배포 공격 비율에서는 1배 아래로 떨어진다. 그 원인이 정상 요청의 과다 넘김에 있음을 보인다.</li>
-  <li>확신도 게이트가 이상적 라우터보다 몇 배 더 넘기는지(과잉 넘김 배율)를 5-fold 교차검증으로 측정하고, 확신도 신호를 바꾸는 것으로는 이 차이가 줄지 않음을 보인다.</li>
-  <li>예측 클래스마다 임계값을 따로 두는 게이트를 측정 전에 고정한 기준으로 검증한다. 과잉 넘김 감소(18.7%)는 기준에 못 미쳤지만, 실용 운영점에서는 정확도 손실 없이 정상 요청의 넘김을 줄여 배포 조건의 속도 배수를 높였다. 이 효과는 탐색적 결과로 구분해 보고한다.</li>
+  <li>캐스케이드의 속도–정확도 교환을 장치 2종 × 배치 크기 4종과 공격 비율 3종에서 다시 측정한다. 이전 데이터셋의 5.07배는 SR-BH 에서 요청 단위 CPU 처리와 배포 공격 비율일 때 1배 아래로 떨어지며, 그 원인이 정상 요청의 과다 넘김에 있음을 보인다. 이 넘김은 게이트가 아니라 1차의 학습 방식으로 줄었다(0.99배 → 1.42배).</li>
+  <li>확신도 게이트가 이상적 라우터보다 몇 배 더 넘기는지(과잉 넘김 배율)를 5-fold 교차검증으로 측정하고, 신호 교체·클래스별 임계값·1차 내부 표현을 쓰는 학습형 라우터 어느 것도 측정 전에 정한 기준으로 이 차이를 줄이지 못함을 보인다.</li>
+  <li>게이트를 시험 집합의 넘김률로만 평가하면 배포 조건의 속도를 거꾸로 판단할 수 있음을 실측으로 보이고, 정상 요청 넘김률과 공격 비율 재가중 배수를 함께 보고하는 평가 방식을 제안한다. 1차의 확신 오답에 대한 라벨 감사로 이 평가의 목표에 라벨 잡음이 섞여 있다는 증거를 덧붙인다.</li>
 </ul>
-<p>모든 판정 기준(대표 운영점 규칙, 헤드라인 측정 조건, 게이트 개선의 채택 기준)은 측정 전에 연구 기록에 고정하였다.</p>
+<p>모든 판정 기준(대표 운영점 규칙, 헤드라인 측정 조건, 1차 학습 방식과 게이트 개선의 채택 기준)은 측정 전에 연구 기록에 고정하였다. 기준에 없던 비교는 탐색적 결과로 구분해 적는다.</p>
 
 <h2>II. 관련 연구</h2>
 <h3>2.1 이미지 기반 보안 탐지</h3>
@@ -121,9 +124,9 @@
 <p>웹 공격 탐지는 대부분 요청 문자열을 직접 다룬다. Tadhani 등[5]은 CNN 과 LSTM 을 결합해 XSS 와 SQL 삽입을 탐지하였다. SR-BH 2020[6]은 실제 웹 서버에 들어온 요청에 CAPEC 기반 다중 라벨을 붙인 데이터셋으로, 공개 페이로드 모음과 달리 요청 전체(URI, 본문, 헤더)를 담는다.</p>
 <h3>2.3 캐스케이드와 넘김 판단</h3>
 <p>Wang 등[7]은 사전학습된 모델을 확신도 임계값으로 잇기만 해도 같은 정확도에서 큰 모델보다 수 배 빠르다는 것을 보였다. 웹 공격 탐지에서도 Tasdemir 등[8]은 가벼운 1차 모델과 BERT 2차 모델의 캐스케이드로 약 20배의 속도 향상을 보고하였고, 2단 구성의 WAF 탐지기[9]와 실시간 제로데이 탐지 캐스케이드[10]도 제안되었다. 이들 수치는 2차 모델과 측정 조건이 서로 달라 직접 비교할 수 없다.</p>
-<p>넘김 규칙은 일반 기계학습에서 별도로 연구되었다. 최대 소프트맥스 확률(maximum softmax probability, MSP)은 오분류 탐지의 기준선이다[12]. 선택적 분류는 1차 모델의 기각을 위험–커버리지 교환으로 다루고[13], 넘김 학습(learning to defer)은 뒤의 결정자를 고려해 넘길 대상을 학습한다[14][15]. Kag 등[16]은 엣지 모델과 라우터를 함께 학습해 서버 모델이 맞힐 어려운 예제만 보냈다. Jitkrittum 등[11]은 최적 넘김 규칙이 두 모델의 정답 확률 차이에 달려 있으므로 1차 확신도만 보는 규칙은 2차의 정오를 알 수 없고, 2차가 일부 입력에만 강하거나 라벨에 잡음이 있을 때 실패한다는 것을 보였다. Enomoto 와 Eda[17]는 일반적인 확률 보정이 캐스케이드에서는 오히려 해로울 수 있음을 보고하였다. 조기 종료 신경망[18]은 한 모델 안에서 같은 발상을 쓴다.</p>
+<p>넘김 규칙은 일반 기계학습에서 별도로 연구되었다. 최대 소프트맥스 확률(maximum softmax probability, MSP)은 오분류 탐지의 기준선이다[12]. 선택적 분류는 1차 모델의 기각을 위험–커버리지 교환으로 다루고[13], 넘김 학습(learning to defer)은 뒤의 결정자를 고려해 넘길 대상을 학습한다[14][15]. Kag 등[16]은 엣지 모델과 라우터를 함께 학습해 서버 모델이 맞힐 어려운 예제만 보냈다. Jitkrittum 등[11]은 최적 넘김 규칙이 두 모델의 정답 확률 차이에 달려 있으므로 1차 확신도만 보는 규칙은 2차의 정오를 알 수 없고, 2차가 일부 입력에만 강하거나 라벨에 잡음이 있을 때 실패한다는 것을 보였다. 본 연구의 학습형 라우터는 이 분석이 권하는 대로 “1차는 틀리고 2차는 맞는가”를 직접 예측한다. Enomoto 와 Eda[17]는 일반적인 확률 보정이 캐스케이드에서는 오히려 해로울 수 있음을 보고하였다. 조기 종료 신경망[18]은 한 모델 안에서 같은 발상을 쓴다.</p>
 <h3>2.4 지연과 측정 조건</h3>
-<p>Hong 등[19]은 입력을 조작해 조기 종료를 막는 지연 유발 공격을 보였다. 캐스케이드의 비용이 입력에 따라 달라진다는 점에서 본 연구의 넘김률 분석과 맞닿는다. 추론 성능은 질의를 하나씩 처리하는지, 묶어서 처리하는지에 따라 크게 달라지므로, MLPerf Inference[20]는 시나리오별로 따로 측정한다. 침입 탐지에서는 공격의 기저 비율이 낮을수록 오경보가 지배적이 된다는 기저율 문제[21]가 오래전에 지적되었다. 본 연구는 이 문제를 캐스케이드 지연에 적용한다.</p>
+<p>Hong 등[19]은 입력을 조작해 조기 종료를 막는 지연 유발 공격을 보였다. 캐스케이드의 비용이 입력에 따라 달라진다는 점에서 본 연구의 넘김률 분석과 맞닿는다. 추론 성능은 질의를 하나씩 처리하는지, 묶어서 처리하는지에 따라 크게 달라지므로, MLPerf Inference[20]는 시나리오별로 따로 측정한다. 침입 탐지에서는 공격의 기저 비율이 낮을수록 오경보가 지배적이 된다는 기저율 문제[21]가 오래전에 지적되었다. 본 연구는 이 문제를 캐스케이드 지연과 게이트 평가에 적용한다.</p>
 
 <h2>III. 방법</h2>
 <h3>3.1 요청의 이미지 변환</h3>
@@ -134,30 +137,38 @@
   <img src="../figures/imaging/srbh_4class_samples_text_raw_48_rgb.png" alt="Sample byte images of SR-BH requests by class">
   <figcaption>Fig. 1. Byte images of SR-BH 2020 requests (URI and body, 48×48, RGB). Most requests fill only the top one to three rows.</figcaption>
 </figure>
-<h3>3.2 1차·2차 모델</h3>
+<h3>3.2 1차·2차 모델과 1차 학습 방식</h3>
 <p>1차 RGB CNN 은 합성곱 3단(32·64·128 채널, 배치 정규화, ReLU, 최대 풀링)과 전역 평균 풀링, 완전연결층으로 이루어지며 파라미터는 93,988개이다. 2차 char-CNN 은 같은 바이트열을 1차원 문자 시퀀스로 받는 합성곱 분류기이다. 두 모델은 각각 따로 학습하며, 캐스케이드는 학습된 두 모델을 추가 학습 없이 잇는다. 따라서 캐스케이드가 줄이는 것은 추론 비용뿐이고 학습 비용은 두 모델의 합이다. ViT 계열 1차와 조기 종료 1차도 시험했으나 채택하지 않았다(전자는 정확도 차이가 유의하지 않았고, 후자는 GPU 에서 연산을 18% 줄여도 시간이 6% 늘었다).</p>
+<p>SR-BH 는 클래스가 크게 불균형하다(Table 1). 1차는 두 방식으로 학습해 비교한다. (가) 언더샘플링: 학습 집합의 각 클래스를 가장 작은 클래스(CmdI, 3,886행)에 맞춰 무작위로 줄여 15,544행으로 학습한다. (나) 클래스 가중치: 학습 집합 186,157행을 모두 쓰고 손실에 클래스 빈도의 역수에 비례하는 가중치를 준다. 2차 char-CNN 은 두 경우 모두 (가)로 학습한 같은 모델을 써서 1차의 효과만 분리한다.</p>
 <h3>3.3 캐스케이드와 확신도 게이트</h3>
 <p>1차 모델의 클래스 확률을 <i>p</i><sub>1</sub>(<i>k</i>|<i>x</i>), 확신도를 <i>s</i>(<i>x</i>) = max<sub><i>k</i></sub> <i>p</i><sub>1</sub>(<i>k</i>|<i>x</i>) 라 할 때 캐스케이드의 예측은 다음과 같다.</p>
 <div class="eq"><span>ŷ(x) = h₁(x) if s(x) ≥ τ, otherwise h₂(x)</span><span>(2)</span></div>
-<p>임계값 τ 는 검증 집합에서 넘김 예산 <i>b</i>(넘길 요청의 비율)에 해당하는 확신도 분위수로 정하고, 시험 집합에는 한 번만 적용한다. τ→0 이면 RGB CNN 단독, τ→1 이면 char-CNN 단독과 같다.</p>
+<p>임계값 τ 는 검증 집합에서 넘김 예산 <i>b</i>(넘길 요청의 비율)에 해당하는 확신도 분위수로 정하고, 시험 집합에는 한 번만 적용한다. τ→0 이면 RGB CNN 단독, τ→1 이면 char-CNN 단독과 같다. 이 단일 임계값 게이트를 B0 라 부른다.</p>
 <h3>3.4 과잉 넘김 배율</h3>
 <p>이상적 라우터(오라클)는 1차가 틀리는 요청만 넘긴다. 그 넘김률을 <i>e</i><sub>o</sub>, 게이트가 2차 단독 Macro-F1 에 도달하는 데 필요한 최소 넘김률을 <i>e</i><sub>g</sub> 라 하면 과잉 넘김 배율은 다음과 같다.</p>
 <div class="eq"><span>ρ = e_g / e_o</span><span>(3)</span></div>
 <p>ρ=1 이면 게이트가 오라클만큼 효율적이고, ρ 가 클수록 1차가 맞힌 요청을 불필요하게 넘긴다.</p>
 <h3>3.5 지연과 공격 비율</h3>
-<p>요청 하나의 1차·2차 지연을 <i>t</i><sub>1</sub>, <i>t</i><sub>2</sub>, 넘김률을 <i>r</i> 이라 하면 캐스케이드의 기대 지연과 char-CNN 단독 대비 속도 배수 <i>S</i> 는 다음과 같다.</p>
+<p>요청 하나의 1차·2차 지연을 <i>t</i><sub>1</sub>, <i>t</i><sub>2</sub>, 넘김률을 <i>r</i> 이라 하면 캐스케이드의 기대 지연과 char-CNN 단독 대비 속도 배수 <i>S</i> 는 다음과 같다. 학습형 라우터를 쓰면 그 지연 <i>t</i><sub>g</sub> 를 <i>t</i><sub>1</sub> 에 더한다.</p>
 <div class="eq"><span>t = t₁ + r · t₂,&nbsp;&nbsp; S = t₂ / t</span><span>(4)</span></div>
 <p>넘김률은 정상 요청(<i>r</i><sub>N</sub>)과 공격 요청(<i>r</i><sub>A</sub>)에서 다르다. 공격 비율이 π 인 환경의 넘김률은 다음과 같이 다시 가중한다.</p>
 <div class="eq"><span>r(π) = π · r_A + (1 − π) · r_N</span><span>(5)</span></div>
-<p>배포 환경의 공격 비율은 시험 집합(74.8%)보다 훨씬 낮으므로, π ∈ {74.8%, 3.3%, 0.1%} 에서 <i>S</i> 를 함께 보고한다.</p>
+<p>배포 환경의 공격 비율은 시험 집합(74.8%)보다 훨씬 낮으므로, π ∈ {74.8%, 3.3%, 0.1%} 에서 <i>S</i> 를 함께 보고한다. π 가 작으면 <i>r</i>(π) 는 <i>r</i><sub>N</sub> 에 수렴한다.</p>
 <h3>3.6 예측 클래스별 임계값</h3>
-<p>단일 τ 는 클래스마다 다른 확신도 분포를 하나의 기준으로 자른다. 예측 클래스 <i>c</i> 마다 임계값 τ<sub><i>c</i></sub> 를 두어 다음과 같이 넘긴다.</p>
+<p>단일 τ 는 클래스마다 다른 확신도 분포를 하나의 기준으로 자른다. 예측 클래스 <i>c</i> 마다 임계값 τ<sub><i>c</i></sub> 를 두어 다음과 같이 넘긴다(이하 G2).</p>
 <div class="eq"><span>defer x  ⇔  s(x) &lt; τ_{ĉ₁(x)},&nbsp; ĉ₁(x) = argmax_k p₁(k|x)</span><span>(6)</span></div>
 <p>τ<sub><i>c</i></sub> 는 검증 집합에서 탐욕적으로 고른다. 넘김을 검증 행의 0.5% 단위로 늘리되, 매 단계 네 클래스 가운데 다음 0.5%를 넘겼을 때 검증 Macro-F1 이 가장 높아지는 클래스에 배정한다. 이 탐색은 4차원 전수 탐색의 근사이므로 결과는 클래스별 임계값이 낼 수 있는 효과의 하한이다.</p>
+<h3>3.7 학습형 라우터</h3>
+<p>Jitkrittum 등[11]의 분석에 따르면 넘길 가치가 있는 요청은 “1차는 틀리고 2차는 맞는” 요청이다. 이를 표적 <i>z</i>(<i>x</i>) = 1[<i>h</i><sub>1</sub>(<i>x</i>) ≠ <i>y</i> ∧ <i>h</i><sub>2</sub>(<i>x</i>) = <i>y</i>] 로 두고, 넘김 점수 <i>g</i>(<i>x</i>) = P(<i>z</i>=1|<i>φ</i>(<i>x</i>)) 를 로지스틱 회귀로 학습한다. 점수가 높은 순서로 넘기며, 임계값은 B0 와 같은 규칙으로 정한다. 특징 <i>φ</i> 는 두 가지이다.</p>
+<ul class="contrib">
+  <li>G3-lite(11차원): 1차 확률 4개, MSP, 상위 두 확률의 차, 원문 통계 5개(로그 바이트 길이, 특수문자·%·숫자의 비율, 2,304바이트 초과 여부). 원문 통계는 1차 확률에 없는 정보를 2차를 돌리지 않고 얻는다.</li>
+  <li>G3-full(139차원): G3-lite 에 1차의 전역 평균 풀링 출력(128차원)을 더한다. 1차를 이미 돌렸으므로 추가 추론이 없다.</li>
+</ul>
+<p>라우터는 검증 집합에서만 학습한다. 같은 점수로 임계값까지 고르면 과적합되므로, 검증 집합을 라벨 층화로 둘로 나누어 한쪽에서 학습한 라우터의 점수를 다른 쪽에 매기는 교차 적합을 하고, 시험 점수는 두 라우터의 평균을 쓴다. 특징 계산과 두 내적을 포함한 라우터의 요청당 CPU 지연은 G3-lite 0.018ms, G3-full 0.024ms 였다.</p>
 
 <h2>IV. 실험 환경</h2>
 <h3>4.1 데이터셋</h3>
-<p>주 데이터셋은 SR-BH 2020[6]이다. 원본 907,815행의 CAPEC 라벨을 정상(Normal), SQL 삽입(SQLi), 코드 삽입(CodeInjection), 명령 삽입(CmdI) 4클래스로 대응시키고, 자체 시그니처 감사로 라벨이 의심되는 30,280행, 같은 입력에 다른 라벨이 붙은 행, 완전 중복을 제거하여 265,939행을 얻었다. CodeInjection 은 XSS 가 아니라 서버 측 PHP 코드 삽입 탐침이 대부분이다. 입력은 URI 와 본문이다. 쿠키를 더한 입력은 RGB CNN 의 Macro-F1 을 올렸지만, 쿠키 값을 같은 길이의 무의미한 문자로 지운 입력과 차이가 유의하지 않아(Holm 보정 p=0.17) 내용이 아닌 길이·존재 효과로 판단하고 쓰지 않았다. 70/15/15 층화 분할(seed 42)이며, 학습 집합만 언더샘플링으로 균형을 맞추었다(Table 1).</p>
+<p>주 데이터셋은 SR-BH 2020[6]이다. 원본 907,815행의 CAPEC 라벨을 정상(Normal), SQL 삽입(SQLi), 코드 삽입(CodeInjection), 명령 삽입(CmdI) 4클래스로 대응시키고, 자체 시그니처 감사로 라벨이 의심되는 30,280행, 같은 입력에 다른 라벨이 붙은 행, 완전 중복을 제거하여 265,939행을 얻었다. CodeInjection 은 XSS 가 아니라 서버 측 PHP 코드 삽입 탐침이 대부분이다. 입력은 URI 와 본문이다. 쿠키를 더한 입력은 RGB CNN 의 Macro-F1 을 올렸지만, 쿠키 값을 같은 길이의 무의미한 문자로 지운 입력과 차이가 유의하지 않아(Holm 보정 p=0.17) 내용이 아닌 길이·존재 효과로 판단하고 쓰지 않았다. 70/15/15 층화 분할(seed 42)이다(Table 1).</p>
 <div class="tbl">
   <p class="cap">Table 1. SR-BH 2020 track after cleaning (rows per split)</p>
   <table>
@@ -171,57 +182,68 @@
 </div>
 <p>SR-BH 의 정상 요청은 대부분 취약점 스캐너의 탐색 요청이다. 중복 제거 후 97.8%가 스캐너 사용자 에이전트를 달고 있고, 실사용자 에이전트만 있는 정상 요청은 645개(시험 집합 95개)이다. 따라서 정상 요청 오탐률(FPR)은 스캐너 트래픽 기준의 값이며, 실사용자 층의 오탐 수를 함께 적는다. 비교를 위해 이전 실험의 데이터셋(공개 SQLi·XSS·CmdI 페이로드 모음과 CSIC 2010 정상 트래픽, 이하 이전 데이터셋)의 결과도 병기한다.</p>
 <h3>4.2 평가 절차</h3>
-<p>평가 지표는 Macro-F1, FPR 1%에서의 탐지율(TPR@1%FPR), 정상 요청 FPR 이다. 게이트 비교(V장 5.4·5.5절)는 시험 집합을 건드리지 않도록 학습+검증 풀 226,048행을 5-fold 로 나눈 교차검증에서 수행하였다. 각 fold 에서 1차와 2차는 같은 학습·검증 분할을 쓰고, 임계값과 온도는 fold 의 검증 부분에서, 평가는 fold 의 시험 부분에서 한다. 속도–정확도 곡선(5.2절)은 고정 분할의 시험 집합에 한 번 적용하였다.</p>
-<p>지연은 순전파만 재며, 클래스 편향을 피하려고 무작위로 뽑은 대표 배치를 쓴다. 장치는 GPU(RTX 4080 SUPER)와 CPU(8 스레드), 배치 크기는 1·32·128·1024 이다. 헤드라인 조건은 측정 전에 CPU·배치 1 로 고정하였다. 요청이 하나씩 들어오는 WAF 환경에 가장 가깝고, MLPerf 의 단일 스트림 시나리오[20]에 해당한다. 배치가 1보다 클 때 캐스케이드 지연은 식 (4)의 근사이다.</p>
-<p>대표 운영점은 검증 Macro-F1 이 char-CNN 단독의 검증 Macro-F1 에서 0.5%p 이내로 들어오는 가장 작은 넘김 예산으로 정하였다. 이 운영점의 헤드라인 속도 배수가 2배에 못 미치면 속도 이득을 “조건부”로 낮추어 보고하기로 측정 전에 정하였다.</p>
+<p>평가 지표는 Macro-F1, FPR 1%에서의 탐지율(TPR@1%FPR), 정상 요청 FPR 이다. 게이트 비교의 주 판정(V장 5.4·5.5절)은 시험 집합을 건드리지 않도록 학습+검증 풀 226,048행을 5-fold 로 나눈 교차검증에서 수행하였다. 각 fold 에서 1차(클래스 가중치)와 2차는 같은 학습·검증 분할을 쓰고, 임계값·온도·라우터는 fold 의 검증 부분에서 정하며, 평가는 fold 의 시험 부분에서 한다. 속도–정확도 곡선(5.2절)과 게이트의 확인 실험(5.6절)은 고정 분할의 시험 집합에 한 번 적용하였다.</p>
+<p>지연은 순전파만 재며, 클래스 편향을 피하려고 무작위로 뽑은 대표 배치를 쓴다. 장치는 GPU(RTX 4080 SUPER)와 CPU(8 스레드), 배치 크기는 1·32·128·1024 이다. 헤드라인 조건은 측정 전에 CPU·배치 1 로 고정하였다. 요청이 하나씩 들어오는 WAF 환경에 가장 가깝고, MLPerf 의 단일 스트림 시나리오[20]에 해당한다. 두 모델의 구조는 1차 학습 방식과 무관하므로 두 구성에 같은 지연 측정값을 쓴다. 배치가 1보다 클 때 캐스케이드 지연은 식 (4)의 근사이다.</p>
+<p>대표 운영점은 검증 Macro-F1 이 char-CNN 단독의 검증 Macro-F1 에서 0.5%p 이내로 들어오는 가장 작은 넘김 예산으로 정하였다. 측정 전에 정한 판정 기준은 다음과 같다. (1) 운영점의 헤드라인 속도 배수가 2배에 못 미치면 속도 이득을 “조건부”로 낮춘다. (2) 1차 학습 방식은 클래스 가중치 구성이 π=3.3% 헤드라인 배수를 언더샘플링 구성보다 20% 이상 높이고(1.19배 이상) 운영점 Macro-F1 손실이 0.3%p 이하이면 권장 구성으로 바꾼다. (3) 교차검증의 게이트 개선은 B0 대비 과잉 넘김 배율 20% 이상 감소와 p&lt;0.05 를 모두 만족해야 채택한다. (4) 고정 분할의 확인 실험은 B0 대비 시험 넘김률 5%p 이상 감소, 부트스트랩(2,000회) 95% 신뢰구간 상한 0 미만, Macro-F1 손실 0.3%p 이하를 채택 기준으로 하였다.</p>
 
 <h2>V. 실험 결과</h2>
 <h3>5.1 이미지 단독 탐지(RQ1)</h3>
-<p>SR-BH 교차검증에서 RGB CNN 의 Macro-F1 은 0.8949±0.0140, char-CNN 은 0.9884±0.0037 이었다(5-fold 대응표본 t-검정 p&lt;0.001). 고정 분할의 시험 집합에서도 0.8118 대 0.9853 이다. 이전 데이터셋에서는 차이가 작았지만(0.9804 대 0.9954) 방향은 같았고 교차검증에서 유의하였다. 이미지 단독 탐지는 두 데이터셋 모두에서 텍스트 모델을 대체하지 못한다. 차이는 SR-BH 에서 9%p 이상으로 커졌다.</p>
-<h3>5.2 넘김 예산에 따른 속도–정확도 교환</h3>
-<p>Table 2 와 Fig. 2 는 넘김 예산에 따른 시험 집합 성능이다. 예산을 늘리면 Macro-F1 이 단조롭게 오르고 곡선의 양 끝은 두 단독 모델과 일치한다. 대표 운영점 규칙을 처음 만족하는 예산은 50%였다(검증 0.9824, 시험 0.9814). 30%에서는 0.9455 로 char-CNN 보다 4%p 낮다. 이전 데이터셋에서 8%만 넘기면 되던 것과 크게 다르다. 오라클은 15.33%만 넘기고 0.9886 에 이르므로, 같은 정확도를 위해 게이트는 오라클보다 3배 이상 넘긴다.</p>
-<div class="tbl">
-  <p class="cap">Table 2. Cascade performance on the SR-BH test split by deferral budget (τ chosen on validation)</p>
-  <table>
-    <thead><tr><th>Budget</th><th>Deferred</th><th>Macro-F1</th><th>TPR@1%FPR</th><th>Normal FPR</th><th>Real-user FP</th></tr></thead>
-    <tbody>
-      <tr><td>0% (RGB CNN)</td><td>0.00%</td><td>0.8118</td><td>0.679</td><td>9.38%</td><td>8/95</td></tr>
-      <tr><td>5%</td><td>5.29%</td><td>0.8534</td><td>0.730</td><td>6.84%</td><td>7/95</td></tr>
-      <tr><td>10%</td><td>10.17%</td><td>0.8769</td><td>0.776</td><td>4.94%</td><td>6/95</td></tr>
-      <tr><td>20%</td><td>20.10%</td><td>0.9152</td><td>0.868</td><td>2.72%</td><td>6/95</td></tr>
-      <tr><td>30%</td><td>29.98%</td><td>0.9455</td><td>0.944</td><td>1.65%</td><td>5/95</td></tr>
-      <tr class="hl"><td>50%</td><td>50.30%</td><td>0.9814</td><td>0.992</td><td>0.94%</td><td>5/95</td></tr>
-      <tr><td>100% (char-CNN)</td><td>100%</td><td>0.9853</td><td>0.996</td><td>0.78%</td><td>5/95</td></tr>
-      <tr><td>Oracle</td><td>15.33%</td><td>0.9886</td><td>–</td><td>–</td><td>–</td></tr>
-    </tbody>
-  </table>
-</div>
-<figure>
-  <img src="../figures/cascade/tradeoff_budget_srbh_4class_cnn_raw_rgb_bal_len2304_nall_s42_dcuda-cpu_b1-32-128-1024.png" alt="Macro-F1 versus deferral budget on SR-BH">
-  <figcaption>Fig. 2. Test Macro-F1 versus deferral budget on SR-BH 2020. Dashed lines mark the stand-alone RGB CNN (lower) and char-CNN (upper).</figcaption>
-</figure>
-<p>운영점에서 넘김은 클래스마다 크게 달랐다. 실제 라벨 기준 넘김률은 Normal 70.7%, CmdI 83.7%, SQLi 43.8%, CodeInjection 13.7% 였다. 공격 요청 전체의 넘김률은 <i>r</i><sub>A</sub>=43.4%, 정상 요청은 <i>r</i><sub>N</sub>=70.7%로, 정상 요청이 더 많이 넘겨진다. 실사용자 층 오탐은 운영점과 char-CNN 단독이 같은 5/95(95% 신뢰구간 2.3–11.7%)로, 표본이 적어 두 구성을 구별할 수 없다.</p>
-<h3>5.3 배포 조건별 지연</h3>
-<p>Table 3 은 운영점(넘김 50.3%)의 장치·배치별 속도 배수이다. 헤드라인 조건(CPU·배치 1)에서 1.22배로, 측정 전에 정한 기준 2배에 못 미친다. 8개 조건 가운데 가장 큰 값도 1.79배(GPU·배치 128)이다. GPU·배치 1 에서는 두 모델 모두 커널 실행 오버헤드가 지배적이라 캐스케이드가 char-CNN 단독보다 느리다(0.72배).</p>
+<p>SR-BH 교차검증에서 RGB CNN 의 Macro-F1 은 0.8949±0.0140, char-CNN 은 0.9884±0.0037 이었다(5-fold 대응표본 t-검정 p&lt;0.001). 고정 분할의 시험 집합에서도 RGB CNN 은 학습 방식에 따라 0.8118(언더샘플링)과 0.8672(클래스 가중치)로, char-CNN 의 0.9853 에 크게 못 미친다. 이전 데이터셋에서는 차이가 작았지만(0.9804 대 0.9954) 방향은 같았고 교차검증에서 유의하였다. 이미지 단독 탐지는 두 데이터셋 모두에서 텍스트 모델을 대체하지 못한다.</p>
+<h3>5.2 넘김 예산과 1차 학습 방식에 따른 속도–정확도 교환</h3>
+<p>Table 2 와 Fig. 2 는 넘김 예산에 따른 시험 집합 성능이다. 예산을 늘리면 Macro-F1 이 단조롭게 오르고 곡선의 양 끝은 두 단독 모델과 일치한다. 1차를 언더샘플링으로 학습하면 대표 운영점 규칙을 처음 만족하는 예산이 50%였다(시험 0.9814). 이전 데이터셋에서 8%만 넘기면 되던 것과 크게 다르다. 클래스 가중치로 학습한 1차는 단독 Macro-F1 이 0.8118 에서 0.8672 로, 정상 FPR 이 9.38%에서 3.74%로 좋아졌고, 운영점이 30%(시험 0.9798)로 내려왔다. 같은 예산에서 비교하면 30%일 때 0.9455 대 0.9798, 20%일 때 0.9152 대 0.9690 이다.</p>
 <div class="tbl wide">
-  <p class="cap">Table 3. Per-request latency (ms) and cascade speedup over the stand-alone char-CNN at the operating point, by device, batch size, and attack rate π</p>
+  <p class="cap">Table 2. Cascade performance on the SR-BH test split by deferral budget for two first-stage training schemes (τ chosen on validation; second stage is the same char-CNN)</p>
   <table>
-    <thead><tr><th class="l">Device · batch</th><th>RGB CNN</th><th>char-CNN</th><th>Cascade</th><th>S (π=74.8%)</th><th>S (π=3.3%)</th><th>S (π=0.1%)</th></tr></thead>
+    <thead>
+      <tr><th rowspan="2">Budget</th><th colspan="4">First stage: undersampled</th><th colspan="4">First stage: class-weighted</th></tr>
+      <tr><th>Deferred</th><th>Macro-F1</th><th>Normal FPR</th><th>Real-user FP</th><th>Deferred</th><th>Macro-F1</th><th>Normal FPR</th><th>Real-user FP</th></tr>
+    </thead>
     <tbody>
-      <tr class="hl"><td class="l">CPU · 1 (headline)</td><td>0.350</td><td>1.114</td><td>0.911</td><td>1.22</td><td>0.99</td><td>0.98</td></tr>
-      <tr><td class="l">CPU · 32</td><td>0.132</td><td>0.901</td><td>0.585</td><td>1.54</td><td>1.18</td><td>1.17</td></tr>
-      <tr><td class="l">CPU · 128</td><td>0.125</td><td>1.024</td><td>0.640</td><td>1.60</td><td>1.22</td><td>1.21</td></tr>
-      <tr><td class="l">CPU · 1024</td><td>0.165</td><td>1.725</td><td>1.033</td><td>1.67</td><td>1.26</td><td>1.25</td></tr>
-      <tr><td class="l">GPU · 1</td><td>0.209</td><td>0.235</td><td>0.327</td><td>0.72</td><td>0.63</td><td>0.63</td></tr>
-      <tr><td class="l">GPU · 32</td><td>0.0081</td><td>0.0374</td><td>0.0269</td><td>1.39</td><td>1.09</td><td>1.08</td></tr>
-      <tr><td class="l">GPU · 128</td><td>0.0040</td><td>0.0699</td><td>0.0392</td><td>1.79</td><td>1.32</td><td>1.31</td></tr>
-      <tr><td class="l">GPU · 1024</td><td>0.0080</td><td>0.0634</td><td>0.0399</td><td>1.59</td><td>1.21</td><td>1.20</td></tr>
+      <tr><td>0% (RGB CNN)</td><td>0.00%</td><td>0.8118</td><td>9.38%</td><td>8/95</td><td>0.00%</td><td>0.8672</td><td>3.74%</td><td>6/95</td></tr>
+      <tr><td>5%</td><td>5.29%</td><td>0.8534</td><td>6.84%</td><td>7/95</td><td>5.06%</td><td>0.9080</td><td>2.32%</td><td>5/95</td></tr>
+      <tr><td>10%</td><td>10.17%</td><td>0.8769</td><td>4.94%</td><td>6/95</td><td>10.08%</td><td>0.9353</td><td>1.48%</td><td>5/95</td></tr>
+      <tr><td>20%</td><td>20.10%</td><td>0.9152</td><td>2.72%</td><td>6/95</td><td>19.71%</td><td>0.9690</td><td>1.03%</td><td>6/95</td></tr>
+      <tr><td>30%</td><td>29.98%</td><td>0.9455</td><td>1.65%</td><td>5/95</td><td><b>29.84%</b></td><td><b>0.9798</b></td><td><b>0.90%</b></td><td><b>7/95</b></td></tr>
+      <tr><td>50%</td><td><b>50.30%</b></td><td><b>0.9814</b></td><td><b>0.94%</b></td><td><b>5/95</b></td><td>50.21%</td><td>0.9848</td><td>0.79%</td><td>5/95</td></tr>
+      <tr><td>100% (char-CNN)</td><td>100%</td><td>0.9853</td><td>0.78%</td><td>5/95</td><td>100%</td><td>0.9853</td><td>0.78%</td><td>5/95</td></tr>
+      <tr><td>Oracle</td><td>15.33%</td><td>0.9886</td><td>–</td><td>–</td><td>9.16%</td><td>0.9892</td><td>–</td><td>–</td></tr>
     </tbody>
   </table>
+  <p class="cap">Bold: operating point (smallest budget whose validation Macro-F1 is within 0.5 pp of the char-CNN).</p>
 </div>
-<p>공격 비율을 배포 환경 수준(3.3%, 0.1%)으로 낮추면 모든 조건에서 배수가 더 줄고, 헤드라인 조건은 0.99배로 char-CNN 단독보다 느려진다. 식 (5)에서 π 가 작아지면 넘김률이 <i>r</i><sub>N</sub>=70.7%에 가까워지기 때문이다. 넘김이 0%일 때의 상한도 CPU·배치 1 에서 <i>t</i><sub>2</sub>/<i>t</i><sub>1</sub>=3.18배로, 이전 데이터셋의 처리량 비(13.6배)보다 훨씬 작다. 이전 데이터셋의 5.07배(GPU·배치 512)에 가장 가까운 조건인 GPU·배치 1024 에서도 SR-BH 의 배수는 1.59배이다.</p>
+<figure class="wide">
+  <div class="pair">
+    <div><img src="../figures/cascade/tradeoff_budget_srbh_4class_cnn_raw_rgb_bal_len2304_nall_s42_dcuda-cpu_b1-32-128-1024.png" alt="Macro-F1 versus deferral rate, undersampled first stage"><p class="sub">(a) Undersampled first stage</p></div>
+    <div><img src="../figures/cascade/tradeoff_budget_srbh_4class_cnn_raw_rgb_s2bal_len2304_nall_s42_dcuda-cpu_b1-32-128-1024.png" alt="Macro-F1 versus deferral rate, class-weighted first stage"><p class="sub">(b) Class-weighted first stage</p></div>
+  </div>
+  <figcaption>Fig. 2. Test Macro-F1 versus deferral rate on SR-BH 2020. Dashed lines mark the stand-alone RGB CNN (lower) and char-CNN (upper); the star is the oracle router.</figcaption>
+</figure>
+<p>두 구성 모두 운영점에서 정상 요청이 공격 요청보다 더 많이 넘겨졌다. 언더샘플링 구성은 <i>r</i><sub>N</sub>=70.7%, <i>r</i><sub>A</sub>=43.4%(실제 라벨 기준 CmdI 83.7%, SQLi 43.8%, CodeInjection 13.7%), 클래스 가중치 구성은 <i>r</i><sub>N</sub>=39.5%, <i>r</i><sub>A</sub>=26.6%(CmdI 61.2%, SQLi 26.8%, CodeInjection 2.2%)였다. 1차 학습 방식을 바꾸자 정상 넘김이 31%p 줄었다. 실사용자 층 오탐은 5/95 와 7/95 로, 표본이 95개뿐이라 두 구성과 char-CNN 단독(5/95)을 구별할 수 없다.</p>
+<h3>5.3 배포 조건별 지연</h3>
+<p>Table 3 은 두 구성의 운영점에서 장치·배치별 속도 배수이다. 언더샘플링 구성은 헤드라인 조건(CPU·배치 1)에서 1.22배, 공격 비율 3.3%에서 0.99배로 char-CNN 단독보다 느려진다. 식 (5)에서 π 가 작아지면 넘김률이 <i>r</i><sub>N</sub>=70.7%에 가까워지기 때문이다. 클래스 가중치 구성은 같은 조건에서 1.63배와 1.42배로, 측정 전에 정한 1차 학습 방식의 채택 기준(1.19배 이상, Macro-F1 손실 0.3%p 이하; 손실 0.16%p)을 충족하여 이후 권장 구성으로 삼는다. 다만 헤드라인 배수는 여전히 기준 2배에 못 미쳐 속도 이득은 “조건부”로 보고한다. 이득의 출처는 지연이 아니라 넘김률이다. 같은 지연에 넘김률만 39.1%(π=3.3%)로 바뀌었다.</p>
+<div class="tbl wide">
+  <p class="cap">Table 3. Per-request latency (ms) and cascade speedup S over the stand-alone char-CNN at each operating point, by device, batch size, and attack rate π</p>
+  <table>
+    <thead>
+      <tr><th class="l" rowspan="2">Device · batch</th><th rowspan="2">RGB CNN</th><th rowspan="2">char-CNN</th><th colspan="3">Undersampled first stage (50.3%)</th><th colspan="3">Class-weighted first stage (29.8%)</th></tr>
+      <tr><th>π=74.8%</th><th>π=3.3%</th><th>π=0.1%</th><th>π=74.8%</th><th>π=3.3%</th><th>π=0.1%</th></tr>
+    </thead>
+    <tbody>
+      <tr class="hl"><td class="l">CPU · 1 (headline)</td><td>0.350</td><td>1.114</td><td>1.22</td><td>0.99</td><td>0.98</td><td>1.63</td><td>1.42</td><td>1.41</td></tr>
+      <tr><td class="l">CPU · 32</td><td>0.132</td><td>0.901</td><td>1.54</td><td>1.18</td><td>1.17</td><td>2.25</td><td>1.86</td><td>1.85</td></tr>
+      <tr><td class="l">CPU · 128</td><td>0.125</td><td>1.024</td><td>1.60</td><td>1.22</td><td>1.21</td><td>2.38</td><td>1.95</td><td>1.93</td></tr>
+      <tr><td class="l">CPU · 1024</td><td>0.165</td><td>1.725</td><td>1.67</td><td>1.26</td><td>1.25</td><td>2.54</td><td>2.05</td><td>2.04</td></tr>
+      <tr><td class="l">GPU · 1</td><td>0.209</td><td>0.235</td><td>0.72</td><td>0.63</td><td>0.63</td><td>0.84</td><td>0.78</td><td>0.78</td></tr>
+      <tr><td class="l">GPU · 32</td><td>0.0081</td><td>0.0374</td><td>1.39</td><td>1.09</td><td>1.08</td><td>1.94</td><td>1.65</td><td>1.64</td></tr>
+      <tr><td class="l">GPU · 128</td><td>0.0040</td><td>0.0699</td><td>1.79</td><td>1.32</td><td>1.31</td><td>2.81</td><td>2.23</td><td>2.21</td></tr>
+      <tr><td class="l">GPU · 1024</td><td>0.0080</td><td>0.0634</td><td>1.59</td><td>1.21</td><td>1.20</td><td>2.35</td><td>1.93</td><td>1.92</td></tr>
+    </tbody>
+  </table>
+  <p class="cap">Latencies from a single measurement shared by both configurations (same architectures). A separate run of the class-weighted configuration under a busier CPU gave 1.67× and 1.45× at the headline condition.</p>
+</div>
+<p>GPU·배치 1 에서는 두 모델 모두 커널 실행 오버헤드가 지배적이라 캐스케이드가 char-CNN 단독보다 느리다. 넘김이 0%일 때의 상한도 CPU·배치 1 에서 <i>t</i><sub>2</sub>/<i>t</i><sub>1</sub>=3.18배로, 이전 데이터셋의 처리량 비(13.6배)보다 훨씬 작다. 배치를 키우면 2차의 상대 비용이 커져 배수가 오르고, 클래스 가중치 구성은 GPU·배치 128 에서 시험 비율 2.81배, π=3.3%에서 2.23배에 이른다. 이전 데이터셋의 5.07배(GPU·배치 512)와 가장 가까운 조건(GPU·배치 1024)에서 SR-BH 의 배수는 1.59배와 2.35배이다.</p>
 <h3>5.4 확신도 신호 교체(게이트 한계)</h3>
-<p>운영점이 50%까지 밀린 원인이 게이트 신호에 있는지 확인하려고, MSP 를 온도 보정 MSP(msp_T)[22], 상위 두 확률의 차(margin), 엔트로피로 바꾸어 과잉 넘김 배율을 비교하였다(Table 4). 측정 전에 “배율 20% 이상 감소, Holm 보정 p&lt;0.05”를 채택 기준으로 정하였다.</p>
+<p>운영점이 크게 밀린 원인이 게이트 신호에 있는지 확인하려고, MSP 를 온도 보정 MSP(msp_T)[22], 상위 두 확률의 차(margin), 엔트로피로 바꾸어 교차검증에서 과잉 넘김 배율을 비교하였다(Table 4).</p>
 <div class="tbl">
   <p class="cap">Table 4. Over-deferral ratio ρ of confidence signals in 5-fold cross-validation (target: stand-alone char-CNN Macro-F1 of each fold)</p>
   <table>
@@ -237,52 +259,86 @@
     </tbody>
   </table>
 </div>
-<p>MSP 게이트는 오라클보다 평균 10.5배(6.1~17.7배) 많이 넘겼다. 이전 데이터셋의 단일 분할에서 측정한 14.8배와 같은 자릿수이다. 세 대체 신호는 배율을 4~5%만 줄였고 유의하지 않았다. 네 신호가 매기는 요청 순위의 상관(Spearman)은 모든 fold 에서 0.997 이상이었고, 검증 집합에서 맞춘 온도는 0.99~1.06 으로 1에 가까웠다. 확신도를 어떻게 요약하든 “1차가 덜 확신하는 요청”이라는 같은 집합을 고르며, 이 집합은 오라클이 고르는 집합(1차가 틀리는 6~8%)과 다르다. 1차 확신도는 2차가 맞힐지를 알지 못한다는 Jitkrittum 등[11]의 분석이 이 데이터에서 그대로 나타난다.</p>
-<h3>5.5 예측 클래스별 임계값(게이트 개선)</h3>
-<p>3.6절의 클래스별 임계값(G2)을 단일 임계값(B0)과 같은 교차검증 확률에서 비교하였다. 두 게이트 모두 검증 부분에서 임계값을 정해 시험 부분에 적용하므로 같은 조건이다. 채택 기준은 5.4절과 같이 “배율 20% 이상 감소, p&lt;0.05”로 측정 전에 정하였고, 비교가 한 쌍이므로 다중비교 보정은 하지 않는다.</p>
+<p>MSP 게이트는 오라클보다 평균 10.5배(6.1~17.7배) 많이 넘겼다. 이전 데이터셋의 단일 분할에서 측정한 14.8배와 같은 자릿수이다. 세 대체 신호는 배율을 4~5%만 줄였고 유의하지 않았다. 네 신호가 매기는 요청 순위의 상관(Spearman)은 모든 fold 에서 0.997 이상이었고, 검증 집합에서 맞춘 온도는 0.99~1.06 으로 1에 가까웠다. 확신도를 어떻게 요약하든 “1차가 덜 확신하는 요청”이라는 같은 집합을 고른다.</p>
+<p>원인을 더 보려고 다섯 fold 의 시험 부분을 모아 요청마다 1·2차의 정오를 나누었다(탐색적 분석). 1차 오답은 6.82%, 그 가운데 2차가 맞혀 넘길 가치가 있는 요청은 6.40% 였다. MSP 는 1차 오답을 AUROC 0.938 로 잘 가려냈지만, 넘길 가치가 있는 요청의 일부는 1차가 0.99 이상으로 확신한 꼬리에 있었다. 이 꼬리까지 회수해 95%를 고치려면 MSP 순서로 23.4%를 넘겨야 하고, 그 과정에서 1차가 맞힌 요청이 함께 넘어간다. 이렇게 낭비된 넘김의 53%가 정상 요청이었다.</p>
+<h3>5.5 게이트 개선: 클래스별 임계값과 학습형 라우터</h3>
+<p>신호 교체가 같은 순위를 내므로, 순위 자체를 바꾸는 두 방향을 측정 전에 정한 기준 (3)으로 검증하였다. G2 는 같은 MSP 에서 넘김 배분을 클래스별로 바꾸고, G3 는 1차 확률 밖의 정보(원문 통계, 1차 내부 표현)로 순위를 다시 매긴다. 모든 게이트는 fold 의 검증 부분에서 정한 것을 시험 부분에 적용하였다(Table 5).</p>
 <div class="tbl">
-  <p class="cap">Table 5. Over-deferral ratio ρ of a single threshold (B0) and class-wise thresholds (G2), both transferred from validation to test</p>
+  <p class="cap">Table 5. Over-deferral ratio ρ of the single threshold (B0), class-wise thresholds (G2), and learned routers (G3) in 5-fold cross-validation</p>
   <table>
-    <thead><tr><th>Fold</th><th>Oracle</th><th>B0 needs</th><th>B0 ρ</th><th>G2 needs</th><th>G2 ρ</th></tr></thead>
+    <thead><tr><th>Fold</th><th>Oracle</th><th>B0</th><th>G2</th><th>G3-lite</th><th>G3-full</th></tr></thead>
     <tbody>
-      <tr><td>1</td><td>7.98%</td><td>60.6%</td><td>7.60</td><td>94.9%</td><td>11.89</td></tr>
-      <tr><td>2</td><td>6.29%</td><td>82.4%</td><td>13.11</td><td>47.6%</td><td>7.58</td></tr>
-      <tr><td>3</td><td>5.95%</td><td>48.5%</td><td>8.15</td><td>48.8%</td><td>8.21</td></tr>
-      <tr><td>4</td><td>8.29%</td><td>50.6%</td><td>6.10</td><td>45.2%</td><td>5.45</td></tr>
-      <tr><td>5</td><td>5.59%</td><td>100%</td><td>17.90</td><td>54.9%</td><td>9.83</td></tr>
-      <tr class="hl"><td>Mean</td><td></td><td></td><td>10.57</td><td></td><td>8.59</td></tr>
-      <tr><td colspan="4" class="l">Reduction vs. B0 (paired t-test p)</td><td colspan="2">18.7% (0.42)</td></tr>
+      <tr><td>1</td><td>7.98%</td><td>7.60</td><td>11.89</td><td>10.15</td><td>7.45</td></tr>
+      <tr><td>2</td><td>6.29%</td><td>13.11</td><td>7.58</td><td>7.41</td><td>12.25</td></tr>
+      <tr><td>3</td><td>5.95%</td><td>8.15</td><td>8.21</td><td>13.40</td><td>11.79</td></tr>
+      <tr><td>4</td><td>8.29%</td><td>6.10</td><td>5.45</td><td>4.99</td><td>5.88</td></tr>
+      <tr><td>5</td><td>5.59%</td><td>17.90</td><td>9.83</td><td>13.76</td><td>12.36</td></tr>
+      <tr class="hl"><td>Mean</td><td></td><td>10.57</td><td>8.59</td><td>9.94</td><td>9.95</td></tr>
+      <tr><td colspan="3" class="l">Reduction vs. B0 (paired t-test p)</td><td>18.7% (0.42)</td><td>6.0% (0.77)*</td><td>5.9% (0.69)</td></tr>
+    </tbody>
+  </table>
+  <p class="cap">* G3-lite in cross-validation was not pre-registered (exploratory). B0 applies the validation-chosen threshold to fold-test, so it differs slightly from the MSP column of Table 4, which ranks fold-test directly.</p>
+</div>
+<p>G2 는 평균 배율을 18.7% 줄였으나 p=0.42 로 기준에 미달하였다. 효과의 방향도 fold 마다 달라, B0 가 거의 모든 요청을 넘겨야 했던 fold 2·5 에서는 크게 줄었지만 fold 1 에서는 오히려 늘었다. 1차 내부 표현 128차원을 더한 G3-full 도 5.9%(p=0.69)에 그쳤다. 2차의 정오를 직접 표적으로 학습하고 1차가 본 정보를 모두 넣어도, 2차 단독과 같은 정확도를 요구하는 엄격한 목표에서는 넘김이 줄지 않았다. 사전 판정 기준으로 보면 세 개선 방향은 모두 기각이다.</p>
+<p>실제 운영에서는 2차 단독과 정확히 같은 정확도보다 작은 여유를 둔 운영점이 쓰인다. 4.2절의 운영점 규칙으로 고른 결과를 Table 6 에 정리하였다(탐색적).</p>
+<div class="tbl">
+  <p class="cap">Table 6. Operating point (validation Macro-F1 within 0.5 pp of char-CNN) in 5-fold cross-validation, fold means; S is the CPU, batch 1 estimate from Eq. (4)–(5) (exploratory)</p>
+  <table>
+    <thead><tr><th class="l"></th><th>B0</th><th>G2</th><th>G3-lite</th><th>G3-full</th></tr></thead>
+    <tbody>
+      <tr><td class="l">Deferred (test)</td><td>24.9%</td><td>17.3%</td><td>22.4%</td><td>21.7%</td></tr>
+      <tr><td class="l">Macro-F1 (test)</td><td>0.9830</td><td>0.9822</td><td>0.9835</td><td>0.9835</td></tr>
+      <tr><td class="l">Benign deferral r<sub>N</sub></td><td>44.6%</td><td>27.4%</td><td>43.6%</td><td>39.6%</td></tr>
+      <tr><td class="l">Attack deferral r<sub>A</sub></td><td>18.3%</td><td>13.9%</td><td>15.2%</td><td>15.6%</td></tr>
+      <tr class="hl"><td class="l">S (π=3.3%)</td><td>1.34</td><td>1.75</td><td>1.49†</td><td>1.44†</td></tr>
+    </tbody>
+  </table>
+  <p class="cap">† Router latency excluded; including it (0.018 / 0.024 ms) lowers S by about 0.04.</p>
+</div>
+<p>여유를 둔 운영점에서는 세 게이트 모두 넘김을 줄였고, 그 크기는 정상 요청의 넘김을 얼마나 줄였는지에 따라 배포 배수로 이어졌다. G2 는 줄어든 넘김의 대부분이 정상 요청이어서(<i>r</i><sub>N</sub> −17.2%p) 공격 비율 3.3%의 추정 배수를 1.34배에서 1.75배로 올렸다. G3 계열은 주로 공격 요청의 넘김을 줄여(<i>r</i><sub>A</sub> −3%p, <i>r</i><sub>N</sub> −1~5%p) 배포 배수의 이득이 작았다. 이 운영점 비교는 측정 전에 기준으로 정하지 않은 사후 분석이므로 개선으로 확정하지 않는다. G2 의 임계값은 표본이 적은 CodeInjection 에서 fold 간 표준편차가 0.26 으로 불안정하였다.</p>
+<h3>5.6 고정 분할 확인과 게이트 평가의 함정</h3>
+<p>운영점 효과를 교차검증에 쓰지 않은 데이터에서 확인하려고, 고정 분할 시험 집합에서 기준 (4)로 G2·G3 를 다시 판정하였다(Table 7 위쪽, 언더샘플링 1차). 기준은 측정 전에 정한 대로 시험 집합의 넘김률로 판정하였다. B0 는 넘김 예산을 0.5% 단위로 고르므로 Table 2 의 운영점(50.3%)과 조금 다르다.</p>
+<div class="tbl wide">
+  <p class="cap">Table 7. Gates at the operating point on the fixed SR-BH test split. S is CPU, batch 1, including router latency. Upper block: pre-registered confirmation (undersampled first stage); lower block: exploratory (class-weighted first stage)</p>
+  <table>
+    <thead><tr><th class="l">First stage · gate</th><th>Deferred</th><th>Macro-F1</th><th>r<sub>N</sub></th><th>r<sub>A</sub></th><th>ρ</th><th>S (π=74.8%)</th><th>S (π=3.3%)</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td class="l">Undersampled · B0</td><td>48.25%</td><td>0.9803</td><td>67.2%</td><td>41.9%</td><td>4.70</td><td>1.26</td><td>1.02</td><td>–</td></tr>
+      <tr><td class="l">Undersampled · G2</td><td>39.47%</td><td>0.9795</td><td>71.0%</td><td>28.9%</td><td>4.30</td><td>1.41</td><td>0.99</td><td>accepted</td></tr>
+      <tr><td class="l">Undersampled · G3-lite</td><td>47.59%</td><td>0.9809</td><td>98.3%</td><td>30.5%</td><td>4.84</td><td>1.24</td><td>0.77</td><td>rejected</td></tr>
+      <tr><td class="l">Undersampled · G3-full</td><td>41.56%</td><td>0.9806</td><td>78.1%</td><td>29.3%</td><td>6.52</td><td>1.33</td><td>0.91</td><td>accepted</td></tr>
+      <tr><td class="l">Class-weighted · B0</td><td>29.39%</td><td>0.9794</td><td>38.7%</td><td>26.2%</td><td>7.68</td><td>1.65</td><td>1.43</td><td>–</td></tr>
+      <tr class="hl"><td class="l">Class-weighted · G2</td><td>15.29%</td><td>0.9779</td><td>22.7%</td><td>12.8%</td><td>5.24</td><td>2.14</td><td>1.86</td><td>(expl.)</td></tr>
+      <tr><td class="l">Class-weighted · G3-lite</td><td>24.03%</td><td>0.9766</td><td>46.7%</td><td>16.4%</td><td>4.89</td><td>1.76</td><td>1.27</td><td>(expl.)</td></tr>
+      <tr><td class="l">Class-weighted · G3-full</td><td>23.11%</td><td>0.9771</td><td>43.1%</td><td>16.4%</td><td>10.92</td><td>1.77</td><td>1.32</td><td>(expl.)</td></tr>
     </tbody>
   </table>
 </div>
-<p>G2 는 평균 배율을 10.57배에서 8.59배로 18.7% 줄였으나 p=0.42 로 기준에 미달하여 기각하였다. 효과의 방향도 fold 마다 달랐다. B0 가 거의 모든 요청을 넘겨야 했던 fold 2·5 에서는 크게 줄었지만, fold 1 에서는 필요 넘김이 60.6%에서 94.9%로 오히려 늘었다. 이 지표는 char-CNN 단독과 같은 Macro-F1 을 요구하므로 곡선의 끝부분에서 판정되는데, 탐욕 할당은 그 구간에서 불안정하다.</p>
-<p>실제 운영에서는 2차 단독과 정확히 같은 정확도보다 작은 여유를 둔 운영점이 쓰인다. 4.2절의 규칙(검증 Macro-F1 이 char-CNN 보다 0.5%p 이내)으로 고른 운영점을 Table 6 에 정리하였다. 이 비교는 측정 전에 판정 기준으로 정하지 않았으므로 탐색적 결과이다.</p>
+<p>언더샘플링 1차에서 G2 는 넘김을 8.8%p(신뢰구간 −9.1~−8.4%p), G3-full 은 6.7%p(−7.1~−6.3%p) 줄여 기준을 통과하였고, G3-lite 는 0.7%p 에 그쳐 기각되었다. 그러나 표의 오른쪽을 보면 결론이 달라진다. 세 게이트 모두 공격 요청의 넘김을 줄인 대신 정상 요청의 넘김을 늘렸다. 공격이 75%인 시험 집합에서는 이것이 이득이지만, 공격 비율 3.3%에서는 넘김률이 <i>r</i><sub>N</sub> 에 수렴하므로 기준을 통과한 G2(0.99배)와 G3-full(0.91배)이 B0(1.02배)보다 느리다. G3-lite 는 정상 요청의 98%를 넘긴다. 과잉 넘김 배율 ρ 도 배포 속도와 같은 방향으로 움직이지 않았다(G3-full 은 넘김을 줄였는데 ρ 는 4.70 에서 6.52 로 나빠졌다).</p>
+<p>이 어긋남은 사전 기준이 시험 집합의 공격 비율에서 넘김률을 쟀기 때문에 생겼다. 기준은 측정 후에 바꾸지 않고 그대로 판정했으며, 대신 이 사례를 게이트 평가의 함정으로 보고한다. 넘김 판단을 비교할 때는 시험 집합의 넘김률만이 아니라 <i>r</i><sub>N</sub>, <i>r</i><sub>A</sub> 와 배포 공격 비율로 재가중한 속도 배수를 함께 보아야 한다. 클래스 가중치 1차 위에서는 G2 가 정상·공격 넘김을 모두 줄여 π=3.3% 배수를 1.43배에서 1.86배로 올렸다(탐색적, 교차검증 운영점의 1.34→1.75배와 같은 방향). G3 계열은 이 구성에서도 정상 넘김을 늘려 B0 보다 느렸다.</p>
+<h3>5.7 확신 오답의 라벨 감사</h3>
+<p>5.4절의 꼬리, 즉 1차가 0.99 이상으로 확신했는데 틀리고 2차는 맞힌 요청 110건을 원문으로 확인하였다. 대조로 두 모델이 모두 확신해서 맞힌 요청 110건을 무작위로 뽑아 섞고, 어느 집합인지와 모델 예측을 가린 채 원문과 라벨만 보고 “라벨이 맞다·의심·틀리다”를 판정하였다(Table 8). 판정은 대형 언어모델 한 개로 하였고 전문가 검수가 아니며, 판정자가 하나라 판정자 간 일치도는 없다.</p>
 <div class="tbl">
-  <p class="cap">Table 6. Operating point (validation Macro-F1 within 0.5 pp of char-CNN) in 5-fold cross-validation; speedups are CPU, batch 1 estimates from Eq. (4)–(5) (exploratory)</p>
+  <p class="cap">Table 8. Label audit of confidently misclassified requests (blind to set and predictions)</p>
   <table>
-    <thead><tr><th class="l"></th><th>B0</th><th>G2</th></tr></thead>
+    <thead><tr><th class="l">Set</th><th>n</th><th>Correct</th><th>Doubtful</th><th>Wrong</th><th>Doubtful + wrong</th></tr></thead>
     <tbody>
-      <tr><td class="l">Deferred (test)</td><td>24.9 ± 2.3%</td><td>17.3 ± 3.9%</td></tr>
-      <tr><td class="l">Macro-F1 (test)</td><td>0.9830</td><td>0.9822</td></tr>
-      <tr><td class="l">Benign deferral r<sub>N</sub></td><td>44.6%</td><td>27.4%</td></tr>
-      <tr><td class="l">Attack deferral r<sub>A</sub></td><td>18.3%</td><td>13.9%</td></tr>
-      <tr><td class="l">S (π=74.8%)</td><td>1.78</td><td>2.06</td></tr>
-      <tr class="hl"><td class="l">S (π=3.3%)</td><td>1.34</td><td>1.75</td></tr>
-      <tr><td class="l">S (π=0.1%)</td><td>1.33</td><td>1.74</td></tr>
+      <tr><td class="l">First stage confident error, second stage correct</td><td>110</td><td>32</td><td>14</td><td>64</td><td>70.9%</td></tr>
+      <tr><td class="l">Both confident and correct (control)</td><td>110</td><td>75</td><td>6</td><td>29</td><td>31.8%</td></tr>
     </tbody>
   </table>
+  <p class="cap">Fisher's exact test: odds ratio 5.2, p ≈ 1×10<sup>−8</sup>. By label: SQLi 62% vs. 23%, Normal 80% vs. 74%.</p>
 </div>
-<p>운영점에서 G2 는 Macro-F1 을 0.08%p 만 낮추면서 넘김률을 7.6%p 줄였고, 다섯 fold 모두에서 넘김이 줄었다. 줄어든 넘김의 대부분은 정상 요청이었다(<i>r</i><sub>N</sub> −17.1%p, <i>r</i><sub>A</sub> −4.4%p). 배포 환경의 넘김률은 <i>r</i><sub>N</sub> 에 수렴하므로(식 (5)), 공격 비율 3.3%에서의 추정 속도 배수가 1.34배에서 1.75배로 오른다. 다만 운영점의 임계값은 표본이 적은 CodeInjection 에서 fold 간 표준편차가 0.26 으로 불안정하였다. 속도 배수는 고정 분할에서 잰 지연을 식 (4)에 넣은 추정이며, G2 자체의 지연은 재지 않았다.</p>
-<p>교차검증의 B0 운영점(넘김 24.9%)은 5.2절 고정 분할의 운영점(50.3%)보다 넘김이 훨씬 적다. 고정 분할의 1차는 학습 집합을 언더샘플링해 학습한 모델(시험 Macro-F1 0.8118)이고, 교차검증의 1차는 클래스 가중치로 학습한 모델(fold 평균 0.8949)이다. 1차가 강할수록 덜 넘긴다. 5.3절의 헤드라인 값은 측정 전에 고정한 절차의 결과이므로 그대로 보고하되, 교차검증 기준으로도 CPU·배치 1 의 배수는 1.78배로 2배에 못 미쳐 “속도 이득은 조건부”라는 결론은 학습 방식과 무관하게 유지된다.</p>
+<p>틀린 라벨의 대부분(64건 중 39건)은 명령 삽입 흔적(<code>|cat /etc/passwd#</code>, 백틱, ShellShock 문자열)이 SQLi 나 정상으로 붙어 있는 경우였고, 정상 라벨에는 SQL 삽입·경로 탐색·외부 URL 삽입 탐침도 섞여 있었다. 대조 집합에서도 31.8%가 같은 문제를 보였고, 특히 정상 19건 중 14건이 공격 탐침이었다. 두 모델이 같은 잡음을 함께 학습했다는 뜻이다. 그러면 “2차가 맞혔다”는 것의 일부는 2차가 잡음까지 따라 했다는 의미가 되고, 넘김 평가의 목표인 char-CNN 단독 Macro-F1 도 그만큼 잡음을 포함한다. 다만 이 110건은 넘길 가치가 있는 요청(교차검증 약 14,500건)의 0.8%라서 과잉 넘김의 주원인이 라벨 잡음이라고까지는 말할 수 없다.</p>
 
 <h2>VI. 논의</h2>
-<p><b>이득이 사라진 이유.</b> 캐스케이드의 속도 이득은 두 조건이 함께 맞아야 난다. 1차가 대부분의 요청을 맞혀 넘김이 적어야 하고, 2차가 1차보다 충분히 비싸야 한다. 이전 데이터셋에서는 두 모델의 Macro-F1 차이가 1.5%p, 처리량 비가 13.6배였다. SR-BH 에서는 차이가 17%p 로 벌어지고 요청 단위 지연 비는 3.18배로 줄었다. 앞의 조건 때문에 넘김이 50%로 늘었고, 뒤의 조건 때문에 넘김이 적더라도 얻을 수 있는 상한 자체가 낮아졌다.</p>
-<p><b>기저율과 넘김.</b> 정상 요청의 넘김률(70.7%)이 공격 요청(43.4%)보다 높다는 점은 배포 환경에서 특히 불리하다. 대부분의 요청이 정상인 환경에서는 넘김률이 정상 요청의 넘김률에 수렴하므로, 시험 집합에서 잰 넘김률이 배포 환경의 비용을 과소평가한다. 탐지 성능에서 알려진 기저율 문제[21]가 비용 쪽에서도 나타나는 셈이다. 캐스케이드의 속도 배수를 보고할 때 장치, 배치 크기와 함께 평가 집합의 공격 비율을 밝혀야 하는 이유이다.</p>
-<p><b>게이트를 고치는 방향.</b> 신호 교체가 실패한 것은 신호의 문제가 아니라 1차 확신도라는 정보원 자체의 한계로 보인다. G2 의 결과도 이 해석과 어긋나지 않는다. 같은 MSP 를 쓰면서 예산만 클래스별로 나누었을 때, 2차와 같은 정확도를 요구하는 엄격한 목표에서는 개선이 유의하지 않았고, 여유를 둔 운영점에서만 정상 요청의 넘김이 일관되게 줄었다. 클래스별 임계값은 게이트의 정보원을 바꾸지 않고 배분만 바꾸므로 효과에 상한이 있다. 남은 방향은 2차의 정답 여부를 직접 예측하는 학습형 라우터[11][16]와, 1차와 2차의 정확도 차를 줄이는 1차 강화이다.</p>
-<p><b>한계.</b> 첫째, SR-BH 의 정상 요청은 스캐너 트래픽이 대부분이고 실사용자 정상 요청은 시험 집합에 95개뿐이어서 실사용자 오탐률의 신뢰구간이 넓다. 둘째, 속도–정확도 곡선과 지연은 고정 분할 1회, 지연 측정 1회의 값이며, 배치가 1보다 클 때의 캐스케이드 지연은 근사이다. 셋째, 속도–정확도 곡선(언더샘플링 학습)과 게이트 비교(클래스 가중치 학습)의 1차 모델은 학습 방식이 달라 운영점 넘김률이 다르다(5.5절). 넷째, 게이트를 알고 넘김을 부풀리도록 설계된 적응형 공격[19]은 이번 측정에 포함하지 않았다. 다섯째, 다른 시기·다른 서버의 데이터(예: [24])에서 임계값이 같은 넘김률을 유지하는지는 아직 확인하지 않았다. 분포가 바뀌면 사후 보정만으로는 부족하다는 보고[23]가 있어 별도 검증이 필요하다.</p>
+<p><b>이득이 사라진 이유와 되돌린 것.</b> 캐스케이드의 속도 이득은 두 조건이 함께 맞아야 난다. 1차가 대부분의 요청을 맞혀 넘김이 적어야 하고, 2차가 1차보다 충분히 비싸야 한다. 이전 데이터셋에서는 두 모델의 Macro-F1 차이가 1.5%p, 처리량 비가 13.6배였다. SR-BH 에서는 요청 단위 지연 비가 3.18배로 줄어 상한 자체가 낮아졌고, 언더샘플링 1차는 학습 행의 92%를 버린 탓에 정상 요청을 자주 틀리고(FPR 9.4%) 확신도도 낮아 정상 요청을 70%나 넘겼다. 같은 구조의 1차를 전체 학습 집합으로 학습하는 것만으로 정상 넘김이 39.5%로 줄고 배포 배수가 0.99배에서 1.42배로 올랐다. 이번 측정에서 배포 조건의 속도를 실제로 움직인 것은 넘김 판단보다 1차의 학습 방식이었다.</p>
+<p><b>기저율과 게이트 평가.</b> 대부분의 요청이 정상인 환경에서는 넘김률이 정상 요청의 넘김률에 수렴하므로, 시험 집합에서 잰 넘김률은 배포 비용을 과소평가한다. 탐지 성능에서 알려진 기저율 문제[21]가 비용 쪽에서도 나타나는 셈이다. 5.6절은 이것이 보고의 문제에 그치지 않고 게이트 선택을 뒤집을 수 있음을 보여 준다. 공격 쪽 넘김을 덜어내는 게이트는 시험 집합 기준을 통과하면서 배포 조건에서는 느려진다. 캐스케이드와 넘김 규칙을 보고할 때 장치, 배치 크기와 함께 평가 집합의 공격 비율, 정상·공격 요청별 넘김률을 밝혀야 하는 이유이다.</p>
+<p><b>넘김 판단의 한계.</b> 신호 교체, 배분 변경, 1차 밖 정보를 쓴 학습형 라우터가 모두 엄격한 목표에서 과잉 넘김 배율을 줄이지 못했다. 1차 내부 표현까지 넣은 라우터가 실패한 것은, 2차가 맞힐지를 1차가 본 정보만으로는 예측하기 어렵다는 것을 뜻한다. 이는 1차 확신도의 한계에 대한 Jitkrittum 등[11]의 분석과 맞고, 그 분석이 실패 조건으로 든 라벨 잡음의 직접 증거도 5.7절에서 찾았다. 엄격한 목표(2차 단독 Macro-F1)의 꼬리에는 2차가 잡음을 따라 맞힌 요청이 섞여 있으므로, 과잉 넘김 배율의 일부는 게이트의 비효율이 아니라 목표의 잡음일 수 있다. 남은 방향은 2차를 일부 돌린 뒤 판단하는 라우터, 넘김 비용을 정상·공격별로 달리 매기는 비용 민감 넘김 학습[15], 그리고 라벨을 정제한 데이터에서의 재평가이다.</p>
+<p><b>한계.</b> 첫째, SR-BH 의 정상 요청은 스캐너 트래픽이 대부분이고 실사용자 정상 요청은 시험 집합에 95개뿐이어서 실사용자 오탐률의 신뢰구간이 넓다. 둘째, 속도–정확도 곡선, 1차 학습 방식 비교, 고정 분할 게이트 확인은 단일 분할·단일 seed 의 값이고, 지연은 1회 측정이며 배치가 1보다 클 때의 캐스케이드 지연은 근사이다. 셋째, 클래스 가중치 1차 위의 게이트 결과와 교차검증 운영점 비교는 사후 분석이다. 넷째, 라벨 감사는 대형 언어모델 한 개의 판정으로 220건만 보았다. 다섯째, 게이트를 알고 넘김을 부풀리도록 설계된 적응형 공격[19]은 이번 측정에 포함하지 않았다. 여섯째, 다른 시기·다른 서버의 데이터(예: [24])에서 임계값이 같은 넘김률을 유지하는지는 아직 확인하지 않았다. 분포가 바뀌면 사후 보정만으로는 부족하다는 보고[23]가 있어 별도 검증이 필요하다.</p>
 
 <h2>VII. 결론</h2>
-<p>웹 요청의 바이트 이미지 탐지는 텍스트 모델보다 정확도가 낮았고, 이 음성 결과에서 출발한 표현 이질적 캐스케이드는 이전 데이터셋에서 5.07배의 속도 이득을 보였다. 실트래픽 기반 SR-BH 2020 에서 다시 측정하자 2차 모델 수준의 정확도를 얻는 데 요청의 절반을 넘겨야 했고, 요청 단위 CPU 처리에서 1.22배, 배포 수준의 공격 비율에서는 이득이 없었다. 확신도 게이트는 오라클보다 평균 10.5배 많이 넘겼고, 신호를 바꾸는 것으로는 줄지 않았다. 예측 클래스별 임계값은 사전 기준에서는 기각되었으나, 실용 운영점에서 정상 요청의 넘김을 줄여 배포 조건의 속도 배수를 1.34배에서 1.75배로 높이는 탐색적 효과를 보였다. 캐스케이드의 속도 이득은 장치·배치 크기·공격 비율을 함께 밝힐 때에만 의미가 있으며, 넘김 판단의 개선은 1차 확신도 밖의 정보에서 찾아야 한다.</p>
+<p>웹 요청의 바이트 이미지 탐지는 텍스트 모델보다 정확도가 낮았고, 이 음성 결과에서 출발한 표현 이질적 캐스케이드는 이전 데이터셋에서 5.07배의 속도 이득을 보였다. 실트래픽 기반 SR-BH 2020 에서 다시 측정하자, 언더샘플링으로 학습한 1차로는 2차 수준의 정확도를 얻는 데 요청의 절반을 넘겨야 했고 배포 수준의 공격 비율에서는 이득이 없었다. 1차를 전체 학습 집합과 클래스 가중치로 학습하자 요청 단위 CPU 처리에서 1.63배, 공격 비율 3.3%에서 1.42배로 이득이 일부 돌아왔다. 넘김 판단은 신호 교체, 클래스별 임계값, 1차 내부 표현을 쓰는 학습형 라우터 어느 것으로도 사전 기준을 넘지 못했고, 시험 집합의 넘김률로만 평가하면 배포 조건에서 더 느린 게이트를 고를 수 있었다. 캐스케이드의 속도 이득은 장치·배치 크기·공격 비율과 정상·공격 요청별 넘김률을 함께 밝힐 때에만 의미가 있으며, 그 크기는 넘김 판단보다 1차 모델의 학습 방식과 데이터의 라벨 품질에 더 크게 좌우된다.</p>
 
 <h2>References</h2>
 <ol class="refs">
