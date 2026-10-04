@@ -66,6 +66,25 @@ def label_fingerprint(y: np.ndarray) -> str:
     return hashlib.sha256(np.asarray(y, dtype=np.int64).tobytes()).hexdigest()[:16]
 
 
+def save_fold_probabilities(path: Path, classes, y, fold_probabilities) -> None:
+    """지표 JSON과 분리해 풀 인덱스와 확률의 대응을 검증한 뒤 저장한다."""
+    labels = np.asarray(y, dtype=np.int64)
+    arrays = {"classes": np.asarray(classes, dtype=str),
+              "label_fingerprint": np.asarray(label_fingerprint(labels)), "y": labels}
+    for k, fold in enumerate(fold_probabilities, start=1):
+        for split in ("val", "test"):
+            indices = np.asarray(fold[f"{split}_idx"], dtype=np.int64)
+            probabilities = np.asarray(fold[f"{split}_probs"], dtype=np.float32)
+            if indices.ndim != 1 or probabilities.shape != (len(indices), len(classes)):
+                raise ValueError(f"fold {k} {split} 인덱스와 확률 모양이 맞지 않습니다.")
+            if np.any(indices < 0) or np.any(indices >= len(labels)):
+                raise ValueError(f"fold {k} {split} 인덱스가 풀 범위를 벗어났습니다.")
+            arrays[f"{split}_idx_{k}"] = indices
+            arrays[f"{split}_probs_{k}"] = probabilities
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(path, **arrays)
+
+
 def load_image_pool(track: str, text: str, side: int, channels: str,
                     encoders: tuple[str, ...] | None, *,
                     fields: str | None = None, exclude_test: bool = False):
@@ -280,7 +299,7 @@ def inner_train_val_split(y_trainval: np.ndarray, val_ratio: float, seed: int):
 
 
 def run_fold_torch(model_name: str, pool_x, y, classes, tr_idx, va_idx, te_idx,
-                   args, is_image: bool, pool_strata=None) -> dict:
+                   args, is_image: bool, pool_strata=None, fold_probabilities=None) -> dict:
     """torch 모델(cnn/charcnn/bilstm) 한 fold 학습 → test fold 지표 반환."""
     import torch
     from torch.utils.data import DataLoader
@@ -325,6 +344,12 @@ def run_fold_torch(model_name: str, pool_x, y, classes, tr_idx, va_idx, te_idx,
     if pool_strata is not None:
         result["fpr_by_stratum"] = fold_strata_report(
             y_true, y_pred, classes, pool_strata[te_idx])
+
+    if args.save_probs:
+        # fit이 복원한 best 가중치로만 평가하며 test 확률은 기존 추론값을 재사용한다.
+        _, _, val_score = T.evaluate(model, val_loader, device)
+        fold_probabilities.append({"val_idx": va_idx, "val_probs": val_score,
+                                   "test_idx": te_idx, "test_probs": y_score})
 
     # fold 마다 GPU 메모리를 반납하지 않으면 5폴드 누적으로 OOM 이 난다.
     del model, train_ds, val_ds, test_ds, train_loader, val_loader, test_loader
@@ -386,6 +411,7 @@ def main() -> None:
     parser.add_argument("--text", default="raw", choices=["raw", "decoded"])
     parser.add_argument("--exclude-test", action="store_true", help="test를 읽지 않고 train+val만 사용")
     parser.add_argument("--fields", choices=list(FIELD_COMBINATIONS), default=None)
+    parser.add_argument("--save-probs", action="store_true", help="torch 모델의 fold별 val/test 확률 저장")
     parser.add_argument("--side", type=int, default=48)
     parser.add_argument("--channels", default="gray", choices=["gray", "rgb"])
     parser.add_argument("--rgb-encoders", default="raw_byte,char_class,local_entropy")
@@ -401,6 +427,8 @@ def main() -> None:
     parser.add_argument("--patience", type=int, default=5)
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
+    if args.save_probs and args.model in TFIDF_MODELS:
+        parser.error("--save-probs는 torch 모델에서만 허용됩니다.")
     if args.fields is not None and (args.track != "srbh_4class" or args.text != "raw"):
         parser.error("--fields는 --track srbh_4class --text raw에서만 허용됩니다.")
 
@@ -447,6 +475,7 @@ def main() -> None:
 
     import train as T
     fold_results = []
+    fold_probabilities = [] if args.save_probs else None
     for k, (trval_idx, te_idx) in enumerate(folds, start=1):
         # 시드는 fold 마다 다르게(재현 가능하게) 줘서 초기값 우연을 분산시킨다.
         T.set_seed(args.seed + k)
@@ -460,7 +489,8 @@ def main() -> None:
             tr_rel, va_rel = inner_train_val_split(y[trval_idx], args.val_ratio, args.seed + k)
             res = run_fold_torch(args.model, pool_x, y, classes,
                                  trval_idx[tr_rel], trval_idx[va_rel], te_idx,
-                                 args, is_image=is_image, pool_strata=pool_strata)
+                                 args, is_image=is_image, pool_strata=pool_strata,
+                                 fold_probabilities=fold_probabilities)
         res["fold"] = k
         res["elapsed_sec"] = round(time.perf_counter() - t0, 1)
         fold_results.append(res)
@@ -529,6 +559,7 @@ def main() -> None:
                    "epochs": args.epochs, "batch_size": args.batch_size, "lr": args.lr,
                    "val_ratio": args.val_ratio, "fields": args.fields,
                    "exclude_test": args.exclude_test,
+                   "save_probs": args.save_probs,
                    "pool_splits": list(SPLITS[:2] if args.exclude_test else SPLITS)},
         "summary": summary,
         "fold_results": fold_results,
@@ -539,6 +570,9 @@ def main() -> None:
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     out = RESULTS_DIR / f"cv_{tag}.json"
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    if args.save_probs:
+        save_fold_probabilities(RESULTS_DIR / f"cvprobs_{tag}.npz", classes, y,
+                                fold_probabilities)
 
     print(f"\n=== {tag} 완료 → {out.name} ===")
     for key, s in summary.items():

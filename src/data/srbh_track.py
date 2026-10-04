@@ -23,9 +23,11 @@ FIELD_COMBINATIONS = {
     "F1": ("request_http_request",),
     "F2": ("request_http_request", "request_body"),
     "F3": ("request_http_request", "request_body", "request_cookie"),
+    "F3M": ("request_http_request", "request_body", "request_cookie"),
     "F4": ("request_http_request", "request_body", "request_cookie", "request_user_agent"),
     "UC": ("request_user_agent", "request_cookie"),
 }
+MASKED_COLUMNS = {"F3M": ("request_cookie",)}
 
 
 def compose_fields(frame: pd.DataFrame, combination: str) -> list[str]:
@@ -37,6 +39,9 @@ def compose_fields(frame: pd.DataFrame, combination: str) -> list[str]:
     if missing:
         raise ValueError(f"필드 조합에 필요한 컬럼이 없습니다: {missing}")
     values = frame[list(columns)].fillna("").astype(str)
+    # 쿠키의 존재·문자 길이는 보존해 내용 자체의 기여만 분리한다.
+    for column in MASKED_COLUMNS.get(combination, ()):
+        values[column] = values[column].map(lambda value: "x" * len(value))
     return ["\n".join(row) for row in values.itertuples(index=False, name=None)]
 
 

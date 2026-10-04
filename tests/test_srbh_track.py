@@ -150,3 +150,17 @@ def test_empty_frame():
     frame, stats = srbh_track.build_srbh_frame(make_raw([]), set())
     assert frame.empty
     assert stats["n_returned"]["total"] == 0
+
+
+@pytest.mark.parametrize("cookie,expected", [
+    ("sid=12", "/a\nb\nxxxxxx"), ("", "/a\nb\n"),
+    (float("nan"), "/a\nb\n"), (None, "/a\nb\n"), ("쿠키", "/a\nb\nxx"),
+])
+def test_compose_f3m_masks_cookie_preserving_character_length(cookie, expected):
+    frame = pd.DataFrame(dict(request_http_request=["/a"], request_body=["b"],
+                              request_cookie=[cookie]))
+    original = frame.copy(deep=True)
+    masked = srbh_track.compose_fields(frame, "F3M")
+    assert masked == [expected]
+    assert len(masked[0]) == len(srbh_track.compose_fields(frame, "F3")[0])
+    pd.testing.assert_frame_equal(frame, original)

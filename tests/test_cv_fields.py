@@ -32,7 +32,7 @@ def pool_files(tmp_path, monkeypatch):
     return tmp_path
 
 
-@pytest.mark.parametrize("fields", [None, "F1", "F2", "F3", "F4", "UC"])
+@pytest.mark.parametrize("fields", [None, "F1", "F2", "F3", "F3M", "F4", "UC"])
 def test_sealed_pool_order_and_fingerprint(pool_files, fields):
     texts, y, classes = cv.load_text_pool("srbh_4class", "raw", fields=fields, exclude_test=True)
     images, image_y, image_classes = cv.load_image_pool("srbh_4class", "raw", 48, "gray", None,
@@ -83,6 +83,7 @@ def test_image_import_in_fresh_process(pool_files):
 
 
 def test_tag_defaults_and_suffixes():
+    assert build_tag("srbh_4class", "cnn", fields="F3M").endswith("_fF3M")
     assert build_tag("payload_4class", "cnn", channels="rgb") == "payload_4class_cnn_raw_rgb"
     for fields in (None, "F2"):
         assert build_tag("srbh_4class", "cnn", fields=fields, sealed_test=False) == "srbh_4class_cnn_raw"
