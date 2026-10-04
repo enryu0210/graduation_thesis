@@ -181,3 +181,66 @@ def signal_report(p1_val, y_val, p1_test, p2_test, y_test, n_classes,
                                p1_test, p2_test, truth, conf, n_classes, target_macro_f1),
                            "spearman_with_msp": correlation, "tau_transfer": transfer}
     return {"temperature": temperature, "calibration": calibration, "signals": signals}
+
+
+def apply_classwise(p1, conf, taus):
+    """예측 클래스 기준으로 고른 임계값을 val과 test에 같은 방식으로 적용한다."""
+    probs = _probabilities(p1)
+    confidence = _confidence(conf, len(probs))
+    thresholds = np.asarray(taus)
+    if (thresholds.shape != (probs.shape[1],)
+            or not np.issubdtype(thresholds.dtype, np.number)
+            or np.iscomplexobj(thresholds) or not np.isfinite(thresholds).all()):
+        raise ValueError("임계값은 클래스 수와 같은 길이의 유한 실수 배열이어야 합니다.")
+    return confidence < thresholds[probs.argmax(axis=1)]
+
+
+def _macro_f1_fast(y_true, y_pred, n_classes):
+    """반복 탐색 비용을 줄이되 공용 지표의 클래스 포함·zero_division 규칙을 유지한다."""
+    matrix = np.bincount(y_true * n_classes + y_pred,
+                         minlength=n_classes ** 2).reshape(n_classes, n_classes)
+    denominator = matrix.sum(axis=0) + matrix.sum(axis=1)
+    scores = np.divide(2.0 * matrix.diagonal(), denominator,
+                       out=np.zeros(n_classes), where=denominator != 0)
+    return float(scores.mean())
+
+
+def classwise_tau_path(p1_val, p2_val, y_val, n_classes, step=0.005):
+    """각 단계에서 val Macro-F1이 가장 높은 클래스에 다음 덩어리를 배정한다."""
+    first, second = _probabilities(p1_val), _probabilities(p2_val)
+    if first.shape != second.shape or n_classes != first.shape[1]:
+        raise ValueError("두 확률 모양과 클래스 수가 일치해야 합니다.")
+    truth = _labels(y_val, len(first), n_classes)
+    if not np.isfinite(step) or not 0 < step <= 1:
+        raise ValueError("덩어리 간격은 (0, 1]이어야 합니다.")
+    conf, pred1, pred2 = first.max(axis=1), first.argmax(axis=1), second.argmax(axis=1)
+    class_conf = [conf[pred1 == c] for c in range(n_classes)]
+    counts = np.array([len(values) for values in class_conf])
+    if (counts == 0).any():
+        raise ValueError("val에서 모든 예측 클래스에 적어도 한 행이 있어야 합니다.")
+    chunk = max(1, round(step * len(truth)))
+    allocations = np.zeros(n_classes, dtype=int)
+
+    def point(assigned, index):
+        taus = [tau_for_budget(values, int(a) / len(values))
+                for values, a in zip(class_conf, assigned)]
+        mask = apply_classwise(first, conf, taus)
+        pred = np.where(mask, pred2, pred1)
+        return {"step": index, "allocations": assigned.tolist(), "taus": taus,
+                "val_escalation_rate": float(mask.mean()),
+                "val_macro_f1": _macro_f1_fast(truth, pred, n_classes)}
+
+    # ponytail: 4차원 전수탐색의 근사다. 최적 탐색의 성능 하한으로 해석하며 전역 최적을 보장하지 않는다.
+    path = [point(allocations, 0)]
+    while (allocations < counts).any():
+        candidates = []
+        for c in range(n_classes):
+            if allocations[c] < counts[c]:
+                assigned = allocations.copy()
+                assigned[c] = min(assigned[c] + chunk, counts[c])
+                candidates.append(point(assigned, len(path)))
+        # 클래스 인덱스 순서와 최초 최댓값 선택으로 동점 규칙을 고정한다.
+        chosen = max(candidates, key=lambda row: row["val_macro_f1"])
+        allocations = np.asarray(chosen["allocations"])
+        path.append(chosen)
+    return path
