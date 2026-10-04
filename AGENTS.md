@@ -36,7 +36,7 @@
 ## 2. 검증 명령 (전문 그대로 복사해 쓸 것)
 
 ```bash
-# 필수 — 모든 코드 변경 후. 2026-10-04 기준 390 passed, 약 20초. GPU 불필요.
+# 필수 — 모든 코드 변경 후. 2026-10-04 기준 443 passed, 약 25초. GPU 불필요.
 PYTHONIOENCODING=utf-8 python -m pytest tests/ -q
 ```
 
@@ -47,7 +47,7 @@ PYTHONIOENCODING=utf-8 python -m pytest tests/test_cascade.py -q
 
 - **`PYTHONIOENCODING=utf-8` 를 빼지 말 것.** Windows 한글 콘솔(cp949)에서 파이썬의
   비-ASCII 출력이 `UnicodeEncodeError` 로 죽는다. 코드 문제가 아니라 콘솔 문제다.
-- 테스트가 **390개보다 줄었으면** 뭔가 수집되지 않은 것이다. 통과 개수를 RESULT 에 적어라.
+- 테스트가 **443개보다 줄었으면** 뭔가 수집되지 않은 것이다. 통과 개수를 RESULT 에 적어라.
 - 기존에 실패하던 테스트는 없다. 실패가 보이면 **네 변경 때문**이라고 가정하고 조사할 것
   ("원래 깨져 있던 것" 으로 넘기지 말 것).
 
@@ -189,7 +189,9 @@ PYTHONIOENCODING=utf-8 python src/analysis/srbh_normal_strata.py  # Normal 출�
 - 현재 입력 텍스트는 **URI + "\n" + body**(F2)이고 **F2 유지로 확정**됐다(2026-10-04 T0-a: 쿠키 내용을 지운 F3M 과 F3 의 차이가 유의하지 않음, docs/14 §8.2).
   트랙 전환은 **별도 지시가 있을 때만** 한다(전환하면 라벨 충돌·중복 제거 건수가 모두 바뀐다). 다른 조합은 `cross_validate.py --fields` 로만 실험한다.
 - 3기 교환 측정은 `src/eval/cascade_tradeoff.py`(T0-c 포화·T1 예산표·T2 장치×배치 지연), 게이트 비교는 `src/eval/gate_cv.py`
-  (`cross_validate.py --save-probs` 가 남긴 `cvprobs_*.npz` 두 개를 정렬 검증해 읽는다).
+  (`cross_validate.py --save-probs` 가 남긴 `cvprobs_*.npz` 두 개를 정렬 검증해 읽는다). 클래스별 τ 는 `gate_g2.py`, 학습형 라우터는
+  `gate_g3.py`(고정 split, `--embeddings` 로 표현 추가)·`gate_g3_cv.py`(CV). 1차 표현은 `extract_embeddings.py`·`cross_validate.py --save-embeddings`(tag `_emb`, 기존 cvprobs 보존).
+  권장 캐스케이드 1차는 class weight 체크포인트 → `cascade_tradeoff.py --balance --stage1-no-balance`(tag `_s2bal`, docs/14 §8.11).
 - **MCC 는 제거된 지표다**(`metrics.py` 머리 주석). 새 코드에서 `report["mcc"]` 를 찾지 말 것.
 - 클래스: `Normal` / `SQLInjection` / `CodeInjection`(XSS 아님) / `CommandInjection`.
 
