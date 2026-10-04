@@ -14,7 +14,7 @@
 
 사용법
 ------
-    python docs/reports/html_to_docx.py docs/reports/progress_2026-08-08.html
+    python docs/reports/html_to_docx.py docs/reports/progress/progress_2026-08-08.html
     # → 같은 폴더에 progress_2026-08-08.docx
 """
 

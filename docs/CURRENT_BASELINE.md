@@ -42,7 +42,7 @@
 | 실측 수치 | `experiments/results/*.json` | ⚠️ 전체 .gitignore, 재생성으로 확보 |
 | 그림 | `docs/figures/` | 추적·커밋 대상 |
 | 코드 관례·함정 | `CLAUDE.md` | 트랙 추가 "5곳", tag 규칙 등 |
-| 논문 서술용 흐름 정리 | `docs/reports/thesis_onepass_2026-08-12.html` | ⚠️ **Phase 13 이전 판** — 지표·데이터셋 절은 이 문서로 갱신해 읽을 것 |
+| 논문 서술용 흐름 정리 | `docs/reports/summary/thesis_onepass_2026-08-12.html` | ⚠️ **Phase 13 이전 판** — 지표·데이터셋 절은 이 문서로 갱신해 읽을 것 |
 | 지나간 시점의 기록 | `docs/archive/` | ⚠️ **현행 기준 아님.** 참조가 필요하면 내용을 현행 문서로 옮기고 원본만 남긴다 |
 
 ---
@@ -576,7 +576,7 @@ LLM 판정 후 웹 침투테스트 전문가가 300여 표본을 수동 검증(L
 | **TPR@0.1%FPR** 수치가 나왔다 | 현 트랙(Normal 722)에서는 **정의 불가**. SR-BH 교체 후에만 유효(§4.9) |
 | 문서에 **부트스트랩 95% CI** 가 "신설"로 적혀 있다 | **구현됐다**(2026-09-15, `metrics.bootstrap_ci`). 단 **자동 호출되지 않으므로** 쓰려면 호출부에서 명시적으로 부를 것(§4.8) |
 | `experiments/results/*.json` 의 수치 | 2기 기준. 데이터셋 교체 시 **141개 전부 무효화** — 코드·방법론은 그대로 산다 |
-| `docs/reports/thesis_onepass_2026-08-12` | **Phase 13 이전 판.** 흐름·기여 문구는 유효, **지표·데이터셋 절은 이 문서로 갱신해 읽을 것** |
+| `docs/reports/summary/thesis_onepass_2026-08-12` | **Phase 13 이전 판.** 흐름·기여 문구는 유효, **지표·데이터셋 절은 이 문서로 갱신해 읽을 것** |
 | `docs/07 §1.3` (지표 모범사례) | **Phase 13 으로 대체됨.** 두 문헌은 보조 근거로만 남음 |
 | RQ 번호를 정리하고 싶다 | ❌ **재배열 금지.** 파일명에 박혀 있다. 새 질문은 뒤 번호(RQ7~)로 추가 |
 | 문서·커밋에 **`phase1-data-acquisition`** 브랜치가 나온다 | **삭제된 옛 이름**이다(2026-08-24 `main` 으로 fast-forward 통합). 이름과 달리 Phase 1 전용이 아니라 **전 Phase 가 쌓여 있던** 브랜치다 |
@@ -599,12 +599,12 @@ LLM 판정 후 웹 침투테스트 전문가가 300여 표본을 수동 검증(L
 | 2026-08-24 | §4.3.1 신설(RQ 근접 논문 기준 지표 역검증) |
 | 2026-08-24 | §4.3.2 신설(독립 2차 검증 — PR-AUC 의 base-rate 결함·Brier 부재·τ 선택의 경쟁 표준) |
 | 2026-08-24 | §4.3.3 신설(원문 확보 후 판정 2건 정정 — TPR@FPR 격상·Macro-F1 단서 완화) |
-| 2026-08-24 | ⚠️ **외부 제출용 서술은 이 문서에 섞지 않는다.** 교수님 제출본은 `docs/reports/progress_2026-08-24.html`(→ PDF)로 분리했다 — 이 문서는 내부 참조본으로 유지 |
+| 2026-08-24 | ⚠️ **외부 제출용 서술은 이 문서에 섞지 않는다.** 교수님 제출본은 `docs/reports/progress/progress_2026-08-24.html`(→ PDF)로 분리했다 — 이 문서는 내부 참조본으로 유지 |
 
 ### 재생성 (PDF)
 
 이 문서가 **원본(Markdown)** 이고 PDF 는 산출물이다. 내용은 `.md` 를 고치고 다시 굽는다.
 `pandoc`·`wkhtmltopdf` 는 이 프로젝트에 없으므로 **python-markdown → HTML → Chrome 헤드리스**로 굽는다.
 Chrome 은 상대 경로 출력에서 액세스 거부가 나므로 **입출력 모두 절대 경로**로 넘긴다.
-산출물은 `docs/reports/current_baseline_2026-08-24.pdf`, 굽는 절차는 `docs/reports/README.md` 의
+산출물은 `docs/reports/summary/current_baseline_2026-08-24.pdf`, 굽는 절차는 `docs/reports/README.md` 의
 "PDF 재생성" 절을 따른다(경로는 `git rev-parse --show-toplevel` 로 그때그때 구할 것).

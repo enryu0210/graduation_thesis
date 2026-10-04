@@ -39,7 +39,7 @@
 
 ### 1.1 추가 확보 (2026-08-09) — 진행보고서 인용 논문 일괄 수집
 
-`docs/reports/progress_2026-08-08.pdf` 가 인용한 논문을 전수 대조해 **노트북 쪽 `docs/thetics/` 를
+`docs/reports/progress/progress_2026-08-08.pdf` 가 인용한 논문을 전수 대조해 **노트북 쪽 `docs/thetics/` 를
 데스크톱과 동기화**하면서, §1.2 에 "유료"로 적혀 있던 ACM 2편을 함께 확보했다.
 
 | 파일명 | 서지 | 왜 넣었나 |
@@ -93,7 +93,7 @@
 | `calexnet_…2509.08318.pdf` · `p4sdn_…2509.12291.pdf` · `cascading_llm_failure_2605.17288.pdf` | §1 표 참조 | 조기종료·캐스케이드 붕괴 |
 | `acm_sac2025_earlyexit_ids.pdf` · `acm_csur_earlyexit_survey.pdf` | §1.1 표 참조 | M4 의 선행(미채택이지만 관련연구에는 남김) |
 
-> **`docs/reports/` 에 사본이 있는 5편**(`2312.13041v1` · `2512.19203v2` · `deepsloth_2010.02432` ·
+> **`docs/reports/papers/` 에 사본이 있는 5편**(`2312.13041v1` · `2512.19203v2` · `deepsloth_2010.02432` ·
 > `feature_squeezing_ndss2018` · `s42400-023-00170-z`)은 **2026-08-12 부터 git 추적 대상**이다.
 > 교수님 제출 묶음으로 복사해 둔 것이고, 커밋해 두면 다른 기기에서 다시 받을 필요가 없다.
 > 나머지 13편은 여전히 `docs/thetics/`(gitignore)에만 있으므로 **이 표가 유일한 흔적**이다.
@@ -395,7 +395,7 @@ Tasdemir 의 **F1 Efficiency** 는 정확도–지연을 하나의 스칼라로 
 쓰는 지표라 대조에 사실상 필수), 구현 비용은 `src/eval/metrics.py` 한 함수다.
 **docs/11 §16.3 의 "FE 채택 여부 미결"은 이것으로 닫힌다.**
 
-**원문 정의 (PDF `docs/reports/2312.13041v1.pdf` §IV-A Eq.5 직접 확인, 2026-09-15)**
+**원문 정의 (PDF `docs/reports/papers/2312.13041v1.pdf` §IV-A Eq.5 직접 확인, 2026-09-15)**
 
 ```
 FE = α·F1 + (1−α)·l        where α ∈ [0,1],  l ∈ (0,1] is normalised inference time (ms)

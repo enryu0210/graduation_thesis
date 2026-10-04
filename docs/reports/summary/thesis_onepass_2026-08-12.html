@@ -290,7 +290,7 @@ char-CNN 단독보다 느립니다(실측 0.0627 ms vs 0.0561 ms). → <b>채택
 </div>
 
 <figure>
-  <img src="../figures/models/cascade_curve_payload_4class_csicnorm_cascade_raw_rgb_b0.1_bal.png" alt="cascade accuracy-latency curve">
+  <img src="../../figures/models/cascade_curve_payload_4class_csicnorm_cascade_raw_rgb_b0.1_bal.png" alt="cascade accuracy-latency curve">
   <figcaption>그림 1. 대표 운영점(RGB 1차 · budget 10%)의 정확도 / 지연 vs 에스컬레이션 곡선.
   τ 하나로 두 단독 모델 사이를 연속 이동하며, 양 끝점이 각각 얕은 CNN 단독과 char-CNN 단독으로 수렴한다.
   (<code>docs/figures/models/cascade_curve_..._rgb_b0.1_bal.png</code>)</figcaption>
@@ -626,7 +626,7 @@ any-misclass 가 char-CNN 0.224 vs RGB CNN 0.598 로 <b>격렬하게 갈립니�
 </table>
 
 <figure>
-  <img src="../figures/attacks/tamper_auc_payload_4class_csicnorm_cascade_rgb_bal.png" alt="tampering AUC vs tau">
+  <img src="../../figures/attacks/tamper_auc_payload_4class_csicnorm_cascade_rgb_bal.png" alt="tampering AUC vs tau">
   <figcaption>그림 2. τ 스윕에 따른 판별력 변화(base 구성, k=5). τ 를 올리면 커버리지와 ROC-AUC 가 함께 오르지만
   그만큼 2차를 더 돌리므로 비용도 오른다 — "공짜 판정"과 "판별력"은 같은 손잡이의 양 끝이다.
   (<code>docs/figures/attacks/tamper_auc_..._cascade_rgb_bal.png</code>)</figcaption>
@@ -859,7 +859,7 @@ running stats 를 쓴다는 것이며, 단위 테스트로 고정했습니다).<
 </table>
 
 <figure>
-  <img src="../figures/attacks/evasion_compare_payload_4class_csicnorm.png" alt="evasion comparison across models">
+  <img src="../../figures/attacks/evasion_compare_payload_4class_csicnorm.png" alt="evasion comparison across models">
   <figcaption>그림 3. 모델별 회피 비교(캐스케이드 운영점 2개 포함). 표현방식에 따라 any-misclass 가 2.6배 갈린다.
   (<code>docs/figures/attacks/evasion_compare_payload_4class_csicnorm.png</code>)</figcaption>
 </figure>

@@ -3,6 +3,18 @@
 교수님 제출·미팅 배포처럼 **저장소 밖으로 나가는 문서**를 둔다.
 설계·의사결정 기록(`docs/0N_*.md`)과 달리 **읽는 사람이 저장소를 모른다고 가정**하고 쓴다.
 
+## 폴더 구조 (2026-10-04 정리)
+
+| 폴더 | 무엇을 두나 | 파일 이름 규칙 |
+|---|---|---|
+| `progress/` | 교수님 제출·미팅용 **진행 보고**(시점별 스냅숏) | `progress/progress_YYYY-MM-DD.{html,pdf,docx}` |
+| `summary/` | 진행 보고가 아닌 **정리본**(현행 기준 정리 · 논문용 흐름 정리) | `<주제>_YYYY-MM-DD.{html,pdf}` |
+| `papers/` | 보고서와 함께 교수님께 드린 **인용 논문 사본** | 원 파일명 그대로 |
+| (이 폴더 바로 아래) | 이 README 와 변환 도구 `html_to_docx.py` 만 | — |
+
+- 새 보고서는 위 표의 해당 폴더에 바로 만든다. 폴더가 한 단계 깊어졌으므로 HTML 의 그림 경로는 **`../../figures/`** 다.
+- 다른 문서에서 보고서를 가리킬 때는 폴더까지 적는다(예: `docs/reports/progress/progress_2026-10-04.pdf`).
+
 ## 규칙
 
 - **HTML 이 원본, PDF·DOCX 는 산출물**이다. 내용 수정은 `.html` 을 고치고 둘 다 다시 굽는다.
@@ -13,7 +25,7 @@
     HTML 에 되돌려 넣거나 "이번 판은 DOCX 가 최신"임을 아래 목록 표에 적어 둔다.
     적어두지 않으면 다음에 HTML 에서 다시 구울 때 **손본 것이 조용히 사라진다.**
 - 수치는 반드시 `docs/0N_*.md` 나 `experiments/results/*.json` 에 근거를 둔다. 새 수치를 여기서 만들지 않는다.
-- 그림은 `../figures/` 를 **상대 경로**로 참조한다(절대 경로 금지 — 기기마다 드라이브 문자가 다름).
+- 그림은 `../../figures/` 를 **상대 경로**로 참조한다(절대 경로 금지 — 기기마다 드라이브 문자가 다름).
 - PDF 도 커밋한다. 기기 간 이동 수단이 커밋뿐이라, 커밋하지 않으면 다른 기기에서 다시 구워야 한다.
 
 ## PDF 재생성
@@ -23,7 +35,7 @@ Chrome 은 상대 경로 출력에서 액세스 거부가 나므로 **입출력 
 
 ```bash
 # Bash 도구 기준. 경로는 그때그때 구한다(하드코딩 금지)
-WIN=$(cd "$(git rev-parse --show-toplevel)/docs/reports" && pwd -W)
+WIN=$(cd "$(git rev-parse --show-toplevel)/docs/reports/progress" && pwd -W)
 "/c/Program Files/Google/Chrome/Application/chrome.exe" \
     --headless --disable-gpu --no-sandbox --no-pdf-header-footer \
     --print-to-pdf="$WIN/progress_2026-08-08.pdf" \
@@ -66,7 +78,7 @@ css = (tmp / "style.css").read_text(encoding="utf-8")
 print("표", body.count("<table>"), "개 / h2", body.count("<h2>"), "개")
 PY
 # 2단계: Chrome 헤드리스 (입출력 모두 절대 경로)
-WIN=$(cd "$ROOT/docs/reports" && pwd -W); TMPWIN=$(cd "$TMP" && pwd -W)
+WIN=$(cd "$ROOT/docs/reports/summary" && pwd -W); TMPWIN=$(cd "$TMP" && pwd -W)
 "/c/Program Files/Google/Chrome/Application/chrome.exe" \
     --headless --disable-gpu --no-sandbox --no-pdf-header-footer \
     --print-to-pdf="$WIN/current_baseline_2026-08-24.pdf" "file:///$TMPWIN/out.html"
@@ -83,7 +95,7 @@ WIN=$(cd "$ROOT/docs/reports" && pwd -W); TMPWIN=$(cd "$TMP" && pwd -W)
 pandoc 이 없으므로 `html_to_docx.py`(python-docx + bs4, 둘 다 설치돼 있음)로 굽는다.
 
 ```bash
-python docs/reports/html_to_docx.py docs/reports/progress_2026-08-08.html
+python docs/reports/html_to_docx.py docs/reports/progress/progress_2026-08-08.html
 # → 같은 이름의 .docx
 ```
 
@@ -94,7 +106,7 @@ HTML 에 새 구조를 추가하면 `html_to_docx.py` 의 dispatch 에도 함께
 
 ## 함께 두는 인용 논문 PDF (2026-08-12 추가)
 
-보고서가 인용하는 논문 중 **교수님께 함께 드린 5편**은 이 폴더에 사본을 두고 **커밋한다.**
+보고서가 인용하는 논문 중 **교수님께 함께 드린 5편**은 `papers/` 에 사본을 두고 **커밋한다.**
 
 `2312.13041v1.pdf` · `2512.19203v2.pdf` · `deepsloth_2010.02432.pdf` ·
 `feature_squeezing_ndss2018.pdf` · `s42400-023-00170-z.pdf`
@@ -102,20 +114,20 @@ HTML 에 새 구조를 추가하면 `html_to_docx.py` 의 dispatch 에도 함께
 - 원본은 `docs/thetics/` 에 있지만 그쪽은 **`.gitignore` 대상**이라 기기를 옮기면 따라오지 않는다.
   제출 묶음은 다시 만들 일이 잦으므로 사본을 추적한다.
 - **서지정보는 여기 적지 않는다** — 논문 목록의 단일 진실 소스는 `docs/12 §1.3` 이다.
-- ⚠️ 압축본(`.zip`)은 커밋하지 않는다(`.gitignore`). 위 PDF 들의 중복이라 히스토리만 불린다.
+- ⚠️ 압축본(`.zip`)은 커밋하지 않는다(`.gitignore` 의 `docs/reports/**/*.zip` — 하위 폴더까지 막는다). 위 PDF 들의 중복이라 히스토리만 불린다.
   제출용 묶음이 필요하면 그때 다시 압축한다.
 
 ## 목록
 
 | 파일 | 내용 | 기준일 | 최신 원본 |
 |---|---|---|---|
-| `progress_2026-08-08.{html,pdf,docx}` | 캐스케이드 전환 이후(Phase 10~12) 진행 보고. 근거: docs/09·10·11·12 | 2026-08-08 | **DOCX·PDF** |
-| `current_baseline_2026-08-24.pdf` | **현행 기준 정리 — RQ · 평가지표 · 데이터셋.** 1기(gray CNN)·2기(MCC)·3기(Phase 13 개편)를 시기별로 갈라, 지금 무엇이 유효하고 무엇이 폐기됐는지를 한 문서로 통합. 근거: 마스터 + docs/07·11·12·13 | 2026-08-24 | **`docs/CURRENT_BASELINE.md`** (Markdown 원본 — 위 예외) |
-| `progress_2026-08-24.{html,pdf}` ⭐ | **교수님 제출용 진행 보고.** 2026-08-13 미팅 지시 2건(평가지표·데이터셋) 이행 현황 + 지표 선택의 선행연구 역검증 결과. ⚠️ **내부 약칭(`docs/NN`·`Phase N`·`F5`·`C1`·트랙 이름·모델 코드명)을 본문에 일절 쓰지 않는다** — 저장소를 모르는 독자가 읽는 문서다. 근거: 마스터 + docs/12·13 + `CURRENT_BASELINE.md` | 2026-08-24 | **HTML** |
-| `progress_2026-09-14.{html,pdf}` ⭐ | **교수님 제출용 진행 보고.** 새 주 데이터셋(SR-BH 2020) 확보·라벨 매핑·라벨 오류 자체 감사·학습 데이터 구성과, 시험 데이터를 봉인한 입력 필드 선택 실험(이미지 CNN 5종) 결과 + 새로 드러난 한계(정상 = 스캐너 탐색 요청 위주). 문자 단위 CNN 비교는 미포함(미실행). 08-24 판과 같은 스타일·같은 내부 약칭 금지 규칙. 근거: docs/13 §2.5.2~§2.6.1·§4.1.2 | 2026-09-14 | **HTML** (표 6 · h2 8 · 4쪽) |
-| `progress_2026-09-15.{html,pdf}` ⭐ | **교수님 제출용 진행 보고(09-14 판 후속).** 문자 단위 CNN 입력 필드 실험 결과·두 모델 비교, 정상 요청 출처별 오탐률 첫 실측(실사용자가 스캐너의 약 8배), 09-14 판의 실사용자 요청 수(3,666) 정정, 평가 지표 정비(Brier·유병률 병기·FE·신뢰구간·ASR/AUA/AMB), 질문 2건. **사용자 요청으로 초보 독자용 풀이를 넣었다** — 용어 풀이 표(0절)와 표마다 `div.easy`("쉽게 말하면") 상자. ⚠️ `div.easy` 는 `html_to_docx.py` dispatch 에 없다(DOCX 로 구우면 누락). 내부 약칭 금지 규칙 동일. 근거: docs/13 §1.12·§1.13·§4.1.1·§4.1.2 | 2026-09-15 | **HTML** (표 6 · h2 8 · 5쪽) |
-| `progress_2026-10-04.{html,pdf}` ⭐ | **교수님 제출용 진행 보고(09-15 판 후속).** 제목 변경·RQ4 제외 사유, 쿠키 절제(F3M → 입력 F2 유지), 1차 확률 포화 점검, 넘김 비율별 정확도(T1)·장치/배치별 지연(T2, 첫 번째 기여 주장을 조건부 이득으로 하향), 넘김 신호 비교(G1, 가설 기각), 선행 연구 13편 표, 다음 계획 3단계와 질문 1건. 상자·과한 강조 없이 서술형으로 썼다(사용자 요청: AI 느낌 줄이기). 근거: docs/14 §8.2~§8.4 · docs/12 §1.7 | 2026-10-04 | **HTML** (표 5 · h2 10 · 7쪽) |
-| `thesis_onepass_2026-08-12.{html,pdf}` | **논문 반영용 ONE FLOW 정리.** 캐스케이드 전환 이후 전 과정을 **논문 서술 순서**(RQ1→RQ5→RQ2→RQ3→RQ6, RQ4 별도)로 한 흐름에 엮고, 목차 매핑·그림 인벤토리·기여 문구/금지어까지 붙였다. 근거: docs/09·10·11·12 + 마스터 | 2026-08-12 | **HTML** |
+| `progress/progress_2026-08-08.{html,pdf,docx}` | 캐스케이드 전환 이후(Phase 10~12) 진행 보고. 근거: docs/09·10·11·12 | 2026-08-08 | **DOCX·PDF** |
+| `summary/current_baseline_2026-08-24.pdf` | **현행 기준 정리 — RQ · 평가지표 · 데이터셋.** 1기(gray CNN)·2기(MCC)·3기(Phase 13 개편)를 시기별로 갈라, 지금 무엇이 유효하고 무엇이 폐기됐는지를 한 문서로 통합. 근거: 마스터 + docs/07·11·12·13 | 2026-08-24 | **`docs/CURRENT_BASELINE.md`** (Markdown 원본 — 위 예외) |
+| `progress/progress_2026-08-24.{html,pdf}` ⭐ | **교수님 제출용 진행 보고.** 2026-08-13 미팅 지시 2건(평가지표·데이터셋) 이행 현황 + 지표 선택의 선행연구 역검증 결과. ⚠️ **내부 약칭(`docs/NN`·`Phase N`·`F5`·`C1`·트랙 이름·모델 코드명)을 본문에 일절 쓰지 않는다** — 저장소를 모르는 독자가 읽는 문서다. 근거: 마스터 + docs/12·13 + `CURRENT_BASELINE.md` | 2026-08-24 | **HTML** |
+| `progress/progress_2026-09-14.{html,pdf}` ⭐ | **교수님 제출용 진행 보고.** 새 주 데이터셋(SR-BH 2020) 확보·라벨 매핑·라벨 오류 자체 감사·학습 데이터 구성과, 시험 데이터를 봉인한 입력 필드 선택 실험(이미지 CNN 5종) 결과 + 새로 드러난 한계(정상 = 스캐너 탐색 요청 위주). 문자 단위 CNN 비교는 미포함(미실행). 08-24 판과 같은 스타일·같은 내부 약칭 금지 규칙. 근거: docs/13 §2.5.2~§2.6.1·§4.1.2 | 2026-09-14 | **HTML** (표 6 · h2 8 · 4쪽) |
+| `progress/progress_2026-09-15.{html,pdf}` ⭐ | **교수님 제출용 진행 보고(09-14 판 후속).** 문자 단위 CNN 입력 필드 실험 결과·두 모델 비교, 정상 요청 출처별 오탐률 첫 실측(실사용자가 스캐너의 약 8배), 09-14 판의 실사용자 요청 수(3,666) 정정, 평가 지표 정비(Brier·유병률 병기·FE·신뢰구간·ASR/AUA/AMB), 질문 2건. **사용자 요청으로 초보 독자용 풀이를 넣었다** — 용어 풀이 표(0절)와 표마다 `div.easy`("쉽게 말하면") 상자. ⚠️ `div.easy` 는 `html_to_docx.py` dispatch 에 없다(DOCX 로 구우면 누락). 내부 약칭 금지 규칙 동일. 근거: docs/13 §1.12·§1.13·§4.1.1·§4.1.2 | 2026-09-15 | **HTML** (표 6 · h2 8 · 5쪽) |
+| `progress/progress_2026-10-04.{html,pdf}` ⭐ | **교수님 제출용 진행 보고(09-15 판 후속).** 제목 변경·RQ4 제외 사유, 쿠키 절제(F3M → 입력 F2 유지), 1차 확률 포화 점검, 넘김 비율별 정확도(T1)·장치/배치별 지연(T2, 첫 번째 기여 주장을 조건부 이득으로 하향), 넘김 신호 비교(G1, 가설 기각), 선행 연구 13편 표, 다음 계획 3단계와 질문 1건. 상자·과한 강조 없이 서술형으로 썼다(사용자 요청: AI 느낌 줄이기). 근거: docs/14 §8.2~§8.4 · docs/12 §1.7 | 2026-10-04 | **HTML** (표 5 · h2 10 · 7쪽) |
+| `summary/thesis_onepass_2026-08-12.{html,pdf}` | **논문 반영용 ONE FLOW 정리.** 캐스케이드 전환 이후 전 과정을 **논문 서술 순서**(RQ1→RQ5→RQ2→RQ3→RQ6, RQ4 별도)로 한 흐름에 엮고, 목차 매핑·그림 인벤토리·기여 문구/금지어까지 붙였다. 근거: docs/09·10·11·12 + 마스터 | 2026-08-12 | **HTML** |
 
 > ⚠️ `progress_2026-08-08` 은 **Phase 12 종결 전**(M1·M2·M4 실측 이전) 판이다.
 > Phase 12 결과(docs/11 §13·§14·§15 와 종결 요약 §16)를 담은 것은
