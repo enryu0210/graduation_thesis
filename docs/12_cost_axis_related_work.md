@@ -146,6 +146,7 @@ docs/13 §1.9~§1.11 의 지표 역검증에서 실제로 대조한 논문이다
 | `03_회피공격_방어/` | **탐지 우회 공격과 방어** (연구 질문 2·3) | 4 | AdvSQLi(IEEE TIFS) · WAF-A-MoLE · DeepSloth(ICLR'21) · Feature Squeezing(NDSS'18) |
 | `04_이미지화_표현/` | **바이트를 이미지로 바꿔 분류하는 계열** — 제안 표현의 근거 | 4 | Nataraj(VizSec'11, 이미지화의 원점) · VulCNN(ICSE'22) · Appl.Sci. RGB assembly · fileless malware 이미지화 |
 | `05_웹공격탐지_데이터셋/` | **웹공격 탐지 모델·데이터셋 최신 대조 대상** | 4 | WADBERT · WAMM · Uncertainty-Aware Ensemble · Sci.Rep. XSS/SQLi |
+| `06_게이트_라우팅_지연/` (2026-10-04 신설) | **넘김 규칙(게이트)·학습형 라우터·배포 지연 측정** — 3기 두 축의 직접 선행. 목록은 §1.7 | 13 | Jitkrittum(NeurIPS'23) · Wang(ICLR'22) · Kag(ICLR'23) · Enomoto(AAAI'21) · MLPerf(ISCA'20) |
 
 **분류가 애매해 판단이 필요했던 것 2건** (다음에 찾을 때 헤매지 않도록 남긴다)
 
@@ -225,6 +226,42 @@ docs/13 §2.2 와 CURRENT_BASELINE §5.2 는 **처음부터 맞게** 적혀 있�
 
 ⚠️ 제1저자 성은 스페인식 복성 **Sureda Riera** 다. 약식 인용은 `Sureda Riera et al.` 가 정확하지만
 현행 문서 전체가 `Riera et al.` 로 통일돼 있어 **그대로 둔다** — 혼용만 하지 말 것.
+
+---
+
+### 1.7 추가 확보 (2026-10-04) — 3기 두 축(게이트·배포 지연) 선행 13편 · 폴더 `06_게이트_라우팅_지연/`
+
+docs/14 가 연구 초점을 "캐스케이드의 넘김 판단(G)"과 "배포 조건별 속도·정확도 교환(T)"으로 좁히면서,
+기존 수집본에는 **넘김 규칙 자체를 다룬 기계학습 쪽 문헌이 한 편도 없었다**(02 폴더는 전부 보안·조기종료 응용).
+그 빈자리를 채운 13편이다. 모두 arXiv 에서 받았고(Kag 은 NSF PAR), **받은 뒤 원문 1쪽의 제목·저자와 대조했다**(§1.6.1 교훈).
+학회명은 arXiv 메타데이터의 comment 또는 학회 페이지로 확인했다. 확인되지 않은 것은 arXiv 로만 적는다.
+
+| 파일명 (`06_게이트_라우팅_지연/`) | 서지 | 이 논문에서 가져오는 것 | 쓰는 곳 |
+|---|---|---|---|
+| `jitkrittum_cascade_deferral_neurips2023_2307.02764.pdf` ⭐ | Jitkrittum, Gupta, Menon, Narasimhan, Rawat, Kumar. *When Does Confidence-Based Cascade Deferral Suffice?* **NeurIPS 2023** | 최적 넘김 규칙은 r*(x)=1[η_h2(x) − η_h1(x) > c] — 1차 확신도만 보는 규칙은 2차의 정오를 모른다. 확신도 넘김이 무너지는 조건 3개: (i) 2차가 일부 입력에만 강한 전문가, (ii) 라벨 노이즈, (iii) 분포 이동. 사후 규칙 Diff-01 · Diff-Prob · MaxProb 제안 | **G3 설계의 직접 근거**(학습형 라우터의 타깃을 Diff-01 로) · G1 이 실패할 때의 해석 틀 · G4 |
+| `gupta_lm_cascades_iclr2024_2404.10136.pdf` | Gupta, Narasimhan, Jitkrittum, Rawat, Menon, Kumar. *Language Model Cascades: Token-level Uncertainty and Beyond.* **ICLR 2024** | 분류 캐스케이드에서는 확신도 넘김이 이론·실무 모두 기본값이라는 정리. 생성 모델에서는 학습한 사후 넘김 규칙이 단순 집계를 이긴다 | 관련연구 서술(분류 vs 생성의 구분) |
+| `wang_wisdom_of_committees_iclr2022_2012.01988.pdf` | Wang, Kondratyuk, Christiansen, Kitani, Alon(Movshovitz-Attias), Eban. *Wisdom of Committees: An Overlooked Approach to Faster and More Accurate Models.* **ICLR 2022** | 사전학습 모델을 확신도 임계값으로 잇기만 한 캐스케이드가 같은 정확도에서 EfficientNet-B7 대비 5.4배, ViT-L-384 대비 2.3배 빠르다 | T1 배수의 비교 맥락(**기준 모델이 달라 직접 비교 불가** — 마스터 §11 규칙대로 병기만) |
+| `kag_selective_query_iclr2023.pdf` | Kag, Fedorov, Gangrade, Whatmough, Saligrama. *Efficient Edge Inference by Selective Query.* **ICLR 2023** | 엣지 모델 + 라우터를 함께 학습해 "클라우드가 맞힐 어려운 예제"만 보낸다. 정답 라벨이 없는 라우팅 타깃에 대리 감독(proxy supervision)을 쓴다. 지연 조건별로 결과를 보고 | G3(라우터 학습 타깃) · T2(지연 조건별 보고 방식) |
+| `enomoto_learning_to_cascade_2021_2104.09286.pdf` | Enomoto, Eda. *Learning to Cascade: Confidence Calibration for Improving the Accuracy and Computational Cost of Cascade Inference Systems.* **AAAI 2021** | 기존 교정 기법을 캐스케이드에 그대로 쓰면 **오히려 나빠지는 경우가 있다** → 교정 손실을 캐스케이드 목적에 맞춰 함께 학습 | docs/13 §4.1.3 의 "온도 스케일링만으로는 순위가 안 바뀐다" 정정의 외부 근거 · G1 해석 |
+| `hendrycks_msp_baseline_iclr2017_1610.02136.pdf` | Hendrycks, Gimpel. *A Baseline for Detecting Misclassified and Out-of-Distribution Examples in Neural Networks.* **ICLR 2017** | 최대 softmax 확률(MSP)이 오분류 탐지의 기준선 | 현행 게이트 신호 `msp` 의 출처 |
+| `geifman_selective_classification_nips2017_1705.08500.pdf` | Geifman, El-Yaniv. *Selective Classification for Deep Neural Networks.* **NIPS 2017** | 기각(reject) 옵션과 위험–커버리지 교환. 원하는 위험 수준을 맞추는 임계값을 학습 데이터에서 고정 | 넘김 예산 곡선의 개념적 짝(넘김 = 1차의 기각) |
+| `madras_learning_to_defer_neurips2018_1711.06664.pdf` | Madras, Pitassi, Zemel. *Predict Responsibly: Improving Fairness and Accuracy by Learning to Defer.* **NeurIPS 2018** | 기각 학습을 "뒤의 결정자를 고려한 넘김"으로 일반화(learning to defer) | G3 이론 배경 |
+| `mozannar_consistent_l2d_icml2020_2006.01862.pdf` | Mozannar, Sontag. *Consistent Estimators for Learning to Defer to an Expert.* **ICML 2020** | 넘김 학습을 비용 민감 학습으로 환원한 일관 대리 손실 | G3 이론 배경(우리는 사후 라우터라 손실은 쓰지 않는다) |
+| `chen_frugalgpt_2023_2305.05176.pdf` | Chen, Zaharia, Zou. *FrugalGPT: How to Use Large Language Models While Reducing Cost and Improving Performance.* arXiv:2305.05176, 2023 (학회·저널 미확인) | LLM 캐스케이드 + 학습한 점수 함수로 넘김 결정. 최고 단일 모델 성능을 최대 98% 비용 절감으로 | 관련연구(비용 헤드라인의 타 분야 사례) |
+| `teerapittayanon_branchynet_icpr2016_1709.01686.pdf` | Teerapittayanon, McDanel, Kung. *BranchyNet: Fast Inference via Early Exiting from Deep Neural Networks.* ICPR 2016 (arXiv 메타데이터에 학회 표기 없음) | 조기종료 원형. 보조 분기의 확신도(엔트로피)로 종료 | M4(`cnn_ee`) 의 원형 인용 |
+| `reddi_mlperf_inference_isca2020_1911.02549.pdf` | Reddi et al. *MLPerf Inference Benchmark.* **ISCA 2020** | 추론 성능은 시나리오(single-stream · multistream · server · offline)마다 크게 달라진다. single-stream = 질의 크기 1, 응답성이 중요한 클라이언트 | **T2 헤드라인 조건(CPU·배치 1)의 근거** |
+| `ovadia_uncertainty_shift_neurips2019_1906.02530.pdf` | Ovadia et al. *Can You Trust Your Model's Uncertainty? Evaluating Predictive Uncertainty Under Dataset Shift.* **NeurIPS 2019** | 분포 이동 아래에서는 사후 교정(온도 스케일링 등)이 부족하다 | G4(τ 이식성) · H-E5-2 의 사전 예상 |
+
+**이 묶음이 우리 실험에 주는 것 — 세 가지**
+
+1. **G 축의 질문은 이미 일반 ML 에서 정식화돼 있다.** Jitkrittum et al. 2023 이 "확신도 넘김이 언제 충분한가"를 직접 다뤘다.
+   그래서 우리 기여를 "넘김 규칙 개선"이라고 넓게 쓰면 안 되고, **표현이 다른 두 탐지기(이미지 CNN → 바이트 시퀀스 char-CNN)를 잇는 보안 캐스케이드에서
+   그 조건이 성립하는지**를 실측하는 것으로 좁혀야 한다. 2차 char-CNN 은 클래스 단위 전문가는 아니지만, 1차와 입력 표현이 달라
+   **틀리는 샘플이 다르다**(2기 상보성 분석). 이것은 그들의 조건 (i) "2차의 오류 확률이 샘플마다 크게 다르다"에 가깝다. G3 의 근거가 여기서 나온다.
+2. **G3 학습형 라우터의 타깃은 새로 만들 필요가 없다.** Diff-01(=1[2차 정답] − 1[1차 정답])을 회귀하는 사후 모델을 그대로 가져오고,
+   학습 데이터 누수만 우리 원칙(val 을 다시 쪼갠다, docs/14 §4)대로 막는다.
+3. **T2 헤드라인 조건을 CPU·배치 1 로 고정한 근거**가 MLPerf 의 single-stream 시나리오다(docs/14 §8.1).
+   Wang et al. 2022 의 5.4배는 FLOPs·ImageNet·EfficientNet 기준이라 우리 배수와 나란히 쓰되 직접 비교하지 않는다.
 
 ---
 
