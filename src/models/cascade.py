@@ -94,7 +94,7 @@ def checkpoint_tag(track: str, model: str, text: str, balance: bool,
                    channels: str = "gray", encoders=None, lr: float = DEFAULT_LR,
                    defense: str = "none", mutation_split: str | None = None,
                    aug_ratio: float | None = None,
-                   aux_weight: float | None = None) -> str:
+                   aux_weight: float | None = None, width: float = 1.0) -> str:
     """train.py 의 저장 태그 규칙을 그대로 따른다(파일명 불일치 방지).
 
     ⚠️ 규칙을 여기서 다시 구현하지 않고 `tagging.build_tag` 에 위임한다. 예전에는 이 함수가
@@ -111,14 +111,16 @@ def checkpoint_tag(track: str, model: str, text: str, balance: bool,
                      encoders=encoders if is_stage1_image else None,
                      lr=lr, balance=balance, defense=defense,
                      mutation_split=mutation_split, aug_ratio=aug_ratio,
-                     aux_weight=aux_weight if model == "cnn_ee" else None)
+                     aux_weight=aux_weight if model == "cnn_ee" else None,
+                     width=width if model == "cnn" else None)
 
 
 def load_net(model: str, num_classes: int, track: str, text: str, balance: bool,
              device, channels: str = "gray", in_channels: int = 1,
              encoders=None, lr: float = DEFAULT_LR,
              defense: str = "none", mutation_split: str | None = None,
-             aug_ratio: float | None = None, aux_weight: float | None = None):
+             aug_ratio: float | None = None, aux_weight: float | None = None,
+             width: float = 1.0):
     """학습된 체크포인트를 로드해 eval 모드 모델을 반환한다.
 
     체크포인트가 없으면 '어떤 명령으로 만들면 되는지'까지 알려주는 에러를 낸다
@@ -126,7 +128,7 @@ def load_net(model: str, num_classes: int, track: str, text: str, balance: bool,
     """
     if model == "cnn":
         import cnn as cnn_mod
-        net = cnn_mod.build_model(num_classes, in_channels=in_channels)
+        net = cnn_mod.build_model(num_classes, in_channels=in_channels, width=width)
     elif model == "cnn_ee":
         import cnn as cnn_mod
         # 임계값은 여기서 정하지 않는다 — val 스윕이 고른 값을 나중에 net.exit_threshold 로 넣는다.
@@ -135,7 +137,7 @@ def load_net(model: str, num_classes: int, track: str, text: str, balance: bool,
         import text_models
         net = text_models.build_model(model, num_classes)
 
-    path = CKPT_DIR / f"{checkpoint_tag(track, model, text, balance, channels, encoders, lr, defense, mutation_split, aug_ratio, aux_weight)}.pt"
+    path = CKPT_DIR / f"{checkpoint_tag(track, model, text, balance, channels, encoders, lr, defense, mutation_split, aug_ratio, aux_weight, width)}.pt"
     if not path.exists():
         rgb_hint = ""
         if model in STAGE1_MODELS and channels == "rgb":

@@ -24,8 +24,14 @@ import torch.nn as nn
 class PayloadCNN(nn.Module):
     """페이로드 그레이스케일 이미지(1채널)를 K개 클래스로 분류하는 얕은 CNN."""
 
-    def __init__(self, num_classes: int, in_channels: int = 1, dropout: float = 0.3):
+    def __init__(self, num_classes: int, in_channels: int = 1, dropout: float = 0.3,
+                 width: float = 1.0):
         super().__init__()
+        # width: 채널 수 배율(T4b, docs/14 §8.14). 1차 비용 t1 과 정확도의 교환을 재기 위한 축이라
+        # 블록 구조는 그대로 두고 폭만 바꾼다. 1.0 이면 기존 32/64/128 과 동일(체크포인트 호환).
+        if width <= 0:
+            raise ValueError(f"width 는 양수여야 합니다: {width}")
+        c1, c2, c3 = (max(1, round(c * width)) for c in (32, 64, 128))
 
         # 한 블록 = Conv(3x3, padding=1) → BN → ReLU → MaxPool(2). 공간 크기를 절반으로 줄인다.
         def conv_block(cin: int, cout: int) -> nn.Sequential:
@@ -37,15 +43,15 @@ class PayloadCNN(nn.Module):
             )
 
         self.features = nn.Sequential(
-            conv_block(in_channels, 32),   # 48 → 24
-            conv_block(32, 64),            # 24 → 12
-            conv_block(64, 128),           # 12 → 6
+            conv_block(in_channels, c1),   # 48 → 24
+            conv_block(c1, c2),            # 24 → 12
+            conv_block(c2, c3),            # 12 → 6
         )
 
         # GAP: (N,128,H,W) → (N,128,1,1). 공간 크기와 무관하게 128차원 특징으로 요약.
         self.gap = nn.AdaptiveAvgPool2d(1)
         self.dropout = nn.Dropout(dropout)
-        self.classifier = nn.Linear(128, num_classes)
+        self.classifier = nn.Linear(c3, num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.features(x)

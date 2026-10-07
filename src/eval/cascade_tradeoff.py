@@ -172,7 +172,8 @@ def result_tag(args, encoders):
     """체크포인트 축과 표본·측정 축을 모두 반영하여 다른 실행의 덮어쓰기를 막는다."""
     stage1_balance = args.balance and not getattr(args, "stage1_no_balance", False)
     base = cascade.checkpoint_tag(args.track, "cnn", args.text, stage1_balance,
-                                  args.channels, encoders)
+                                  args.channels, encoders,
+                                  width=getattr(args, "stage1_width", 1.0))
     if stage1_balance != args.balance:
         base += "_s2bal"
     limit = "all" if args.limit is None else str(args.limit)
@@ -209,6 +210,8 @@ def parse_args():
     parser.add_argument("--text", choices=("raw",), default="raw")
     parser.add_argument("--balance", action="store_true", help="균형 학습 체크포인트 사용(실행 시 명시)")
     parser.add_argument("--stage1-no-balance", action="store_true", help="1차만 class weight 비균형 체크포인트 사용")
+    parser.add_argument("--stage1-width", type=float, default=1.0,
+                        help="1차 RGB CNN 채널 배율 체크포인트(T4b). 1.0 이 아니면 tag 에 '_w' 축")
     parser.add_argument("--max-len", type=int, default=2304)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--smoke", action="store_true")
@@ -259,7 +262,8 @@ def main():
             raise ValueError("분할별 클래스가 다르거나 빈 입력 또는 Normal 클래스가 없습니다.")
         strata, strata_reason = load_strata(args.track, args.limit, y_test, classes)
         net1 = cascade.load_net("cnn", len(classes), args.track, args.text, args.stage1_balance,
-                                device, args.channels, 3 if args.channels == "rgb" else 1, encoders)
+                                device, args.channels, 3 if args.channels == "rgb" else 1, encoders,
+                                width=args.stage1_width)
         net2 = cascade.load_net("charcnn", len(classes), args.track, args.text, args.balance, device)
         p1_val = cascade.predict_probs(net1, x_img_val, device, 512).astype(np.float32)
         p2_val = cascade.predict_probs(net2, x_seq_val, device, 512).astype(np.float32)

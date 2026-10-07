@@ -238,11 +238,11 @@ def build_datasets(model: str, track: str, text: str, side: int, max_len: int,
 
 
 def build_model(model: str, num_classes: int, in_channels: int = 1,
-                patch: str = "8x8") -> nn.Module:
+                patch: str = "8x8", width: float = 1.0) -> nn.Module:
     """모델 이름 → nn.Module. 이미지 모델은 cnn.py/vit.py, 텍스트는 text_models.py 에서 가져온다."""
     if model == "cnn":
         import cnn
-        return cnn.build_model(num_classes, in_channels=in_channels)
+        return cnn.build_model(num_classes, in_channels=in_channels, width=width)
     if model == "cnn_ee":
         import cnn
         # 조기종료 임계값은 학습에 관여하지 않는다(학습 중에는 조기종료를 하지 않는다).
@@ -380,6 +380,8 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=128)
     parser.add_argument("--lr", type=float, default=DEFAULT_LR)
     parser.add_argument("--patience", type=int, default=5, help="조기 종료 인내 에폭")
+    parser.add_argument("--width", type=float, default=1.0,
+                        help="얕은 CNN 채널 배율(--model cnn 전용, T4b). 1.0 이 아니면 tag 에 '_w' 접미사")
     parser.add_argument("--aux-weight", type=float, default=DEFAULT_AUX_WEIGHT,
                         help="조기종료 보조 헤드 손실 가중치(--model cnn_ee 전용). "
                              "크면 본 헤드 정확도를 깎고, 작으면 보조 헤드가 못 배운다. "
@@ -406,6 +408,9 @@ def main() -> None:
         parser.error("--defense norm 은 입력 정규화 방어이므로 --text decoded 와 함께 써야 합니다.")
     if args.defense == "advtrain" and args.track == "ustc_flow_binary":
         parser.error("--defense advtrain 은 페이로드 문자열 변형 기반이라 흐름 트랙에는 쓸 수 없습니다.")
+    if args.width != 1.0 and args.model != "cnn":
+        # 다른 모델은 tag 에 폭 축이 없으므로 조용히 무시하면 기본 폭 산출물을 덮어쓴다.
+        parser.error("--width 는 --model cnn 에서만 쓸 수 있습니다.")
 
     if args.smoke:
         # 코드가 안 깨지는지만 확인: 아주 작게, 1~2에폭.
@@ -445,7 +450,7 @@ def main() -> None:
     test_loader = DataLoader(test_ds, batch_size=args.batch_size, shuffle=False, num_workers=0)
 
     model = build_model(args.model, len(classes), in_channels=in_channels,
-                        patch=args.patch).to(device)
+                        patch=args.patch, width=args.width).to(device)
     if args.model == "cnn_ee":
         # ⚠️ 학습·체크포인트 선택·test 보고는 **조기종료를 끈 상태**(전 깊이)로 한다.
         #    임계값은 아직 정해지지 않았고(cascade.py 가 val 에서 고른다), 여기서 임의의 값을
@@ -518,6 +523,7 @@ def main() -> None:
             # 보조 헤드 가중치는 학습을 가르는 축 → 체크포인트 tag 에 들어간다.
             # (조기종료 임계값은 추론 축이라 여기 없다 — cascade.py 의 결과 tag 담당)
             aux_weight=args.aux_weight if args.model in MULTI_HEAD_MODELS else None,
+            width=args.width if args.model == "cnn" else None,
         )
         M.save_report(result, RESULTS_DIR / f"{tag}.json")
         # 샘플 단위 예측 저장(모델 간 '탐지 불일치' 분석용 — detection_analysis.py 가 소비)
