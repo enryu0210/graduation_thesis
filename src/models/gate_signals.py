@@ -205,15 +205,19 @@ def _macro_f1_fast(y_true, y_pred, n_classes):
     return float(scores.mean())
 
 
-def classwise_tau_path(p1_val, p2_val, y_val, n_classes, step=0.005):
-    """각 단계에서 val Macro-F1이 가장 높은 클래스에 다음 덩어리를 배정한다."""
+def classwise_tau_path(p1_val, p2_val, y_val, n_classes, step=0.005, conf_val=None):
+    """각 단계에서 val Macro-F1이 가장 높은 클래스에 다음 덩어리를 배정한다.
+
+    conf_val=None 이면 기존처럼 msp 를 쓴다. 다른 신호(G6 거리 점수 등)는 '클수록 확신'
+    방향으로 맞춘 확신도를 넘긴다 — 클래스는 여전히 1차 예측(p1.argmax)으로 가른다."""
     first, second = _probabilities(p1_val), _probabilities(p2_val)
     if first.shape != second.shape or n_classes != first.shape[1]:
         raise ValueError("두 확률 모양과 클래스 수가 일치해야 합니다.")
     truth = _labels(y_val, len(first), n_classes)
     if not np.isfinite(step) or not 0 < step <= 1:
         raise ValueError("덩어리 간격은 (0, 1]이어야 합니다.")
-    conf, pred1, pred2 = first.max(axis=1), first.argmax(axis=1), second.argmax(axis=1)
+    conf = first.max(axis=1) if conf_val is None else _confidence(conf_val, len(first))
+    pred1, pred2 = first.argmax(axis=1), second.argmax(axis=1)
     class_conf = [conf[pred1 == c] for c in range(n_classes)]
     counts = np.array([len(values) for values in class_conf])
     if (counts == 0).any():

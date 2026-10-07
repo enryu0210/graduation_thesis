@@ -38,6 +38,8 @@ def extract_loader_embeddings(net, loader, device):
 def validate_saved_probs(saved, arrays, probs):
     """라벨과 확률을 함께 검사해 같은 라벨 안에서의 행 뒤바뀜도 감지한다."""
     for split in ("val", "test"):
+        if split not in probs:
+            continue
         if not np.array_equal(saved[f"y_{split}"], arrays[f"y_{split}"]):
             raise ValueError(f"{split} check-probs 라벨 정렬 불일치")
         reference = saved[f"p1_{split}"]
@@ -56,10 +58,15 @@ def main():
     parser.add_argument("--balance", action="store_true")
     parser.add_argument("--max-len", type=int, default=2304)
     parser.add_argument("--check-probs", type=Path)
+    parser.add_argument("--splits", default="val,test",
+                        help="쉼표 구분 split. train 은 G6 거리 점수의 참조 분포용(기본은 기존 동작)")
     parser.add_argument("--out", type=Path)
     args = parser.parse_args()
     if args.max_len <= 0:
         parser.error("--max-len은 양수여야 합니다.")
+    splits = tuple(part.strip() for part in args.splits.split(","))
+    if not splits or len(set(splits)) != len(splits) or not set(splits) <= {"train", "val", "test"}:
+        parser.error("--splits는 train,val,test 중 중복 없는 조합이어야 합니다.")
     try:
         encoders = tuple(part.strip() for part in args.rgb_encoders.split(","))
         tag = cascade.checkpoint_tag(args.track, "cnn", "raw", args.balance, args.channels, encoders)
@@ -69,7 +76,7 @@ def main():
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         arrays, probs = {}, {}
         net, classes = None, None
-        for split in ("val", "test"):
+        for split in splits:
             x, _, y, split_classes = cascade.build_inputs(
                 args.track, split, "raw", 48, args.channels, encoders, args.max_len, None)
             if net is None:
@@ -78,7 +85,7 @@ def main():
                                        device, args.channels, 3, encoders)
                 arrays["classes"] = np.asarray(classes)
             elif classes != list(split_classes):
-                raise ValueError("val/test 클래스 순서 불일치")
+                raise ValueError("split 간 클래스 순서 불일치")
             loader = DataLoader(TensorDataset(x), batch_size=512, shuffle=False)
             emb, reconstructed = extract_loader_embeddings(net, loader, device)
             expected = cascade.predict_probs(net, x, device, 512)
@@ -88,7 +95,7 @@ def main():
             arrays[split], arrays[f"y_{split}"] = emb, y
             probs[split] = expected
             print(f"{split}: {emb.shape}, float32, softmax 일치 검사 통과", flush=True)
-        if args.check_probs:
+        if args.check_probs and {"val", "test"} & set(splits):
             with np.load(args.check_probs, allow_pickle=False) as saved:
                 validate_saved_probs(saved, arrays, probs)
             print("check-probs: val/test 라벨·확률 행 정렬 검사 통과", flush=True)
