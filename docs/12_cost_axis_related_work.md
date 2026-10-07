@@ -263,6 +263,19 @@ docs/14 가 연구 초점을 "캐스케이드의 넘김 판단(G)"과 "배포 �
 3. **T2 헤드라인 조건을 CPU·배치 1 로 고정한 근거**가 MLPerf 의 single-stream 시나리오다(docs/14 §8.1).
    Wang et al. 2022 의 5.4배는 FLOPs·ImageNet·EfficientNet 기준이라 우리 배수와 나란히 쓰되 직접 비교하지 않는다.
 
+### 1.8 G6 넘김 점수의 출처 5편 (2026-10-07) — ⚠️ PDF 미확보, 서지만 기록
+
+G6(docs/14 §8.14·§8.15)은 점수를 새로 만들지 않고 아래 문헌의 정의를 그대로 가져왔다(사후 설계 방지).
+**PDF 는 아직 `docs/thetics/` 에 받지 않았다** — 논문에 인용하기 전에 원문을 받아 1쪽 제목·저자와 대조할 것(§1.6.1 교훈). 받으면 `06_게이트_라우팅_지연/` 에 넣는다.
+
+| 서지 | 가져온 것 | 쓰는 곳 |
+|---|---|---|
+| Lee, Lee, Lee, Shin. *A Simple Unified Framework for Detecting Out-of-Distribution Samples and Adversarial Attacks.* **NeurIPS 2018** (arXiv:1807.03888) | 클래스 평균·공유 공분산 Mahalanobis 거리(`maha`). 입력 전처리·층 앙상블은 비용 때문에 쓰지 않음 | G6 점수 정의 |
+| Ren, Fort, Liu, Roy, Padhy, Lakshminarayanan. *A Simple Fix to Mahalanobis Distance for Improving Near-OOD Detection.* arXiv:2106.09022, 2021 (ICML 2021 UDL 워크숍) | 배경 단일 가우시안을 뺀 Relative Mahalanobis(`rmaha`) | G6 점수 정의 |
+| Sun, Ming, Zhu, Li. *Out-of-Distribution Detection with Deep Nearest Neighbors.* **ICML 2022** (arXiv:2204.06507) | L2 정규화 표현의 k 번째 최근접 거리(`knn`, k=50) | G6 점수 정의 |
+| Jiang, Kim, Guan, Gupta. *To Trust Or Not To Trust A Classifier.* **NeurIPS 2018** (arXiv:1805.11783) | Trust Score = 예측 외 클래스 최근접 / 예측 클래스 최근접(`trust`) | G6 점수 정의 · 오답 탐지 해석 |
+| Jaeger, Lüth, Klein, Bungert. *A Call to Reflect on Evaluation Practices for Failure Detection in Image Classification.* **ICLR 2023** (arXiv:2211.15259) | 오분류 탐지에서는 MSP 가 대부분의 OOD 점수보다 강하다 | **G6 음성 결과의 선행 근거**(§8.15 해석) |
+
 ---
 
 ## 2. ⭐ Tasdemir et al. 2023 정독 결과 — 가장 중요

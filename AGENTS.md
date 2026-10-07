@@ -192,6 +192,10 @@ PYTHONIOENCODING=utf-8 python src/analysis/srbh_normal_strata.py  # Normal 출�
   (`cross_validate.py --save-probs` 가 남긴 `cvprobs_*.npz` 두 개를 정렬 검증해 읽는다). 클래스별 τ 는 `gate_g2.py`, 학습형 라우터는
   `gate_g3.py`(고정 split, `--embeddings` 로 표현 추가)·`gate_g3_cv.py`(CV). 1차 표현은 `extract_embeddings.py`·`cross_validate.py --save-embeddings`(tag `_emb`, 기존 cvprobs 보존).
   권장 캐스케이드 1차는 class weight 체크포인트 → `cascade_tradeoff.py --balance --stage1-no-balance`(tag `_s2bal`, docs/14 §8.11).
+  넘김 점수 G6(1차 표현 거리 maha·rmaha·knn·trust)은 `src/models/feature_signals.py` + `gate_g6.py`(고정 split)·`gate_g6_cv.py`(CV) —
+  참조는 **train 표현만**(`extract_embeddings.py --splits train`, `cross_validate.py --save-train-embeddings` → tag `_embtr`). 실사용자·E1-a 이식성은 `gate_g4_e1a.py`,
+  변형 넘김 부풀리기는 `gate_g5_mutation.py`(`run_evasion.py`·`mutations.py` 는 XSS 라벨에 묶여 있어 수정하지 않고 매핑만 한다), 2차 후보 비교는 `stage2_candidates.py`.
+  1차 채널 폭 `--width`(train)·`--stage1-width`(cascade_tradeoff)는 **cnn 전용** tag 축 `_w{폭}`(×1 은 접미사 없음). `cross_validate.py` 에는 폭 축이 없다 — CV 에 폭을 넣으려면 tag 부터 추가할 것(§4.2).
 - **MCC 는 제거된 지표다**(`metrics.py` 머리 주석). 새 코드에서 `report["mcc"]` 를 찾지 말 것.
 - 클래스: `Normal` / `SQLInjection` / `CodeInjection`(XSS 아님) / `CommandInjection`.
 
