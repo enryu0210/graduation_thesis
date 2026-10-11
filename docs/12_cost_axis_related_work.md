@@ -276,6 +276,23 @@ G6(docs/14 §8.14·§8.15)은 점수를 새로 만들지 않고 아래 문헌의
 | Jiang, Kim, Guan, Gupta. *To Trust Or Not To Trust A Classifier.* **NeurIPS 2018** (arXiv:1805.11783) | Trust Score = 예측 외 클래스 최근접 / 예측 클래스 최근접(`trust`) | G6 점수 정의 · 오답 탐지 해석 |
 | Jaeger, Lüth, Klein, Bungert. *A Call to Reflect on Evaluation Practices for Failure Detection in Image Classification.* **ICLR 2023** (arXiv:2211.15259) | 오분류 탐지에서는 MSP 가 대부분의 OOD 점수보다 강하다 | **G6 음성 결과의 선행 근거**(§8.15 해석) |
 
+### 1.9 문헌 비교 그림에 쓴 "유사 연구 최고 수치"의 출처 (2026-10-11) — 원문 표에서 직접 읽은 값
+
+교수 기준("가장 좋은 유사 연구 대비 정확도–속도 그래프에서 위")을 적용하려고 유사 연구가 **보고한 최고 수치**를 원문 표에서 다시 읽었다(요약·2차 인용이 아니라 본문 표).
+그림은 `docs/figures/cascade/literature_comparison_srbh_4class.png`(`src/eval/literature_compare.py`), 해석은 docs/14 §8.26.
+⚠️ 아래 값은 데이터·클래스 수·하드웨어가 서로 달라 **나란히 놓을 수는 있어도 직접 비교는 안 된다.** 같은 축의 비교는 같은 데이터·같은 기기에서 재구현한 값(E3)으로만 한다.
+
+| 서지 | 데이터·과제 | 보고된 최고 수치(원문 위치) | 지연 | 비고 |
+|---|---|---|---|---|
+| Tasdemir 등. arXiv:2312.13041 (§1 의 `2312.13041v1.pdf`) | SQL 주입 이진, 30,609건 | 1차 PassiveAggressive F1 0.9975 · BERT F1 0.9983 · **캐스케이드 정확도 0.9986 / F1 0.9981**(Table 5·6) | 0.0003 / 2.0439 / **0.0988 ms**(A100 GPU, 식 14, 공격 비율 3.3%) | 캐스케이드 구조의 직접 선행. 약 20배 |
+| Osama 등. *Enhanced Web Payload Classification Using WAMM.* arXiv:2512.23610 (§1.4) | **SR-BH 2020**(우리와 같은 데이터), 다중 클래스 | 원본: **XGBoost 정확도 99.25% / Macro-F1 96.77%**. 중복 제거본: XGBoost 99.01% / 97.05%. 딥러닝은 BiLSTM 77.11 · CNN-BiLSTM 75.22 · DistilBERT 85.47(Macro-F1, Table VI) | XGBoost **0.071 / 0.061 ms**, BiLSTM 0.713, DistilBERT 14.423(8 vCPU) | 같은 데이터에서 지연을 보고한 유일한 연구. 클래스 구성(원 13종)이 우리 4분류와 다르다 |
+| Luo 등. *WADBERT.* arXiv:2601.21893 (§1.4) | SR-BH 2020 이진 | 정확도 99.32% / **F1 99.50%** | **보고 없음** | 정확도 축의 최고점. 속도 축에 놓을 수 없다 |
+| **Bitussi, Doriguzzi-Corin. *X-WAD: eXplainable Web Anomaly Detection.* arXiv:2608.27172 (iAIMS 2026 게재 예정본)** ⚠️ PDF 미확보(임시 내려받아 정독만, `docs/thetics/` 에 없음) | SR-BH 2020, 정상만 학습하는 준지도 이상 탐지(이진) | 원 라벨 F1 86.16% / 91.31% → **재라벨본(SR-BH2020-fix) F1 98.29% / 98.84%** | 보고 없음 | ⭐ **데이터의 약 13.8% 가 오라벨**이라고 독립적으로 보고 — 우리 꼬리 라벨 감사(docs/14 §8.10, 1인 판정)의 외부 근거. 2인 감사(T8)를 못 한 한계의 보완 인용 |
+| Kutlimuratov 등. Computers 2026, 15(3):174 (§1 의 `mdpi_lightweight_cascade_zeroday.pdf`) | UNSW-NB15(흐름 특징), 캐스케이드 | 정확도 94.81%(F1 미보고, Table 9) | 0.0036 ms | 웹 페이로드가 아니라 흐름 특징 — 위치 참고용 |
+
+- 찾았지만 비교 대상에서 뺀 것: Alboushy 등 arXiv:2605.13337(과제·지표가 달라 같은 평면에 놓을 수 없음), Simioni 등 ACM SAC'25(조기 종료 IDS, 흐름 데이터), Sevri & Karacan 2022(지연 미보고), Wang 등 ICLR'22(ImageNet·FLOPs).
+- ⚠️ WAMM 의 XGBoost 는 **재구현하지 않았다**(이 기기에 `xgboost` 없음, 새 의존성 추가는 하지 않았다). 같은 데이터 재구현은 같은 계열의 선형 n-gram 1차 두 가지(E3)로 대신했고, 그 한계를 §8.26 에 적는다.
+
 ---
 
 ## 2. ⭐ Tasdemir et al. 2023 정독 결과 — 가장 중요

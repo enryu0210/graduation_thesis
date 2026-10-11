@@ -145,9 +145,11 @@ git check-ignore -v <경로>
 **tag 규칙 변경 → 2곳**
 `src/models/train.py`, `src/eval/cross_validate.py`
 CV 전용 축: `--seed N`(42 가 아니면 `_sN`) · `--group-template`(`_gtpl`, 템플릿 묶음 분할). 둘 다 fold 배정을 바꾸므로 seed 42 산출물과 paired 비교가 성립하지 않는다.
+`--balance`(`_bal`)는 fold 내부 train 만 언더샘플링한다. 사전 판정의 유의성은 `gate_confirm.corrected_t`(Nadeau–Bengio 보정) + Holm 으로 낸다 — `cv_compare.py` 의 t 는 보정 없는 대응 t 라 판정에 쓰지 않는다.
 
 **지연을 재거나 인용할 때**
 기준 측정은 `src/eval/latency_fair.py`(전처리 포함 · 2차 실제 길이 · 스레드 고정, docs/14 §8.21). `cascade.measure_latency` 의 값은 추론만·2,304 채움이라 **채움 기준**이라고 명시해 병기만 한다. CPU 지연 측정 중에는 같은 기기에서 pytest·학습·분석을 돌리지 않는다.
+1차 후보끼리의 지연 비교는 `latency_fair.py --stage1-variants`(반복마다 번갈아 측정) 한 실행 안의 값만 믿는다 — 실행 간 절대값이 4~6% 표류한다. `linear_stage1.py --analyze` 는 그래서 변형의 지연을 "같은 실행의 현행 대비 비율 × E1 지연"으로 맞춘다(docs/14 §8.25).
 
 **SR-BH 필드 조합 규칙 → 2곳 (테스트로 고정)**
 `src/data/srbh_track.FIELD_COMBINATIONS`(CV 입력) 와 `src/analysis/measure_srbh_fields.COMBINATIONS`(E2 단계1 측정).

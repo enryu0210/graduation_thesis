@@ -46,6 +46,7 @@ RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 TRADEOFF_JSON = RESULTS_DIR / ("tradeoff_srbh_4class_cnn_raw_rgb_s2bal_len2304_nall_s42"
                                "_dcuda-cpu_b1-32-128-1024.json")
 OUT_JSON = RESULTS_DIR / "latency_fair_srbh_4class.json"
+VARIANTS_JSON = RESULTS_DIR / "latency_stage1_variants_srbh_4class.json"
 
 COMPONENTS = ("prep_img", "fwd1", "enc_seq_pad", "enc_seq_real", "fwd2_pad", "fwd2_real", "cascade")
 COMPOSITES = {"stage1_e2e": ("prep_img", "fwd1"),
@@ -181,6 +182,37 @@ def measure_gpu(net1, net2, texts: list[str]) -> dict:
     return {"device_name": torch.cuda.get_device_name(device), "rows": rows}
 
 
+@torch.inference_mode()
+def measure_stage1_variants(texts: list[str], n_classes: int, repeats: int, warmup: int = 50) -> dict:
+    """E2: 1차 후보의 요청당 지연(이미지 변환 + 순전파, CPU·배치 1·스레드 1).
+
+    지연은 가중치 값과 무관하므로 무작위 초기화 모델로 잰다(CV 는 체크포인트를 남기지 않는다).
+    현행 1차도 같은 실행에서 다시 재 후보와 같은 조건으로 비교한다.
+    """
+    from cnn import E2_VARIANTS, PayloadCNN, build_e2_variant
+
+    torch.set_num_threads(1)
+    clock = time.perf_counter_ns
+    nets = {name: (PayloadCNN(n_classes, in_channels=3) if name == "cnn"
+                   else build_e2_variant(name, n_classes)).eval() for name in ("cnn",) + tuple(E2_VARIANTS)}
+    for net in nets.values():
+        for text in texts[:warmup]:
+            net(prep_img(text))
+    ms = {name: np.empty((repeats, len(texts))) for name in nets}
+    for r in range(repeats):
+        # 반복마다 후보를 번갈아 잰다 — 후보별로 몰아서 재면 기기 상태(발열·백그라운드)의 표류가
+        # 후보 간 차이로 읽힌다. 판정 조건이 "현행 이하"라 1% 차이도 결과를 가른다.
+        for name, net in nets.items():
+            for i, text in enumerate(texts):
+                t0 = clock()
+                net(prep_img(text))
+                ms[name][r, i] = (clock() - t0) / 1e6
+    out = {name: stats(values.ravel()) for name, values in ms.items()}
+    for name, row in out.items():
+        print(f"  {name:<10} p50 {row['p50']:.4f} ms", flush=True)
+    return out
+
+
 def environment(args) -> dict:
     try:
         git_hash = subprocess.run(["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, capture_output=True,
@@ -206,6 +238,8 @@ def parse_args():
     parser.add_argument("--threads", default="1,4,8", help="쉼표로 구분한 CPU 스레드 수")
     parser.add_argument("--tau", type=float, help="넘김 임계값. 생략하면 tradeoff JSON 의 운영점")
     parser.add_argument("--gpu", action="store_true", help="E1-G: GPU 배치 지연도 잰다")
+    parser.add_argument("--stage1-variants", action="store_true",
+                        help="E2: 1차 후보(cnn·cnn_crop8·cnn_gmp·cnn_1d)의 변환+순전파 지연만 잰다")
     parser.add_argument("--smoke", action="store_true", help="n=50·2회·1스레드, 파일 저장 없음")
     args = parser.parse_args()
     if args.smoke:
@@ -236,6 +270,10 @@ def run(args) -> dict:
     y_all = data_text.encode_labels_with(labels, classes)
     picked = np.random.default_rng(SEED).choice(len(texts_all), args.n, replace=False)
     texts = [texts_all[i] for i in picked]
+
+    if args.stage1_variants:
+        return {"env": environment(args), "n": args.n, "repeats": args.repeats,
+                "stage1_e2e_ms": measure_stage1_variants(texts, len(classes), args.repeats)}
 
     device = torch.device("cpu")
     net1 = cascade.load_net("cnn", len(classes), TRACK, TEXT, False, device, channels="rgb", in_channels=3)
@@ -292,6 +330,11 @@ def main() -> None:
     except (FileNotFoundError, ValueError, KeyError) as error:
         print(f"[오류] {error}", file=sys.stderr)
         sys.exit(1)
+    if args.stage1_variants:
+        if not args.smoke:
+            VARIANTS_JSON.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(f"저장: {VARIANTS_JSON.relative_to(PROJECT_ROOT)}")
+        return
     report(result)
     if args.smoke:
         print("\n스모크 실행이라 결과 파일은 저장하지 않습니다.")

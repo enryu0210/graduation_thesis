@@ -34,6 +34,11 @@
   - ⚠️ T1 운영점 50% 는 `_bal` 체크포인트(F1 0.81) 값이고, CV(class weight, F1 0.89)의 같은 게이트는 ~25% 다 → 두 값을 출처와 함께 병기(docs/14 §8.6).
   - ⚠️ **공정 지연(E1, 2026-10-11, docs/14 §8.21)**: 전처리를 넣고 2차를 실제 길이로 재면 CPU·배치 1 에서 1차 전체 1.311ms > 2차 전체 0.393ms(스레드 1 p50) → 캐스케이드는 char-CNN 단독의 **0.27배**. **"CPU·배치 1 속도 이득" 주장은 철회**(스레드 1·4·8 모두). 위의 1.22배·1.45배·1.01배·1.28배 등은 전부 "추론만·2,304 채움" 값 → **채움 기준이라고 밝혀 병기만**, 헤드라인 금지. 지연은 `latency_fair.py` 로 재고(조용한 기기), `cascade.measure_latency` 값은 채움 기준이다.
   - 📌 **재분석(docs/14 §8.22)**: §8.6 판정의 20% 감소 검정력은 7~10% — "기각"은 "효과 없음"이 아니라 "이 설계로 판정 불가"로 서술. 운영점 실사용자 r_N: B0 69.3% [65.3, 73.0] · G2 49.6% [45.5, 53.8](n=550).
+  - 📌 **확인 실험 판정(2026-10-11, docs/14 §8.23~§8.29 · 규칙은 `docs/paper_revision/03_prereg_v2.md`)**: 클래스별 τ(G2)는 seed 43·44·45 **모두 경계가 위**(1차 규칙 3/3)지만 어느 seed 도 유의하지 않고(p 0.17~0.41), 운영점 이득은 판정 seed 43 에서 +15.7%(기준 20% 미달, seed 간 16~44%) → ✅ "경계가 위이나 유의성·운영점 이득 미확인" / ❌ "개선".
+    RGB CNN CV 평균은 seed 만 바꿔도 표준편차 1.15%p(범위 2.8%p) — **seed 42 가 네 seed 중 최저**(0.8949, 평균 0.9078). 단일 seed 의 +2%p 차이는 seed 잡음 크기다.
+  - 📌 **1차 대안(docs/14 §8.25·§8.26)**: `cnn_1d` 가 E2 세 조건을 모두 채워 **채택**(+3.9%p, Holm p 0.009, 지연 −2~3%) — 넘김 43.7→29.8% 인데 배수는 0.27→0.28배(상한 t2/t1 0.31). 이미지 변환만 0.41ms 로 2차 전체(0.39ms)보다 길어 **같은 변환을 쓰는 1차는 2차보다 빨라질 수 없다**.
+    ⚠️ **TF-IDF+LR 1차 → char-CNN 은 1.24배**(검증 분포; **실사용자 0.86배**)로 RGB CNN 1차의 4.7배 → **"표현 이질성은 속도 이득의 필요조건이 아니다"**(E3 판정). Q 통계량 0.954(RGB) vs 0.996(TF-IDF) — 오류는 덜 겹치나 운영점 F1 은 같다. 교수 기준("그래프에서 위")으로 제안 구성은 위가 **아니다** → "개선"이라 쓰지 말 것.
+  - 📌 **견고성(docs/14 §8.27·§8.28)**: 템플릿 묶음 CV 에서 점수 유지(T5). 1차 class weight 결정은 CV 에서도 +27%(채움 기준·검증 분포) — test 의 0.99→1.45배(+46%)는 **확인용**으로 내리고, 실사용자 분포(+5%)·공정 지연(+1~6%)에서는 이득이 없다고 병기. 고정 test 는 아홉 번 평가에 쓰였다(감사표 §8.28). T8(2인 라벨 감사)은 미실시.
 - ⚠️ `docs/thetics/` 는 **.gitignore 대상**(PDF 미추적) → **수집 목록의 유일한 추적본은 `docs/12` §1**. 논문을 추가하면 docs/12 도 함께 갱신.
 
 ## 데이터 파이프라인
@@ -66,7 +71,10 @@
   텍스트 모델: `charcnn` · `bilstm`(`text_models.py`), 별도 sklearn 베이스라인 `baseline_tfidf.py`.
 - ⚠️ 새 이미지 모델 추가 시 `IMAGE_MODELS` 를 **2곳** 갱신: `train.py`, `cross_validate.py`(트랙의 "5곳"과는 별개).
   1차 재설계 후보(E2, `cnn.build_e2_variant`): `cnn_crop8`(위 8행=384바이트) · `cnn_gmp`(전역 최대 풀링) · `cnn_1d`(3×2,304 1차원 conv).
+  ⚠️ `cnn_1d` 가 E2 판정에서 채택됐다(docs/14 §8.25). 단 3기의 다른 실험(G1~G6·T 계열)은 전부 현행 `cnn` 1차 위에서 잰 값이다 — 1차를 바꿔 인용하면 수치가 섞인다.
 - CV 축: `cross_validate.py --seed N`(tag `_sN`, 42 는 생략) · `--group-template`(tag `_gtpl`, 숫자·hex·긴 토큰을 가린 템플릿으로 묶어 fold 분할 — T5). 사전 판정 규칙은 `docs/paper_revision/03_prereg_v2.md`.
+- CV 판정 도구: `gate_confirm.py --seed N [--group-template]`(C-G2 규칙, 보정 t 는 `gate_confirm.corrected_t`) · `linear_stage1.py --fit|--latency|--analyze`(선형 1차 E3 + E2 변형 경계 + T11) · `literature_compare.py`(유사 연구 비교 그림) · `latency_fair.py --stage1-variants`(1차 후보 지연, 반복마다 번갈아 측정).
+  ⚠️ `cv_compare.py` 의 t 검정은 **보정 없는 대응 t**(fold 간 학습 집합 중복 무시) → 사전 판정에는 `corrected_t`(Nadeau–Bengio) + Holm 을 쓴다. ⚠️ `cross_validate.py --balance`(tag `_bal`)는 fold 내부 train 만 언더샘플링한다(T11).
 - 장시간 작업 로그는 `experiments/logs/`(gitignore).
 - ⚠️ `train.py` 를 `--smoke` 없이 돌리면 **추적 대상 그림**(`docs/figures/models/cm_*.png`)을 덮어씀 → 로컬 코드 검증은 반드시 `--smoke`(저장 생략).
 - 체크포인트가 필요한 스크립트(cascade 등)의 로컬 스모크: 스크래치에서 소량 학습한 임시 `.pt` 를 `experiments/checkpoints/` 에 만들고 검증 후 삭제.
