@@ -514,9 +514,13 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--patience", type=int, default=5)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--balance", action="store_true",
+                        help="fold 내부 train 만 클래스 균형 언더샘플링(T11: 고정 split 의 _bal 1차를 CV 로 재현, tag _bal)")
     parser.add_argument("--group-template", action="store_true",
                         help="같은 템플릿이 한 fold 에만 들어가는 층화 묶음 분할(T5, tag _gtpl)")
     args = parser.parse_args()
+    if args.balance and args.model in TFIDF_MODELS:
+        parser.error("--balance 는 torch 모델에서만 지원합니다.")
     if args.group_template and args.model in TFIDF_MODELS:
         parser.error("--group-template 은 torch 모델에서만 지원합니다.")
     if args.save_embeddings and (not args.save_probs or args.model != "cnn"):
@@ -542,7 +546,7 @@ def main() -> None:
         encoders=encoders if is_image else None,
         patch=args.patch if args.model == "vit" else None,
         lr=args.lr, fields=args.fields, sealed_test=args.exclude_test,
-        cv_seed=args.seed, group_template=args.group_template,
+        cv_seed=args.seed, group_template=args.group_template, balance=args.balance,
     )
     tag = embeddings_tag(tag, args.save_embeddings, args.save_train_embeddings)
     if args.save_embeddings:
@@ -620,6 +624,9 @@ def main() -> None:
                 # 묶음 분할은 (train, val) 순서로 돌려준다 — val 이 1/n_splits 쪽이다.
                 tr_rel, va_rel = inner_group_split(y[trval_idx], groups[trval_idx], args.val_ratio,
                                                    args.seed + k)
+            if args.balance:
+                # val·fold-test 는 실분포 그대로 둔다 — train.py --balance 와 같은 규칙(train 만 줄인다).
+                tr_rel = tr_rel[T.balance_train_indices(y[trval_idx][tr_rel], args.seed + k)]
             res = run_fold_torch(args.model, pool_x, y, classes,
                                  trval_idx[tr_rel], trval_idx[va_rel], te_idx,
                                  args, is_image=is_image, pool_strata=pool_strata,

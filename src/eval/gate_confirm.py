@@ -105,8 +105,9 @@ def latency_conditions():
     return conditions
 
 
-def analyze(seed, figure_devices=None):
-    suffix = "" if seed == 42 else f"_s{seed}"
+def analyze(seed, figure_devices=None, group_template=False):
+    # 템플릿 묶음 분할(T5)은 seed 42 의 다른 분할이라 seed 접미사 대신 _gtpl 을 쓴다(cross_validate 의 tag 규칙).
+    suffix = "_gtpl" if group_template else "" if seed == 42 else f"_s{seed}"
     stage1 = GF.RESULTS / f"cvprobs_srbh_4class_cnn_raw_rgb_sealed{suffix}.npz"
     stage2 = GF.RESULTS / f"cvprobs_srbh_4class_charcnn_raw_sealed{suffix}.npz"
     with np.load(stage1, allow_pickle=False) as a, np.load(stage2, allow_pickle=False) as b:
@@ -122,7 +123,9 @@ def analyze(seed, figure_devices=None):
     val_solo2 = [gates._macro_f1_fast(first["y"][first[f"val_idx_{k}"]], second[f"val_probs_{k}"].argmax(1), n_classes)
                  for k in range(1, 6)]
     conditions = latency_conditions()
-    result = {"seed": seed, "status": "탐색(G2 발견 자료)" if seed == 42 else "확인(사전 기준 C-G2)",
+    status = "탐색(템플릿 묶음 분할, T5)" if group_template else ("탐색(G2 발견 자료)" if seed == 42
+              else "확인(사전 기준 C-G2)" if seed == 43 else "반복(T10, 판정 아님)")
+    result = {"seed": seed, "status": status,
               "prereg": "docs/paper_revision/03_prereg_v2.md", "pi": GF.PI, "e_points": E_POINTS,
               "solo_macro_f1": {"rgb_cnn": float(solo[0]), "charcnn": float(solo[1])},
               "primary": {view: primary_rule(paths, col) for view, col in VIEWS},
@@ -130,9 +133,9 @@ def analyze(seed, figure_devices=None):
                                       **{view: secondary_rule(paths, val_solo2, col, ms1, ms2) for view, col in VIEWS}}
                                for name, (ms1, ms2) in conditions.items()}}
     if figure_devices:
-        figure = GF.FIGURE.with_name(f"gate_frontier_b0_g2_srbh_4class_s{seed}.png")
+        figure = GF.FIGURE.with_name(f"gate_frontier_b0_g2_srbh_4class{suffix or f'_s{seed}'}.png")
         GF.plot(paths, solo, figure=figure, devices={name: conditions[name] for name in figure_devices},
-                title=f"confirmation, CV seed {seed}")
+                title="template-grouped CV" if group_template else f"confirmation, CV seed {seed}")
         result["figure"] = figure.relative_to(PROJECT_ROOT).as_posix()
     return result
 
@@ -140,15 +143,16 @@ def analyze(seed, figure_devices=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", type=int, required=True)
+    parser.add_argument("--group-template", action="store_true", help="템플릿 묶음 분할(T5)의 확률을 읽는다(--seed 42 와 함께)")
     parser.add_argument("--figure-devices", nargs=2, metavar="NAME",
                         help="그림 두 줄에 쓸 지연 조건 이름(산출 JSON 의 secondary_e7 키)")
     args = parser.parse_args()
     try:
-        result = analyze(args.seed, args.figure_devices)
+        result = analyze(args.seed, args.figure_devices, args.group_template)
     except (OSError, ValueError, KeyError) as error:
         print(f"[오류] C-G2 판정 실패: {error}", file=sys.stderr)
         return 1
-    output = GF.RESULTS / f"gate_confirm_srbh_4class_s{args.seed}.json"
+    output = GF.RESULTS / f"gate_confirm_srbh_4class_{'gtpl' if args.group_template else f's{args.seed}'}.json"
     output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({key: result[key] for key in ("seed", "status", "solo_macro_f1", "primary")},
                      ensure_ascii=False, indent=2))

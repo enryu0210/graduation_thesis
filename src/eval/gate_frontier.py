@@ -117,7 +117,8 @@ def plot(paths, solo, figure=FIGURE, devices=None, title="exploratory"):
             ax.scatter([1.0], [solo[1]], marker="*", s=180, c="k", zorder=5, label=f"char-CNN alone (F1 {solo[1]:.3f})")
             ax.scatter([ms2 / ms1], [solo[0]], marker="s", s=70, c="gray", zorder=5,
                        label=f"RGB CNN alone (F1 {solo[0]:.3f})")
-            ax.set_title(f"{device} | {view_title}", fontsize=10)
+            # 조건 이름이 길면 옆 칸 제목과 겹치므로 두 줄로 나눈다.
+            ax.set_title(f"{device}\n{view_title}", fontsize=9.5)
             ax.set_xlabel("Speedup vs char-CNN alone (attack share 3.3%)")
             ax.set_ylim(0.88, 0.995)
             ax.grid(alpha=.3)
