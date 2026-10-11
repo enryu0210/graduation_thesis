@@ -144,6 +144,10 @@ git check-ignore -v <경로>
 
 **tag 규칙 변경 → 2곳**
 `src/models/train.py`, `src/eval/cross_validate.py`
+CV 전용 축: `--seed N`(42 가 아니면 `_sN`) · `--group-template`(`_gtpl`, 템플릿 묶음 분할). 둘 다 fold 배정을 바꾸므로 seed 42 산출물과 paired 비교가 성립하지 않는다.
+
+**지연을 재거나 인용할 때**
+기준 측정은 `src/eval/latency_fair.py`(전처리 포함 · 2차 실제 길이 · 스레드 고정, docs/14 §8.21). `cascade.measure_latency` 의 값은 추론만·2,304 채움이라 **채움 기준**이라고 명시해 병기만 한다. CPU 지연 측정 중에는 같은 기기에서 pytest·학습·분석을 돌리지 않는다.
 
 **SR-BH 필드 조합 규칙 → 2곳 (테스트로 고정)**
 `src/data/srbh_track.FIELD_COMBINATIONS`(CV 입력) 와 `src/analysis/measure_srbh_fields.COMBINATIONS`(E2 단계1 측정).

@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -50,7 +51,7 @@ RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 
 # 모델 종류별 입력 경로가 다르다(이미지 npz / 문자열 CSV / TF-IDF).
 # ⚠️ train.py 의 IMAGE_MODELS 와 함께 갱신할 것(이미지 모델 추가 시 두 곳).
-IMAGE_MODELS = {"cnn", "cnn_ee", "vit", "hybrid"}
+IMAGE_MODELS = {"cnn", "cnn_ee", "vit", "hybrid", "cnn_crop8", "cnn_gmp", "cnn_1d"}
 TEXT_NN_MODELS = {"charcnn", "bilstm"}
 TFIDF_MODELS = {"tfidf_logreg", "tfidf_rf"}
 ALL_MODELS = IMAGE_MODELS | TEXT_NN_MODELS | TFIDF_MODELS
@@ -338,6 +339,34 @@ def inner_train_val_split(y_trainval: np.ndarray, val_ratio: float, seed: int):
     return tr_rel, va_rel
 
 
+# 가리는 순서가 묶음을 정한다: 긴 토큰(세션·해시) → 긴 16진수 → 남은 숫자열.
+_TEMPLATE_MASKS = ((re.compile(r"[A-Za-z0-9_\-]{16,}"), "T"), (re.compile(r"[0-9a-fA-F]{8,}"), "H"),
+                   (re.compile(r"\d+"), "N"))
+
+
+def template_groups(texts) -> np.ndarray:
+    """요청 → 템플릿 묶음 번호(T5). 값만 다른 요청을 한 묶음으로 본다.
+
+    같은 템플릿이 학습과 시험에 함께 들어가면 점수가 암기로 부풀 수 있어 묶음 단위로 fold 를 가른다.
+    """
+    import pandas as pd
+
+    keys = []
+    for text in texts:
+        for pattern, mark in _TEMPLATE_MASKS:
+            text = pattern.sub(mark, text)
+        keys.append(text)
+    return pd.factorize(pd.Series(keys, dtype=object))[0]
+
+
+def inner_group_split(y_trainval: np.ndarray, groups_trainval: np.ndarray, val_ratio: float, seed: int):
+    """묶음 분할용 내부 val — 조기종료가 시험 fold 와 같은 처지(처음 보는 템플릿)에서 멈추도록 val 도 묶음으로 가른다."""
+    from sklearn.model_selection import StratifiedGroupKFold
+
+    splitter = StratifiedGroupKFold(n_splits=round(1 / val_ratio), shuffle=True, random_state=seed)
+    return next(splitter.split(np.zeros(len(y_trainval)), y_trainval, groups_trainval))
+
+
 def run_fold_torch(model_name: str, pool_x, y, classes, tr_idx, va_idx, te_idx,
                    args, is_image: bool, pool_strata=None, fold_probabilities=None) -> dict:
     """torch 모델(cnn/charcnn/bilstm) 한 fold 학습 → test fold 지표 반환."""
@@ -485,7 +514,11 @@ def main() -> None:
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--patience", type=int, default=5)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--group-template", action="store_true",
+                        help="같은 템플릿이 한 fold 에만 들어가는 층화 묶음 분할(T5, tag _gtpl)")
     args = parser.parse_args()
+    if args.group_template and args.model in TFIDF_MODELS:
+        parser.error("--group-template 은 torch 모델에서만 지원합니다.")
     if args.save_embeddings and (not args.save_probs or args.model != "cnn"):
         parser.error("--save-embeddings는 --model cnn --save-probs와 함께 사용해야 합니다.")
     if args.save_train_embeddings and not args.save_embeddings:
@@ -509,6 +542,7 @@ def main() -> None:
         encoders=encoders if is_image else None,
         patch=args.patch if args.model == "vit" else None,
         lr=args.lr, fields=args.fields, sealed_test=args.exclude_test,
+        cv_seed=args.seed, group_template=args.group_template,
     )
     tag = embeddings_tag(tag, args.save_embeddings, args.save_train_embeddings)
     if args.save_embeddings:
@@ -550,8 +584,22 @@ def main() -> None:
     print(f"  풀 크기={len(y):,} classes={classes} 라벨지문={fp}")
 
     # 2) fold 배정 — (y, seed) 에만 의존 → 모든 설정이 같은 fold 를 본다.
-    skf = StratifiedKFold(n_splits=args.folds, shuffle=True, random_state=args.seed)
-    folds = list(skf.split(np.zeros(len(y)), y))
+    groups = None
+    if args.group_template:
+        from sklearn.model_selection import StratifiedGroupKFold
+
+        # 이미지 풀은 npz 라 원문이 없다 → 같은 순서로 이어붙인 텍스트 풀에서 묶음을 만든다.
+        group_texts = pool_texts if pool_texts is not None else load_text_pool(
+            args.track, args.text, fields=args.fields, exclude_test=args.exclude_test)[0]
+        if len(group_texts) != len(y):
+            raise ValueError("템플릿 묶음용 텍스트 풀과 학습 풀의 길이가 다릅니다.")
+        groups = template_groups(group_texts)
+        print(f"  템플릿 묶음 {groups.max() + 1:,}개")
+        skf = StratifiedGroupKFold(n_splits=args.folds, shuffle=True, random_state=args.seed)
+        folds = list(skf.split(np.zeros(len(y)), y, groups))
+    else:
+        skf = StratifiedKFold(n_splits=args.folds, shuffle=True, random_state=args.seed)
+        folds = list(skf.split(np.zeros(len(y)), y))
 
     import train as T
     fold_results = []
@@ -566,7 +614,12 @@ def main() -> None:
             res = run_fold_tfidf(args.model, pool_texts, y, classes, trval_idx, te_idx, args,
                                  pool_strata=pool_strata)
         else:
-            tr_rel, va_rel = inner_train_val_split(y[trval_idx], args.val_ratio, args.seed + k)
+            if groups is None:
+                tr_rel, va_rel = inner_train_val_split(y[trval_idx], args.val_ratio, args.seed + k)
+            else:
+                # 묶음 분할은 (train, val) 순서로 돌려준다 — val 이 1/n_splits 쪽이다.
+                tr_rel, va_rel = inner_group_split(y[trval_idx], groups[trval_idx], args.val_ratio,
+                                                   args.seed + k)
             res = run_fold_torch(args.model, pool_x, y, classes,
                                  trval_idx[tr_rel], trval_idx[va_rel], te_idx,
                                  args, is_image=is_image, pool_strata=pool_strata,
@@ -630,6 +683,8 @@ def main() -> None:
                    "epochs": args.epochs, "batch_size": args.batch_size, "lr": args.lr,
                    "val_ratio": args.val_ratio, "fields": args.fields,
                    "exclude_test": args.exclude_test,
+                   "group_template": args.group_template,
+                   "n_template_groups": int(groups.max() + 1) if groups is not None else None,
                    "save_probs": args.save_probs,
                    "pool_splits": list(SPLITS[:2] if args.exclude_test else SPLITS)},
         "summary": summary,

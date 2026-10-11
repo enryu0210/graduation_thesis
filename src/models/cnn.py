@@ -67,6 +67,62 @@ def build_model(num_classes: int, **kwargs) -> PayloadCNN:
 
 
 # ---------------------------------------------------------------------------
+# E2 — 1차 재설계 후보 (docs/paper_revision/03_prereg_v2.md)
+# ---------------------------------------------------------------------------
+# 요청 길이 p99 가 353바이트라 48×48 격자의 아래 85% 는 대부분 0 이다. 평균 풀링이 그 빈칸에 신호를
+# 희석한다는 가설을 세 방식으로 본다. 채널 인코딩과 폭(32·64·128)은 현행과 같게 둬 구조만 비교한다.
+E2_VARIANTS = ("cnn_crop8", "cnn_gmp", "cnn_1d")
+
+
+class TopRows(nn.Module):
+    """위 rows 행만 남긴다(48열 × 8행 = 앞 384바이트)."""
+
+    def __init__(self, rows: int):
+        super().__init__()
+        self.rows = rows
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return x[:, :, : self.rows]
+
+
+class PayloadCNN1D(nn.Module):
+    """같은 세 채널을 3×2,304 수열로 펴서 1차원 합성곱에 넣는다 — 줄바꿈이 만드는 가짜 세로 이웃을 없앤다."""
+
+    def __init__(self, num_classes: int, in_channels: int = 3, dropout: float = 0.3):
+        super().__init__()
+
+        def conv_block(cin: int, cout: int) -> nn.Sequential:
+            return nn.Sequential(
+                nn.Conv1d(cin, cout, kernel_size=3, padding=1, bias=False),
+                nn.BatchNorm1d(cout),
+                nn.ReLU(inplace=True),
+                nn.MaxPool1d(2),
+            )
+
+        self.features = nn.Sequential(conv_block(in_channels, 32), conv_block(32, 64), conv_block(64, 128))
+        self.dropout = nn.Dropout(dropout)
+        self.classifier = nn.Linear(128, num_classes)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.features(x.flatten(2))   # (N,C,48,48) → (N,C,2304). 행 우선이라 바이트 순서 그대로다.
+        return self.classifier(self.dropout(x.amax(dim=2)))
+
+
+def build_e2_variant(name: str, num_classes: int, in_channels: int = 3) -> nn.Module:
+    """E2 후보 이름 → 모델. 2차원 후보 둘은 PayloadCNN 의 한 부품만 바꿔 나머지가 같음을 보장한다."""
+    if name == "cnn_1d":
+        return PayloadCNN1D(num_classes, in_channels=in_channels)
+    model = PayloadCNN(num_classes, in_channels=in_channels)
+    if name == "cnn_crop8":
+        model.features = nn.Sequential(TopRows(8), model.features)   # 8×48 → 1×6
+    elif name == "cnn_gmp":
+        model.gap = nn.AdaptiveMaxPool2d(1)
+    else:
+        raise ValueError(f"알 수 없는 E2 후보: {name} (가능: {E2_VARIANTS})")
+    return model
+
+
+# ---------------------------------------------------------------------------
 # Phase 12 (M4) — 다단 조기종료 CNN
 # ---------------------------------------------------------------------------
 # 보조 헤드 손실 가중치 기본값. 너무 크면 보조 헤드가 본 헤드 학습을 방해하고(docs/11 §9 리스크),

@@ -32,6 +32,8 @@
   - 꼬리 라벨 감사(`docs/audit/srbh_tail_label_audit.csv`, LLM 1인 판정): 1차 확신 오답의 70.9% 가 라벨 불일치(대조 31.8%) — SR-BH Normal 에 스캐너 탐침이 남아 있다.
   - 클래스별 τ(G2)도 사전 판정은 **기각**(배율 −18.7%, p 0.42, docs/14 §8.6). 운영점 넘김 −7.6pp·배포 배수 1.34→1.75배는 **사후 탐색**이라 "개선"으로 확정해 쓰지 말 것.
   - ⚠️ T1 운영점 50% 는 `_bal` 체크포인트(F1 0.81) 값이고, CV(class weight, F1 0.89)의 같은 게이트는 ~25% 다 → 두 값을 출처와 함께 병기(docs/14 §8.6).
+  - ⚠️ **공정 지연(E1, 2026-10-11, docs/14 §8.21)**: 전처리를 넣고 2차를 실제 길이로 재면 CPU·배치 1 에서 1차 전체 1.311ms > 2차 전체 0.393ms(스레드 1 p50) → 캐스케이드는 char-CNN 단독의 **0.27배**. **"CPU·배치 1 속도 이득" 주장은 철회**(스레드 1·4·8 모두). 위의 1.22배·1.45배·1.01배·1.28배 등은 전부 "추론만·2,304 채움" 값 → **채움 기준이라고 밝혀 병기만**, 헤드라인 금지. 지연은 `latency_fair.py` 로 재고(조용한 기기), `cascade.measure_latency` 값은 채움 기준이다.
+  - 📌 **재분석(docs/14 §8.22)**: §8.6 판정의 20% 감소 검정력은 7~10% — "기각"은 "효과 없음"이 아니라 "이 설계로 판정 불가"로 서술. 운영점 실사용자 r_N: B0 69.3% [65.3, 73.0] · G2 49.6% [45.5, 53.8](n=550).
 - ⚠️ `docs/thetics/` 는 **.gitignore 대상**(PDF 미추적) → **수집 목록의 유일한 추적본은 `docs/12` §1**. 논문을 추가하면 docs/12 도 함께 갱신.
 
 ## 데이터 파이프라인
@@ -63,6 +65,9 @@
 - 이미지 모델(같은 npz 입력): `cnn`(93,988p) · `cnn_ee`(조기종료, 백본 동일 + 보조 헤드 2개) · `vit`(단일 ViT, 2.7M) · `hybrid`(CNN stem+Transformer, 0.58M) — `src/models/cnn.py`, `vit.py`.
   텍스트 모델: `charcnn` · `bilstm`(`text_models.py`), 별도 sklearn 베이스라인 `baseline_tfidf.py`.
 - ⚠️ 새 이미지 모델 추가 시 `IMAGE_MODELS` 를 **2곳** 갱신: `train.py`, `cross_validate.py`(트랙의 "5곳"과는 별개).
+  1차 재설계 후보(E2, `cnn.build_e2_variant`): `cnn_crop8`(위 8행=384바이트) · `cnn_gmp`(전역 최대 풀링) · `cnn_1d`(3×2,304 1차원 conv).
+- CV 축: `cross_validate.py --seed N`(tag `_sN`, 42 는 생략) · `--group-template`(tag `_gtpl`, 숫자·hex·긴 토큰을 가린 템플릿으로 묶어 fold 분할 — T5). 사전 판정 규칙은 `docs/paper_revision/03_prereg_v2.md`.
+- 장시간 작업 로그는 `experiments/logs/`(gitignore).
 - ⚠️ `train.py` 를 `--smoke` 없이 돌리면 **추적 대상 그림**(`docs/figures/models/cm_*.png`)을 덮어씀 → 로컬 코드 검증은 반드시 `--smoke`(저장 생략).
 - 체크포인트가 필요한 스크립트(cascade 등)의 로컬 스모크: 스크래치에서 소량 학습한 임시 `.pt` 를 `experiments/checkpoints/` 에 만들고 검증 후 삭제.
 - ⚠️ 산출물 tag 는 **실험을 가르는 하이퍼파라미터를 전부 반영**해야 함. 안 그러면 서로 덮어씀(커밋 5eede2f 사고: RGB 조합이 전부 `_rgb` 로 저장돼 상호 덮어쓰기).

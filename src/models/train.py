@@ -61,7 +61,7 @@ CKPT_DIR = PROJECT_ROOT / "experiments" / "checkpoints"
 # 이미지를 쓰는 모델과 바이트 시퀀스를 쓰는 모델을 구분한다.
 # vit/hybrid 는 RGB CNN 과 **완전히 같은 이미지 입력**을 받는 비교 arm 이다(vit.py 참조).
 # cnn_ee = 조기종료 CNN(Phase 12/M4). 백본은 cnn 과 동일하고 블록마다 보조 헤드가 붙는다.
-IMAGE_MODELS = {"cnn", "cnn_ee", "vit", "hybrid"}
+IMAGE_MODELS = {"cnn", "cnn_ee", "vit", "hybrid", "cnn_crop8", "cnn_gmp", "cnn_1d"}
 TEXT_MODELS = {"charcnn", "bilstm"}
 # 학습 중 여러 헤드의 logits 를 돌려주는 모델(손실을 가중합해야 한다).
 MULTI_HEAD_MODELS = {"cnn_ee"}
@@ -248,6 +248,9 @@ def build_model(model: str, num_classes: int, in_channels: int = 1,
         # 조기종료 임계값은 학습에 관여하지 않는다(학습 중에는 조기종료를 하지 않는다).
         # 평가 시점의 손잡이라 cascade.py 가 val 에서 골라 넣어준다.
         return cnn.build_early_exit_model(num_classes, in_channels=in_channels)
+    if model in ("cnn_crop8", "cnn_gmp", "cnn_1d"):
+        import cnn
+        return cnn.build_e2_variant(model, num_classes, in_channels=in_channels)
     if model in ("vit", "hybrid"):
         import vit
         return vit.build_model(num_classes, in_channels=in_channels,
