@@ -91,6 +91,8 @@ python src/eval/linear_stage1.py --analyze
 
 # (4) 유사 연구 비교 그림 → docs/figures/cascade/literature_comparison_srbh_4class.png
 python src/eval/literature_compare.py
+# 딥러닝 모델만 남긴 판 → docs/figures/cascade/literature_comparison_dl_only_srbh_4class.png
+python src/eval/literature_compare.py --dl-only
 ```
 
 - 한글 콘솔에서는 각 명령 앞에 `PYTHONIOENCODING=utf-8` 을 붙인다.

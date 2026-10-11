@@ -73,7 +73,7 @@
   1차 재설계 후보(E2, `cnn.build_e2_variant`): `cnn_crop8`(위 8행=384바이트) · `cnn_gmp`(전역 최대 풀링) · `cnn_1d`(3×2,304 1차원 conv).
   ⚠️ `cnn_1d` 가 E2 판정에서 채택됐다(docs/14 §8.25). 단 3기의 다른 실험(G1~G6·T 계열)은 전부 현행 `cnn` 1차 위에서 잰 값이다 — 1차를 바꿔 인용하면 수치가 섞인다.
 - CV 축: `cross_validate.py --seed N`(tag `_sN`, 42 는 생략) · `--group-template`(tag `_gtpl`, 숫자·hex·긴 토큰을 가린 템플릿으로 묶어 fold 분할 — T5). 사전 판정 규칙은 `docs/paper_revision/03_prereg_v2.md`.
-- CV 판정 도구: `gate_confirm.py --seed N [--group-template]`(C-G2 규칙, 보정 t 는 `gate_confirm.corrected_t`) · `linear_stage1.py --fit|--latency|--analyze`(선형 1차 E3 + E2 변형 경계 + T11) · `literature_compare.py`(유사 연구 비교 그림) · `latency_fair.py --stage1-variants`(1차 후보 지연, 반복마다 번갈아 측정).
+- CV 판정 도구: `gate_confirm.py --seed N [--group-template]`(C-G2 규칙, 보정 t 는 `gate_confirm.corrected_t`) · `linear_stage1.py --fit|--latency|--analyze`(선형 1차 E3 + E2 변형 경계 + T11) · `literature_compare.py [--dl-only]`(유사 연구 비교 그림, `--dl-only` 는 고전 ML 을 뺀 판을 `_dl_only` 파일로 따로 저장) · `latency_fair.py --stage1-variants`(1차 후보 지연, 반복마다 번갈아 측정).
   ⚠️ `cv_compare.py` 의 t 검정은 **보정 없는 대응 t**(fold 간 학습 집합 중복 무시) → 사전 판정에는 `corrected_t`(Nadeau–Bengio) + Holm 을 쓴다. ⚠️ `cross_validate.py --balance`(tag `_bal`)는 fold 내부 train 만 언더샘플링한다(T11).
 - 장시간 작업 로그는 `experiments/logs/`(gitignore).
 - ⚠️ `train.py` 를 `--smoke` 없이 돌리면 **추적 대상 그림**(`docs/figures/models/cm_*.png`)을 덮어씀 → 로컬 코드 검증은 반드시 `--smoke`(저장 생략).

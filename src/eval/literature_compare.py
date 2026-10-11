@@ -7,9 +7,12 @@
         교수 기준("그래프에서 위면 개선")은 이 패널로만 판단할 수 있다.
 
 선행 조건: latency_fair.py(E1) → linear_stage1.py --fit → --latency → --analyze.
+
+--dl-only: 고전 ML(선형·부스팅)을 모두 빼고 딥러닝 모델만 남긴 판을 따로 그린다(파일명 `_dl_only`, 기본 그림은 그대로).
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -36,6 +39,14 @@ REPORTED = [
     ("WAMM'25 XGBoost (SR-BH deduplicated, CPU)", 0.061, 0.9705, "s", "tab:blue", True),
     ("Kutlimuratov'26 cascade (UNSW-NB15, accuracy)", 0.0036, 0.9481, "P", "tab:gray", False),
 ]
+FIGURE_DL = FIGURE.with_name("literature_comparison_dl_only_srbh_4class.png")
+# 딥러닝만 남긴 판의 보고값. 뺀 것: 고전 ML 단독(PassiveAggressive·XGBoost), 1차가 고전 ML 인 Tasdemir 캐스케이드,
+#   모델 종류를 원문에서 확인하지 못한 Kutlimuratov 캐스케이드. WAMM 의 CNN-BiLSTM(0.7522)은 지연을 옮겨 적지 않아 뺐다.
+REPORTED_DL = [
+    ("Tasdemir'23 BERT alone (SQLi, GPU)", 2.0439, 0.9983, "^", "tab:green", True),
+    ("WAMM'25 DistilBERT (SR-BH original, CPU)", 14.423, 0.8547, "o", "tab:blue", True),
+    ("WAMM'25 BiLSTM (SR-BH original, CPU)", 0.713, 0.7711, "s", "tab:blue", True),
+]
 # 지연을 보고하지 않은 연구는 가로선으로만 표시한다(둘 다 SR-BH 2020 이진 탐지).
 NO_LATENCY = [("WADBERT'26 (SR-BH, binary F1 0.995, no latency reported)", 0.9950, "tab:brown"),
               ("X-WAD'26 (SR-BH relabeled, binary F1 0.988, no latency reported)", 0.9884, "tab:olive")]
@@ -43,16 +54,25 @@ STAGE1_STYLE = {"rgb_cnn": ("tab:red", "RGB CNN (ours)"), "tfidflr": ("tab:purpl
                 "hashlr": ("tab:orange", "Hashing + LogReg (re-impl.)"),
                 # E2 후보 가운데 지연이 절반인 것과 정확도가 가장 높은 것만 올린다(셋 다 그리면 선이 겹쳐 읽히지 않는다).
                 "cnn_crop8": ("tab:brown", "RGB CNN top 8 rows (ours)"), "cnn_1d": ("tab:cyan", "RGB 1-D CNN (ours)")}
+CLASSICAL_STAGE1 = {"tfidflr", "hashlr"}
 
 
-def ours_reported_style(analysis, view="val_mix"):
+def stage1_styles(dl_only):
+    """그림에 올릴 1차 목록. 딥러닝만 남기는 판은 선형 1차 둘을 빼고, 빈 자리에 E2 의 나머지 후보(최대값 풀링)를 넣는다."""
+    if not dl_only:
+        return STAGE1_STYLE
+    return {**{name: style for name, style in STAGE1_STYLE.items() if name not in CLASSICAL_STAGE1},
+            "cnn_gmp": ("tab:pink", "RGB CNN global max pool (ours)")}
+
+
+def ours_reported_style(analysis, styles, view="val_mix"):
     """우리 결과를 (a) 패널의 형식(요청당 지연 ms, Macro-F1)으로 바꾼다. 운영점을 못 고른 구성은 뺀다."""
     ms2 = analysis["stage2_ms"]
     points = [("char-CNN alone (ours, stage 2)", ms2, analysis["stage2_solo_macro_f1"], "*", "k")]
     for name, row in analysis["stage1"].items():
-        if name not in STAGE1_STYLE:
+        if name not in styles:
             continue
-        color, label = STAGE1_STYLE[name]
+        color, label = styles[name]
         points.append((f"{label} alone", row["ms1"], row["solo_macro_f1"], "s", color))
         if "reason" not in row[view]:
             # 배수 S = t2 / (기대 지연) 이므로 기대 지연 = t2 / S.
@@ -61,7 +81,7 @@ def ours_reported_style(analysis, view="val_mix"):
     return points
 
 
-def plot(analysis, loaded):
+def plot(analysis, loaded, styles, dl_only=False):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -69,17 +89,17 @@ def plot(analysis, loaded):
     ms2 = analysis["stage2_ms"]
     fig, axes = plt.subplots(1, 3, figsize=(19, 6.2), gridspec_kw={"width_ratios": [1.25, 1, 1]})
     ax = axes[0]
-    for label, ms, score, marker, color, is_f1 in REPORTED:
+    for label, ms, score, marker, color, is_f1 in (REPORTED_DL if dl_only else REPORTED):
         ax.scatter([ms], [score], marker=marker, s=90, zorder=4, label=label,
                    facecolors=color if is_f1 else "none", edgecolors=color)
-    for label, ms, score, marker, color in ours_reported_style(analysis):
+    for label, ms, score, marker, color in ours_reported_style(analysis, styles):
         ax.scatter([ms], [score], marker=marker, s=170 if marker == "*" else 80, color=color, zorder=5,
                    edgecolors="k", linewidths=.8, label=label + " (SR-BH, CPU)")
     for label, score, color in NO_LATENCY:
         ax.axhline(score, color=color, lw=1, ls="--", label=label)
     ax.set_xscale("log")
     ax.invert_xaxis()                       # 다른 패널처럼 오른쪽이 빠른 쪽이 되게 한다
-    ax.set_ylim(0.88, 1.001)
+    ax.set_ylim(0.74 if dl_only else 0.88, 1.001)   # WAMM 의 딥러닝 보고값(0.77·0.85)이 잘리지 않게
     ax.set_xlabel("Latency per request, ms (log scale; faster to the right)")
     ax.set_ylabel("F1 as reported (hollow marker = accuracy)")
     ax.set_title("(a) As reported: different data, classes and hardware (not directly comparable)", fontsize=10)
@@ -90,7 +110,7 @@ def plot(analysis, loaded):
     grid = np.linspace(0.1, max(ms2 / analysis["stage1"][name]["ms1"] for name in loaded), 300)
     for ax, (col, (_, title)), letter in zip(axes[1:], enumerate(GF.NORMAL_VIEWS), "bc"):
         for name, L in loaded.items():
-            color, label = STAGE1_STYLE[name]
+            color, label = styles[name]
             ms1 = analysis["stage1"][name]["ms1"]
             env = GF.envelopes(L["paths"], ms1, ms2, col, grid)
             for gate, style, gate_label in (("b0", "-", "standard deferral"), ("g2", "--", "class-wise tau")):
@@ -113,24 +133,31 @@ def plot(analysis, loaded):
     for legend in legends:
         legend.set_in_layout(False)     # 축 밖 범례가 패널 간격을 벌리지 않게 한다(저장 때는 bbox 로 포함)
     title = fig.suptitle("Accuracy-speed comparison with the best reported similar studies "
-                 "(squares = stage 1 alone, diamonds = cascade)", fontsize=12)
+                 + ("- deep-learning models only " if dl_only else "")
+                 + "(squares = stage 1 alone, diamonds = cascade)", fontsize=12)
     fig.tight_layout()
-    FIGURE.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(FIGURE, dpi=130, bbox_inches="tight", bbox_extra_artists=[*legends, title])
+    figure = FIGURE_DL if dl_only else FIGURE
+    figure.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(figure, dpi=130, bbox_inches="tight", bbox_extra_artists=[*legends, title])
     plt.close(fig)
+    return figure
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--dl-only", action="store_true", help="고전 ML 을 빼고 딥러닝 모델만 남긴 판을 그린다")
+    args = parser.parse_args()
+    styles = stage1_styles(args.dl_only)
     try:
         analysis = json.loads(LS.OUTPUT.read_text(encoding="utf-8"))
         strata = np.asarray(CV.load_pool_strata("srbh_4class", exclude_test=True))
         paths = {"rgb_cnn": GF.STAGE1, **{name: LS.probs_path(name) for name in LS.CANDIDATES},
                  **{name: GF.RESULTS / f"cvprobs_srbh_4class_{name}_raw_rgb_sealed.npz" for name in LS.E2_LABELS}}
-        loaded = {name: LS.load_stage1(paths[name], strata) for name in analysis["stage1"] if name in STAGE1_STYLE}
-        plot(analysis, loaded)
-        for label, ms, score, _, _ in ours_reported_style(analysis):
+        loaded = {name: LS.load_stage1(paths[name], strata) for name in analysis["stage1"] if name in styles}
+        figure = plot(analysis, loaded, styles, args.dl_only)
+        for label, ms, score, _, _ in ours_reported_style(analysis, styles):
             print(f"{label}: {ms:.4f} ms, Macro-F1 {score:.4f}")
-        print(f"그림: {FIGURE.relative_to(PROJECT_ROOT).as_posix()}")
+        print(f"그림: {figure.relative_to(PROJECT_ROOT).as_posix()}")
     except (OSError, ValueError, KeyError) as error:
         print(f"[오류] 문헌 비교 그림 실패: {error}", file=sys.stderr)
         return 1
