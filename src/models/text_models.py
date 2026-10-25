@@ -99,6 +99,38 @@ class BiLSTM(nn.Module):
         return self.classifier(self.dropout(feat))
 
 
+DISTILBERT_NAME = "distilbert-base-uncased"
+DISTILBERT_MAX_TOKENS = 512  # 이 풀에서 잘림 0% — WAMM 의 128 은 주입 클래스 ~25% 를 자른다(사전 문서 E10).
+
+
+class DistilBertClassifier(nn.Module):
+    """사전학습 DistilBERT + 분류 헤드 (DL-A·같은 조건 유사 연구 재구현, 사전 문서 E10).
+
+    입력은 바이트가 아니라 공식 토크나이저의 토큰 id(패딩 0 = [PAD]). 다른 텍스트 모델과
+    같은 학습 루프(train.fit)에 넣으려고 logits 텐서만 돌려준다. 배치를 실제 최대 길이까지
+    잘라 계산한다 — 패딩 위치는 마스크로 가려지므로 결과는 같고 계산만 준다.
+    config 를 주면 사전학습 가중치 없이 만든다(테스트용, 내려받기 불필요).
+    """
+
+    def __init__(self, num_classes: int, config=None):
+        super().__init__()
+        from transformers import AutoModelForSequenceClassification, DistilBertForSequenceClassification
+        from transformers.utils import logging as hf_logging
+
+        hf_logging.set_verbosity_error()  # "헤드가 새로 초기화됨" 경고는 의도된 것이라 끈다.
+        if config is None:
+            self.bert = AutoModelForSequenceClassification.from_pretrained(
+                DISTILBERT_NAME, num_labels=num_classes)
+        else:
+            config.num_labels = num_classes
+            self.bert = DistilBertForSequenceClassification(config)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        mask = x != 0
+        width = max(int(mask.sum(dim=1).max()), 1)
+        return self.bert(input_ids=x[:, :width], attention_mask=mask[:, :width].long()).logits
+
+
 def build_model(name: str, num_classes: int, **kwargs) -> nn.Module:
     """이름으로 텍스트 베이스라인 모델을 생성한다."""
     if name == "charcnn":
@@ -113,4 +145,24 @@ def build_model(name: str, num_classes: int, **kwargs) -> nn.Module:
         return EarlyExitCharCNN(num_classes=num_classes, **kwargs)
     if name == "bilstm":
         return BiLSTM(num_classes=num_classes, **kwargs)
-    raise ValueError(f"알 수 없는 텍스트 모델: {name} (charcnn | charcnn_tiny | charcnn_k3 | charcnn_ee | bilstm)")
+    if name == "distilbert":
+        return DistilBertClassifier(num_classes=num_classes, **kwargs)
+    raise ValueError(f"알 수 없는 텍스트 모델: {name} "
+                     "(charcnn | charcnn_tiny | charcnn_k3 | charcnn_ee | bilstm | distilbert)")
+
+
+def encode_token_matrix_int16(texts: list[str], max_len: int = DISTILBERT_MAX_TOKENS):
+    """문자열 → (N,max_len) int16 토큰 id (공식 토크나이저, 패딩 0, 넘치면 자름).
+
+    어휘 30,522 < int16 상한이라 무손실 — 바이트 경로(cross_validate.encode_byte_matrix_int16)와
+    같은 이유로 int16 이다. 잘린 행 수를 함께 돌려줘 E10 의 "잘림 0%" 전제를 실행마다 확인한다.
+    """
+    import numpy as np
+    from transformers import AutoTokenizer
+
+    tok = AutoTokenizer.from_pretrained(DISTILBERT_NAME)
+    ids = tok(list(texts), truncation=True, max_length=max_len, padding="max_length")["input_ids"]
+    matrix = np.asarray(ids, dtype=np.int16)
+    # 마지막 칸까지 찬 행 = 잘림 수의 상한(정확히 512 토큰인 행도 센다). 0 이면 잘림도 0 이다.
+    truncated_upper = int((matrix[:, -1] != 0).sum())
+    return matrix, truncated_upper

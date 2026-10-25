@@ -52,7 +52,10 @@ RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 # 모델 종류별 입력 경로가 다르다(이미지 npz / 문자열 CSV / TF-IDF).
 # ⚠️ train.py 의 IMAGE_MODELS 와 함께 갱신할 것(이미지 모델 추가 시 두 곳).
 IMAGE_MODELS = {"cnn", "cnn_ee", "vit", "hybrid", "cnn_crop8", "cnn_gmp", "cnn_1d"}
-TEXT_NN_MODELS = {"charcnn", "charcnn_tiny", "charcnn_k3", "charcnn_ee", "bilstm"}
+TEXT_NN_MODELS = {"charcnn", "charcnn_tiny", "charcnn_k3", "charcnn_ee", "bilstm", "distilbert"}
+# 바이트가 아니라 사전학습 토크나이저의 토큰 id 를 먹는 모델(사전 문서 E10). train.TEXT_MODELS 에는 넣지 않는다 —
+# train.py 의 데이터 경로는 바이트 인코딩뿐이라 넣으면 바이트 id 가 조용히 토큰 id 로 들어간다.
+TOKEN_MODELS = {"distilbert"}
 TFIDF_MODELS = {"tfidf_logreg", "tfidf_rf"}
 ALL_MODELS = IMAGE_MODELS | TEXT_NN_MODELS | TFIDF_MODELS
 
@@ -594,7 +597,12 @@ def main() -> None:
                 args.track, args.text, fields=args.fields, exclude_test=args.exclude_test)
         input_conflicts = count_input_conflicts(conflict_texts, y)
 
-    if not is_image and not is_tfidf:
+    if args.model in TOKEN_MODELS:
+        import text_models
+        print("  토큰 인코딩 중...")
+        pool_x, truncated_upper = text_models.encode_token_matrix_int16(pool_texts)
+        print(f"  최대 {text_models.DISTILBERT_MAX_TOKENS} 토큰 · 끝까지 찬 행 {truncated_upper:,} (잘림 상한)")
+    elif not is_image and not is_tfidf:
         print("  바이트 시퀀스 인코딩 중...")
         pool_x = encode_byte_matrix_int16(pool_texts, args.max_len)
 
