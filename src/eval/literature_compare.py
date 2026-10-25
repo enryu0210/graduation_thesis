@@ -57,6 +57,8 @@ STAGE1_STYLE = {"rgb_cnn": ("tab:red", "RGB CNN (ours)"), "tfidflr": ("tab:purpl
 CLASSICAL_STAGE1 = {"tfidflr", "hashlr"}
 # 딥러닝 판에만 올리는 char-CNN 내부 조기 종료(DL-C, E8 운영점)와 k3 단독 대조(E9-1). 기술만 한다(사전 문서 §E9-3).
 DL_CASCADE = GF.RESULTS / "dl_cascade_srbh_4class.json"
+# 같은 SR-BH fold 로 재구현한 WAMM DistilBERT(E10-2 의 R)와 char-CNN → DistilBERT 운영점(E10-3). 기술만 한다.
+DL_A = GF.RESULTS / "dl_a_srbh_4class.json"
 
 
 def dl_cascade_points(view):
@@ -69,7 +71,22 @@ def dl_cascade_points(view):
     if "k3_alone" in result:
         points.append(("k3-only char-CNN alone (ours, control)", result["k3_alone"]["speedup"],
                        result["k3_alone"]["macro_f1"], "s", "tab:gray"))
+    if DL_A.exists():
+        # E10-3 운영점. 배수는 같은 실행의 char-CNN 지연 기준(t2 / (t2 + E_π·t_R)) — 이 그림의 다른 점과 같은 기준이다.
+        row = json.loads(DL_A.read_text(encoding="utf-8"))["e10_3"][view]
+        if "reason" not in row:
+            points.append(("char-CNN -> DistilBERT cascade (ours)", row["vs_charcnn"]["latency_ratio"],
+                           row["b0"]["macro_f1"], "D", "tab:blue"))
     return points
+
+
+def distilbert_reimpl():
+    """같은 fold 로 재구현한 WAMM DistilBERT 단독(E10-2 의 R): (char-CNN 대비 배수, Macro-F1). 없으면 None."""
+    if not DL_A.exists():
+        return None
+    result = json.loads(DL_A.read_text(encoding="utf-8"))
+    ms = result["latency_ms"]
+    return ms["t2"] / ms["t_R"], result["distilbert_macro_f1"]
 
 
 def stage1_styles(dl_only):
@@ -96,6 +113,9 @@ def ours_reported_style(analysis, styles, view="val_mix"):
     if "rgb_cnn" in styles and "tfidflr" not in styles:     # 딥러닝 판(stage1_styles(dl_only=True))에서만
         points += [(label, ms2 / speedup, score, marker, color)
                    for label, speedup, score, marker, color in dl_cascade_points(view)]
+        if distilbert_reimpl():
+            speedup, score = distilbert_reimpl()
+            points.append(("DistilBERT alone (WAMM'25 re-impl., same folds)", ms2 / speedup, score, "h", "tab:blue"))
     return points
 
 
@@ -144,6 +164,11 @@ def plot(analysis, loaded, styles, dl_only=False):
         for label, speedup, score, marker, color in (dl_cascade_points(GF.NORMAL_VIEWS[col][0]) if dl_only else []):
             ax.scatter([speedup], [score], marker=marker, s=80, color=color, edgecolors="k", linewidths=.8,
                        zorder=6, label=label)
+        if dl_only and distilbert_reimpl():
+            # 배수가 0.01 대라 점으로 찍으면 가로축이 눌린다 — 정확도만 가로선으로 보인다.
+            speedup, score = distilbert_reimpl()
+            ax.axhline(score, color="tab:blue", lw=1, ls="-.",
+                       label=f"DistilBERT alone (WAMM'25 re-impl., same folds, {speedup:.4f}x)")
         ax.axvline(1.0, color="k", lw=.8, ls=":")
         ax.set_ylim(0.88, 1.001)
         ax.set_xlabel("Speedup vs char-CNN alone (attack share 3.3%)")

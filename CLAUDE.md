@@ -41,11 +41,14 @@
   - 📌 **견고성(docs/14 §8.27·§8.28)**: 템플릿 묶음 CV 에서 점수 유지(T5). 1차 class weight 결정은 CV 에서도 +27%(채움 기준·검증 분포) — test 의 0.99→1.45배(+46%)는 **확인용**으로 내리고, 실사용자 분포(+5%)·공정 지연(+1~6%)에서는 이득이 없다고 병기. 고정 test 는 아홉 번 평가에 쓰였다(감사표 §8.28). T8(2인 라벨 감사)은 미실시.
 - 📌 **딥러닝 한정 후속 후보(2026-10-11 등록 · 미측정, docs/14 §8.30)**: 사용자 방향 = 제안 구성은 딥러닝만(고전 ML 은 비교 기준으로만), RGB CNN 은 필수 아님 — ⚠️ 마스터 문서·제목에는 미반영(교수 확인 전).
   `DL-A` char-CNN → 트랜스포머 · `DL-B` 더 작은 문자 모델 → char-CNN · `DL-C` char-CNN 내부 조기 종료. 관문: DL-B·C 는 char-CNN 층별 시간 측정(학습 불필요), DL-A 는 트랜스포머 단독 CV 가 0.9884 를 넘는가. 비교 대상은 char-CNN 단독.
-  ✅ **DL-B·C 관문 통과(2026-10-25, E7, docs/14 §8.31)**: `latency_fair.py --charcnn-breakdown` — 호출 고정비는 t2 의 8.5% 뿐, 91% 가 합성곱 → 상한 DL-B 7.24배·DL-C 3.03배(넘김 5.3% 가정). DL-A 관문은 미실시.
+  ✅ **DL-B·C 관문 통과(2026-10-25, E7, docs/14 §8.31)**: `latency_fair.py --charcnn-breakdown` — 호출 고정비는 t2 의 8.5% 뿐, 91% 가 합성곱 → 상한 DL-B 7.24배·DL-C 3.03배(넘김 5.3% 가정). DL-A 관문은 E10 에서 통과(아래).
   📌 **본 측정 E8(2026-10-25, docs/14 §8.32 · `dl_cascade.py --latency|--analyze`)**: DL-C(`charcnn_ee`) **char-CNN 단독보다 위**(실사용자 3.53배, F1 −0.10%p) · DL-B(`charcnn_tiny`) **위가 아니다**(2.39배지만 F1 −0.45%p > 0.3%p).
     ⚠️ DL-C 이득은 넘김이 아니라 **보조 헤드(k3 분기) 자체**에서 나온다 — 5 fold 중 3개가 넘김 0%. "넘김 판단 개선"으로 쓰지 말 것.
     📌 **E9(docs/14 §8.33)**: seed 43 확인 **통과(2/2, 3.62배·F1 +0.33%p, 전 fold 넘김 0%)** · k3 단독 대조 `charcnn_k3` 0.9748(−1.36%p) → E8 미충족 = "결합 학습의 몫"(단 보조 헤드와 차이 p 0.34, k3 단독은 조기 종료로 불안정 — 최적화 안정성일 수 있음).
     → DL-C 는 넘김 축이 아니라 **2차 모델 압축(결합 학습한 k3 출구)**으로 서술. "유사 연구 대비 개선" 금지(그림은 `literature_compare.py --dl-only` 에 점만 추가).
+  📌 **DL-A(E10, 2026-10-25, docs/14 §8.34 · `dl_a.py --latency|--analyze`, 모델 `distilbert` = WAMM'25 DistilBERT 같은 fold 재구현)**: 관문 통과(0.9914 > 0.9884, 단 p 0.57). t_R 45.15ms = char-CNN 의 80배(같은 실행).
+    ✅ **char-CNN → DistilBERT 캐스케이드는 재구현 DistilBERT 단독보다 위**(실사용자 51.6배 · F1 −0.03%p, seed 42, fold 4 는 2.95배) — 교수 기준을 **재구현 기준으로** 충족한 첫 구성. char-CNN 단독은 80배지만 −0.303%p 로 0.003%p 차 미달.
+    ⚠️ 캐스케이드의 char-CNN 대비 몫은 +0.28%p(p 0.34)·지연 1.56배 — "char-CNN 보다 정확"·"원 논문 대비 개선" 금지. ⚠️ `distilbert` 는 토큰 id 입력이라 `cross_validate.TOKEN_MODELS` 에만 있고 `train.TEXT_MODELS` 에는 **일부러 없다**(train.py 는 바이트 경로뿐).
 - ⚠️ `docs/thetics/` 는 **.gitignore 대상**(PDF 미추적) → **수집 목록의 유일한 추적본은 `docs/12` §1**. 논문을 추가하면 docs/12 도 함께 갱신.
 
 ## 데이터 파이프라인
@@ -75,7 +78,7 @@
 
 ## 모델 / 학습
 - 이미지 모델(같은 npz 입력): `cnn`(93,988p) · `cnn_ee`(조기종료, 백본 동일 + 보조 헤드 2개) · `vit`(단일 ViT, 2.7M) · `hybrid`(CNN stem+Transformer, 0.58M) — `src/models/cnn.py`, `vit.py`.
-  텍스트 모델: `charcnn` · `charcnn_tiny`(DL-B, 임베딩 32·k3·필터 64) · `charcnn_ee`(DL-C, k3 분기 보조 헤드 + 가중 0.3 결합 손실) · `charcnn_k3`(E9 대조, 임베딩 64·k3·필터 128 단독) · `bilstm`(`text_models.py`), 별도 sklearn 베이스라인 `baseline_tfidf.py`.
+  텍스트 모델: `charcnn` · `charcnn_tiny`(DL-B, 임베딩 32·k3·필터 64) · `charcnn_ee`(DL-C, k3 분기 보조 헤드 + 가중 0.3 결합 손실) · `charcnn_k3`(E9 대조, 임베딩 64·k3·필터 128 단독) · `bilstm`(`text_models.py`) · `distilbert`(E10, HF `distilbert-base-uncased`, 토큰 512, CV 전용), 별도 sklearn 베이스라인 `baseline_tfidf.py`.
   ⚠️ 새 텍스트 모델은 `train.TEXT_MODELS`·`cross_validate.TEXT_NN_MODELS` 2곳, 다중 헤드면 `train.MULTI_HEAD_MODELS` 도. `charcnn_ee --save-probs` 는 보조 헤드 확률을 `cvprobs_{tag}_aux.npz` 로 따로 남긴다.
 - ⚠️ 새 이미지 모델 추가 시 `IMAGE_MODELS` 를 **2곳** 갱신: `train.py`, `cross_validate.py`(트랙의 "5곳"과는 별개).
   1차 재설계 후보(E2, `cnn.build_e2_variant`): `cnn_crop8`(위 8행=384바이트) · `cnn_gmp`(전역 최대 풀링) · `cnn_1d`(3×2,304 1차원 conv).
