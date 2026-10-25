@@ -31,3 +31,12 @@ def test_k3_alone_applies_e8_conditions_without_deferral():
     good = D.k3_alone(probs(True), probs(True), 0.9884, t2=0.345, t_front=0.095)
     assert good["e9_1"]["above"] and good["macro_f1"] == 1.0 and good["dl_c_aux_minus_k3_pp"] == [0.0] * 5
     assert not D.k3_alone(probs(False), probs(True), 0.9884, t2=0.345, t_front=0.095)["e9_1"]["above"]
+
+
+def test_e10_2_above_r_needs_speed_and_f1():
+    # 사전 문서 §E10-2: t_R / t_X ≥ 1.2 그리고 F1_X ≥ F1_R − 0.3%p.
+    from src.eval import dl_a
+    r = [0.990, 0.991, 0.989, 0.990, 0.990]
+    assert dl_a.above_r(12.0, 10.0, [0.988] * 5, r)["above"]
+    assert not dl_a.above_r(11.9, 10.0, [0.990] * 5, r)["above"]        # 1.19배
+    assert not dl_a.above_r(20.0, 1.0, [0.9865] * 5, r)["above"]        # 0.35%p 손실

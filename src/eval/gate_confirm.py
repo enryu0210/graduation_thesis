@@ -84,6 +84,7 @@ def secondary_rule(paths, val_solo2, normal_col, ms1, ms2):
            for gate, rows in chosen.items()}
     out.update(speedup_gain=gain, f1_loss_vs_b0_pp=loss_pp, corrected_t=test["t"], corrected_p=test["p"],
                per_fold_speedup={gate: rows[:, 0].tolist() for gate, rows in chosen.items()},
+               per_fold_macro_f1={gate: rows[:, 1].tolist() for gate, rows in chosen.items()},
                adopted=bool(gain >= 0.20 and test["p"] is not None and test["p"] < 0.05 and loss_pp <= 0.3))
     return out
 
