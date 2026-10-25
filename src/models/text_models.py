@@ -106,8 +106,11 @@ def build_model(name: str, num_classes: int, **kwargs) -> nn.Module:
     if name == "charcnn_tiny":
         # DL-B 1차. 구조는 사전 문서 E8 에 고정 — 결과를 보고 바꾸지 않는다.
         return CharCNN(num_classes=num_classes, embed_dim=32, num_filters=64, kernel_sizes=(3,), **kwargs)
+    if name == "charcnn_k3":
+        # E9-1 대조: DL-C 보조 헤드 경로와 같은 크기(임베딩 64·k3 128)를 처음부터 단독 학습한다.
+        return CharCNN(num_classes=num_classes, kernel_sizes=(3,), **kwargs)
     if name == "charcnn_ee":
         return EarlyExitCharCNN(num_classes=num_classes, **kwargs)
     if name == "bilstm":
         return BiLSTM(num_classes=num_classes, **kwargs)
-    raise ValueError(f"알 수 없는 텍스트 모델: {name} (charcnn | charcnn_tiny | charcnn_ee | bilstm)")
+    raise ValueError(f"알 수 없는 텍스트 모델: {name} (charcnn | charcnn_tiny | charcnn_k3 | charcnn_ee | bilstm)")

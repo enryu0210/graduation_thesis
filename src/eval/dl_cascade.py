@@ -6,6 +6,7 @@
   --latency : t_tiny·t2·t_front·t_rest 를 같은 실행 안에서 번갈아 잰다(CPU·배치 1·스레드 1·p50, E7 과 같은 표본).
               지연은 가중치 값과 무관하므로 학습하지 않은 같은 구조의 모델로 잰다.
   --analyze : 두 후보의 운영점을 fold 마다 val 에서 골라(gate_confirm.secondary_rule) fold-test 배수·F1 로 판정한다.
+              seed 42 는 E9-1 k3 단독 대조(`charcnn_k3`)도 함께 판정한다. `--seed 43` 은 E9-2 확인(DL-C 만).
 """
 from __future__ import annotations
 
@@ -31,6 +32,7 @@ from src.models import text_models  # noqa: E402
 LATENCY_JSON = GF.RESULTS / "dl_cascade_latency_srbh_4class.json"
 OUTPUT = GF.RESULTS / "dl_cascade_srbh_4class.json"
 CVPROBS = "cvprobs_srbh_4class_{}_raw_sealed{}.npz"
+BASE_SEED = 42   # DL-B·k3 대조는 이 seed 로만 학습했다(§E8·§E9).
 N_CLASSES = 4
 # E8 판정 기준(사전 고정).
 MIN_SPEEDUP, MAX_F1_LOSS = 1.2, 0.003
@@ -71,8 +73,13 @@ def measure_latency(texts: list[str], repeats: int, warmup: int = 50) -> dict:
                    "t_front": p50["enc"] + p50["ee_front_fwd"], "t_rest": p50["ee_rest_fwd"]}}
 
 
-def load_cvprobs(model: str, aux: bool = False) -> dict:
-    with np.load(GF.RESULTS / CVPROBS.format(model, "_aux" if aux else ""), allow_pickle=False) as data:
+def cvprobs_suffix(seed: int, aux: bool = False) -> str:
+    # cross_validate 의 tag 규칙: seed 42 는 접미사 생략, 보조 헤드 파일은 tag 뒤에 _aux.
+    return ("" if seed == BASE_SEED else f"_s{seed}") + ("_aux" if aux else "")
+
+
+def load_cvprobs(model: str, aux: bool = False, seed: int = BASE_SEED) -> dict:
+    with np.load(GF.RESULTS / CVPROBS.format(model, cvprobs_suffix(seed, aux)), allow_pickle=False) as data:
         return dict(data)
 
 
@@ -96,23 +103,45 @@ def judge(row: dict, solo_f1: float) -> dict:
     return {**checks, "above": all(checks.values()), "f1_vs_solo_pp": (row["b0"]["macro_f1"] - solo_f1) * 100}
 
 
-def analyze() -> dict:
+def fold_test_f1(probs: dict) -> list[float]:
+    return [gates._macro_f1_fast(probs["y"][probs[f"test_idx_{k}"]], probs[f"test_probs_{k}"].argmax(1), N_CLASSES)
+            for k in range(1, 6)]
+
+
+def k3_alone(k3: dict, ee_aux: dict, solo_test: float, t2: float, t_front: float) -> dict:
+    """E9-1: 넘김 없는 k3 단독에 E8 세 조건을 그대로 건다. t_k3 = t_front(같은 계산 경로, 사전 문서)."""
+    f1, aux_f1 = fold_test_f1(k3), fold_test_f1(ee_aux)
+    row = {"b0": {"macro_f1": float(np.mean(f1))}, "per_fold_speedup": {"b0": [t2 / t_front] * 5}}
+    diffs = np.subtract(aux_f1, f1)
+    return {"per_fold_macro_f1": f1, "macro_f1": row["b0"]["macro_f1"], "speedup": t2 / t_front,
+            "e9_1": judge(row, solo_test),
+            "dl_c_aux_minus_k3_pp": (diffs * 100).tolist(), "dl_c_aux_minus_k3_corrected": GC.corrected_t(diffs)}
+
+
+def analyze(seed: int = BASE_SEED) -> dict:
     latency = json.loads(LATENCY_JSON.read_text(encoding="utf-8"))["latency"]["ms"]
-    solo = load_cvprobs("charcnn")
-    tiny, ee_main, ee_aux = load_cvprobs("charcnn_tiny"), load_cvprobs("charcnn_ee"), load_cvprobs("charcnn_ee", aux=True)
-    check_aligned(solo, tiny, ee_main, ee_aux)
+    solo = load_cvprobs("charcnn", seed=seed)
+    ee_main, ee_aux = load_cvprobs("charcnn_ee", seed=seed), load_cvprobs("charcnn_ee", aux=True, seed=seed)
+    extra = {}
+    if seed == BASE_SEED:
+        extra = {"dl_b": load_cvprobs("charcnn_tiny"), "k3": load_cvprobs("charcnn_k3")}
+    check_aligned(solo, ee_main, ee_aux, *extra.values())
     y = solo["y"]
     solo_val = [gates._macro_f1_fast(y[solo[f"val_idx_{k}"]], solo[f"val_probs_{k}"].argmax(1), N_CLASSES)
                 for k in range(1, 6)]
-    solo_test = float(np.mean([gates._macro_f1_fast(y[solo[f"test_idx_{k}"]], solo[f"test_probs_{k}"].argmax(1),
-                                                    N_CLASSES) for k in range(1, 6)]))
+    solo_test = float(np.mean(fold_test_f1(solo)))
     strata = np.asarray(cross_validate.load_pool_strata("srbh_4class", exclude_test=True))
     t2 = latency["t2"]
     # DL-C 는 S = t2 / (t_front + E_π·t_rest): secondary_rule 의 배수 t_rest/(t_front + E_π·t_rest) 에 t2/t_rest 를 곱한다.
-    candidates = {"dl_b": (tiny, solo, latency["t_tiny"], t2, 1.0),
-                  "dl_c": (ee_aux, ee_main, latency["t_front"], latency["t_rest"], t2 / latency["t_rest"])}
-    result = {"prereg": "docs/paper_revision/03_prereg_v2.md §E8", "pi": GF.PI, "latency_ms": latency,
-              "charcnn_solo_test_macro_f1": solo_test}
+    candidates = {"dl_c": (ee_aux, ee_main, latency["t_front"], latency["t_rest"], t2 / latency["t_rest"])}
+    if extra:
+        # k3 → char-CNN 은 병기(E9-1, 판정 아님). 1차 지연은 t_front 와 같은 계산 경로.
+        candidates = {"dl_b": (extra["dl_b"], solo, latency["t_tiny"], t2, 1.0), **candidates,
+                      "k3_cascade": (extra["k3"], solo, latency["t_front"], t2, 1.0)}
+    result = {"prereg": "docs/paper_revision/03_prereg_v2.md §E8·§E9", "seed": seed, "pi": GF.PI,
+              "latency_ms": latency, "charcnn_solo_test_macro_f1": solo_test}
+    if extra:
+        result["k3_alone"] = k3_alone(extra["k3"], ee_aux, solo_test, t2, latency["t_front"])
     for name, (first, second, ms1, ms2, scale) in candidates.items():
         paths, (solo1, solo2) = GF.fold_paths(first, second, strata)
         block = {"stage1_solo_macro_f1": float(solo1), "stage2_solo_macro_f1": float(solo2),
@@ -134,6 +163,7 @@ def main():
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--latency", action="store_true")
     mode.add_argument("--analyze", action="store_true")
+    parser.add_argument("--seed", type=int, default=BASE_SEED, help="--analyze 의 CV seed (43 = E9-2 확인)")
     parser.add_argument("--n", type=int, default=2000)
     parser.add_argument("--repeats", type=int, default=30)
     parser.add_argument("--smoke", action="store_true", help="--latency 를 n=50·2회로, 저장 없이")
@@ -150,13 +180,20 @@ def main():
                 LATENCY_JSON.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                 print(f"저장: {LATENCY_JSON.relative_to(PROJECT_ROOT).as_posix()}")
             return 0
-        result = analyze()
+        result = analyze(args.seed)
     except (OSError, ValueError, KeyError) as error:
         print(f"[오류] E8 실패: {error}", file=sys.stderr)
         return 1
-    OUTPUT.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"char-CNN 단독 test F1 {result['charcnn_solo_test_macro_f1']:.4f} · 지연 {result['latency_ms']}")
-    for name in ("dl_b", "dl_c"):
+    output = OUTPUT if args.seed == BASE_SEED else OUTPUT.with_name(f"{OUTPUT.stem}_s{args.seed}.json")
+    output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"seed {args.seed} · char-CNN 단독 test F1 {result['charcnn_solo_test_macro_f1']:.4f} · 지연 {result['latency_ms']}")
+    if "k3_alone" in result:
+        k3 = result["k3_alone"]
+        print(f"\n[k3 단독] F1 {k3['macro_f1']:.4f} (fold {np.round(k3['per_fold_macro_f1'], 4).tolist()})"
+              f" · {k3['speedup']:.2f}배 | E9-1 {k3['e9_1']}")
+        print(f"  DL-C 보조 − k3 (%p) {np.round(k3['dl_c_aux_minus_k3_pp'], 2).tolist()}"
+              f" · 보정 t {k3['dl_c_aux_minus_k3_corrected']}")
+    for name in (name for name in ("dl_b", "dl_c", "k3_cascade") if name in result):
         block = result[name]
         print(f"\n[{name}] 1차 단독 F1 {block['stage1_solo_macro_f1']:.4f} · 2차 단독 F1 {block['stage2_solo_macro_f1']:.4f}"
               f" · 상한 {block['upper_bound']:.2f}배")
@@ -168,7 +205,7 @@ def main():
             print(f"  {view}: B0 {row['b0']['speedup']:.3f}배 (fold {np.round(row['per_fold_speedup']['b0'], 3).tolist()})"
                   f" F1 {row['b0']['macro_f1']:.4f} r_N {row['b0']['r_N']:.3f} r_A {row['b0']['r_A']:.3f}"
                   f" | G2 {row['g2']['speedup']:.3f}배 F1 {row['g2']['macro_f1']:.4f} | E8 {row['e8']}")
-    print(f"저장: {OUTPUT.relative_to(PROJECT_ROOT).as_posix()}")
+    print(f"저장: {output.relative_to(PROJECT_ROOT).as_posix()}")
     return 0
 
 

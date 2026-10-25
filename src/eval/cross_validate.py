@@ -52,7 +52,7 @@ RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 # 모델 종류별 입력 경로가 다르다(이미지 npz / 문자열 CSV / TF-IDF).
 # ⚠️ train.py 의 IMAGE_MODELS 와 함께 갱신할 것(이미지 모델 추가 시 두 곳).
 IMAGE_MODELS = {"cnn", "cnn_ee", "vit", "hybrid", "cnn_crop8", "cnn_gmp", "cnn_1d"}
-TEXT_NN_MODELS = {"charcnn", "charcnn_tiny", "charcnn_ee", "bilstm"}
+TEXT_NN_MODELS = {"charcnn", "charcnn_tiny", "charcnn_k3", "charcnn_ee", "bilstm"}
 TFIDF_MODELS = {"tfidf_logreg", "tfidf_rf"}
 ALL_MODELS = IMAGE_MODELS | TEXT_NN_MODELS | TFIDF_MODELS
 

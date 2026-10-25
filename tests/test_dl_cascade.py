@@ -12,3 +12,22 @@ def test_judge_requires_all_three_prereg_conditions():
     assert not D.judge(row([2.0, 2.0, 2.0, 2.0, 0.9], 0.988), 0.9884)["above"]  # 한 fold 가 1 이하
     assert not D.judge(row([1.3] * 5, 0.9850), 0.9884)["above"]             # F1 0.34pp 손실
     assert not D.judge({"reason": "점 없음"}, 0.9884)["above"]
+
+
+def test_cvprobs_suffix_follows_cross_validate_tag_rule():
+    assert D.cvprobs_suffix(42) == "" and D.cvprobs_suffix(42, aux=True) == "_aux"
+    assert D.cvprobs_suffix(43) == "_s43" and D.cvprobs_suffix(43, aux=True) == "_s43_aux"
+
+
+def test_k3_alone_applies_e8_conditions_without_deferral():
+    import numpy as np
+    y = np.array([0, 1, 2, 3] * 5)
+    def probs(correct):
+        out = {"y": y}
+        for k in range(1, 6):
+            p = np.eye(4)[y if correct else (y + 1) % 4]
+            out[f"test_idx_{k}"], out[f"test_probs_{k}"] = np.arange(len(y)), p
+        return out
+    good = D.k3_alone(probs(True), probs(True), 0.9884, t2=0.345, t_front=0.095)
+    assert good["e9_1"]["above"] and good["macro_f1"] == 1.0 and good["dl_c_aux_minus_k3_pp"] == [0.0] * 5
+    assert not D.k3_alone(probs(False), probs(True), 0.9884, t2=0.345, t_front=0.095)["e9_1"]["above"]

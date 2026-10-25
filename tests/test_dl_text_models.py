@@ -11,6 +11,14 @@ def test_charcnn_tiny_matches_prereg_structure():
     assert [(c.kernel_size[0], c.out_channels) for c in net.convs] == [(3, 64)]
 
 
+def test_charcnn_k3_matches_dl_c_front_size():
+    # E9-1: t_k3 = t_front 로 두는 근거 — 보조 헤드 경로와 같은 모양이어야 한다.
+    net, ee = text_models.build_model("charcnn_k3", 4), text_models.build_model("charcnn_ee", 4)
+    assert net.embedding.embedding_dim == ee.embedding.embedding_dim
+    assert [(c.kernel_size[0], c.out_channels) for c in net.convs] == [(3, ee.convs[0].out_channels)]
+    assert net.classifier.weight.shape == ee.aux_head.weight.shape
+
+
 def test_charcnn_ee_heads_follow_train_and_eval_contract():
     torch.manual_seed(0)
     net = text_models.build_model("charcnn_ee", 4)
@@ -25,4 +33,4 @@ def test_charcnn_ee_heads_follow_train_and_eval_contract():
         # 보조 헤드는 커널 3 분기만 본다 — latency_fair.charcnn_parts 의 DL-C 앞부분 비용과 같은 연산.
         pooled3 = torch.relu(net.convs[0](net.embedding(x).transpose(1, 2))).max(dim=2).values
         assert torch.allclose(aux, net.aux_head(pooled3))
-    assert "charcnn_ee" in T.MULTI_HEAD_MODELS and {"charcnn_tiny", "charcnn_ee"} <= T.TEXT_MODELS
+    assert "charcnn_ee" in T.MULTI_HEAD_MODELS and {"charcnn_tiny", "charcnn_k3", "charcnn_ee"} <= T.TEXT_MODELS
