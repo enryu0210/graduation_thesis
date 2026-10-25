@@ -41,7 +41,9 @@
   - 📌 **견고성(docs/14 §8.27·§8.28)**: 템플릿 묶음 CV 에서 점수 유지(T5). 1차 class weight 결정은 CV 에서도 +27%(채움 기준·검증 분포) — test 의 0.99→1.45배(+46%)는 **확인용**으로 내리고, 실사용자 분포(+5%)·공정 지연(+1~6%)에서는 이득이 없다고 병기. 고정 test 는 아홉 번 평가에 쓰였다(감사표 §8.28). T8(2인 라벨 감사)은 미실시.
 - 📌 **딥러닝 한정 후속 후보(2026-10-11 등록 · 미측정, docs/14 §8.30)**: 사용자 방향 = 제안 구성은 딥러닝만(고전 ML 은 비교 기준으로만), RGB CNN 은 필수 아님 — ⚠️ 마스터 문서·제목에는 미반영(교수 확인 전).
   `DL-A` char-CNN → 트랜스포머 · `DL-B` 더 작은 문자 모델 → char-CNN · `DL-C` char-CNN 내부 조기 종료. 관문: DL-B·C 는 char-CNN 층별 시간 측정(학습 불필요), DL-A 는 트랜스포머 단독 CV 가 0.9884 를 넘는가. 비교 대상은 char-CNN 단독.
-  ✅ **DL-B·C 관문 통과(2026-10-25, E7, docs/14 §8.31)**: `latency_fair.py --charcnn-breakdown` — 호출 고정비는 t2 의 8.5% 뿐, 91% 가 합성곱 → 상한 DL-B 7.24배·DL-C 3.03배(넘김 5.3% 가정). ⚠️ 상한일 뿐 — 작은 모델·보조 헤드의 넘김률은 학습해야 안다(본 측정 기준 미작성). DL-A 관문은 미실시.
+  ✅ **DL-B·C 관문 통과(2026-10-25, E7, docs/14 §8.31)**: `latency_fair.py --charcnn-breakdown` — 호출 고정비는 t2 의 8.5% 뿐, 91% 가 합성곱 → 상한 DL-B 7.24배·DL-C 3.03배(넘김 5.3% 가정). DL-A 관문은 미실시.
+  📌 **본 측정 E8(2026-10-25, docs/14 §8.32 · `dl_cascade.py --latency|--analyze`)**: DL-C(`charcnn_ee`) **char-CNN 단독보다 위**(실사용자 3.53배, F1 −0.10%p) · DL-B(`charcnn_tiny`) **위가 아니다**(2.39배지만 F1 −0.45%p > 0.3%p).
+    ⚠️ DL-C 이득은 넘김이 아니라 **보조 헤드(k3 분기) 자체**에서 나온다 — 5 fold 중 3개가 넘김 0%. "넘김 판단 개선"으로 쓰지 말 것. k3 단독 char-CNN 대조·확인 seed 는 미측정. seed 42 단일 CV.
 - ⚠️ `docs/thetics/` 는 **.gitignore 대상**(PDF 미추적) → **수집 목록의 유일한 추적본은 `docs/12` §1**. 논문을 추가하면 docs/12 도 함께 갱신.
 
 ## 데이터 파이프라인
@@ -71,7 +73,8 @@
 
 ## 모델 / 학습
 - 이미지 모델(같은 npz 입력): `cnn`(93,988p) · `cnn_ee`(조기종료, 백본 동일 + 보조 헤드 2개) · `vit`(단일 ViT, 2.7M) · `hybrid`(CNN stem+Transformer, 0.58M) — `src/models/cnn.py`, `vit.py`.
-  텍스트 모델: `charcnn` · `bilstm`(`text_models.py`), 별도 sklearn 베이스라인 `baseline_tfidf.py`.
+  텍스트 모델: `charcnn` · `charcnn_tiny`(DL-B, 임베딩 32·k3·필터 64) · `charcnn_ee`(DL-C, k3 분기 보조 헤드 + 가중 0.3 결합 손실) · `bilstm`(`text_models.py`), 별도 sklearn 베이스라인 `baseline_tfidf.py`.
+  ⚠️ 새 텍스트 모델은 `train.TEXT_MODELS`·`cross_validate.TEXT_NN_MODELS` 2곳, 다중 헤드면 `train.MULTI_HEAD_MODELS` 도. `charcnn_ee --save-probs` 는 보조 헤드 확률을 `cvprobs_{tag}_aux.npz` 로 따로 남긴다.
 - ⚠️ 새 이미지 모델 추가 시 `IMAGE_MODELS` 를 **2곳** 갱신: `train.py`, `cross_validate.py`(트랙의 "5곳"과는 별개).
   1차 재설계 후보(E2, `cnn.build_e2_variant`): `cnn_crop8`(위 8행=384바이트) · `cnn_gmp`(전역 최대 풀링) · `cnn_1d`(3×2,304 1차원 conv).
   ⚠️ `cnn_1d` 가 E2 판정에서 채택됐다(docs/14 §8.25). 단 3기의 다른 실험(G1~G6·T 계열)은 전부 현행 `cnn` 1차 위에서 잰 값이다 — 1차를 바꿔 인용하면 수치가 섞인다.
