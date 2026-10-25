@@ -62,9 +62,9 @@ CKPT_DIR = PROJECT_ROOT / "experiments" / "checkpoints"
 # vit/hybrid 는 RGB CNN 과 **완전히 같은 이미지 입력**을 받는 비교 arm 이다(vit.py 참조).
 # cnn_ee = 조기종료 CNN(Phase 12/M4). 백본은 cnn 과 동일하고 블록마다 보조 헤드가 붙는다.
 IMAGE_MODELS = {"cnn", "cnn_ee", "vit", "hybrid", "cnn_crop8", "cnn_gmp", "cnn_1d"}
-TEXT_MODELS = {"charcnn", "bilstm"}
+TEXT_MODELS = {"charcnn", "charcnn_tiny", "charcnn_ee", "bilstm"}
 # 학습 중 여러 헤드의 logits 를 돌려주는 모델(손실을 가중합해야 한다).
-MULTI_HEAD_MODELS = {"cnn_ee"}
+MULTI_HEAD_MODELS = {"cnn_ee", "charcnn_ee"}
 
 # DEFAULT_LR 등 tag 관련 상수는 tagging.py 가 단일 진실 소스다(위 import).
 # 여기서 재노출하는 이유: cascade.py / cross_validate.py 가 `train.DEFAULT_LR` 로 참조 중이라

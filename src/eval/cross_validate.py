@@ -52,7 +52,7 @@ RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 # 모델 종류별 입력 경로가 다르다(이미지 npz / 문자열 CSV / TF-IDF).
 # ⚠️ train.py 의 IMAGE_MODELS 와 함께 갱신할 것(이미지 모델 추가 시 두 곳).
 IMAGE_MODELS = {"cnn", "cnn_ee", "vit", "hybrid", "cnn_crop8", "cnn_gmp", "cnn_1d"}
-TEXT_NN_MODELS = {"charcnn", "bilstm"}
+TEXT_NN_MODELS = {"charcnn", "charcnn_tiny", "charcnn_ee", "bilstm"}
 TFIDF_MODELS = {"tfidf_logreg", "tfidf_rf"}
 ALL_MODELS = IMAGE_MODELS | TEXT_NN_MODELS | TFIDF_MODELS
 
@@ -367,6 +367,16 @@ def inner_group_split(y_trainval: np.ndarray, groups_trainval: np.ndarray, val_r
     return next(splitter.split(np.zeros(len(y_trainval)), y_trainval, groups_trainval))
 
 
+def aux_head_probs(model, loader, device) -> np.ndarray:
+    """charcnn_ee 보조 헤드의 softmax. loader 는 shuffle=False 여야 확률 행이 인덱스와 맞는다."""
+    import torch
+
+    model.eval()
+    with torch.no_grad():
+        return np.concatenate([torch.softmax(model.forward_heads(xb.to(device))[0], dim=1).cpu().numpy()
+                               for xb, _ in loader])
+
+
 def run_fold_torch(model_name: str, pool_x, y, classes, tr_idx, va_idx, te_idx,
                    args, is_image: bool, pool_strata=None, fold_probabilities=None) -> dict:
     """torch 모델(cnn/charcnn/bilstm) 한 fold 학습 → test fold 지표 반환."""
@@ -419,6 +429,10 @@ def run_fold_torch(model_name: str, pool_x, y, classes, tr_idx, va_idx, te_idx,
         _, _, val_score = T.evaluate(model, val_loader, device)
         fold = {"val_idx": va_idx, "val_probs": val_score,
                 "test_idx": te_idx, "test_probs": y_score}
+        if model_name == "charcnn_ee":
+            # DL-C: 보조 헤드 확률이 1차(넘김 판단) 입력이다. 본 헤드와 같은 행 순서로 남긴다.
+            for split, loader in (("val", val_loader), ("test", test_loader)):
+                fold[f"{split}_aux_probs"] = aux_head_probs(model, loader, device)
         if getattr(args, "save_embeddings", False):
             from src.eval.extract_embeddings import extract_loader_embeddings
             # 두 loader 모두 shuffle=False이므로 확률과 같은 행 순서가 유지된다.
@@ -706,6 +720,11 @@ def main() -> None:
     if args.save_probs:
         save_fold_probabilities(RESULTS_DIR / f"cvprobs_{tag}.npz", classes, y,
                                 fold_probabilities)
+        if args.model == "charcnn_ee":
+            # 같은 형식의 별도 파일로 두면 넘김 분석 도구가 1차·2차 cvprobs 두 개로 그대로 읽는다.
+            aux = [{"val_idx": f["val_idx"], "val_probs": f["val_aux_probs"],
+                    "test_idx": f["test_idx"], "test_probs": f["test_aux_probs"]} for f in fold_probabilities]
+            save_fold_probabilities(RESULTS_DIR / f"cvprobs_{tag}_aux.npz", classes, y, aux)
 
     if args.save_embeddings:
         save_fold_embeddings(RESULTS_DIR / f"cvemb_{tag}.npz", classes, y, fold_probabilities)

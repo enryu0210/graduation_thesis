@@ -49,6 +49,32 @@ class CharCNN(nn.Module):
         return self.classifier(self.dropout(feat))
 
 
+class EarlyExitCharCNN(CharCNN):
+    """커널 3 분기 위에 보조 헤드를 단 char-CNN (DL-C, docs/paper_revision/03_prereg_v2.md §E8).
+
+    배치 1 CPU 에서 char-CNN 시간의 91% 가 세 합성곱이다(docs/14 §8.31). 가장 싼 커널 3 분기만
+    돌린 뒤 보조 헤드가 확신하면 나머지 두 분기를 건너뛴다 — 두 모델 캐스케이드와 달리 앞부분
+    계산을 버리지 않는다. 구조는 CharCNN 과 같고 늘어나는 것은 보조 헤드 하나뿐이다.
+
+    train 모드: [보조 logits, 본 logits] (train.build_criterion 의 다중 헤드 손실 규칙)
+    eval 모드 : 본 logits — 평가·확률 저장 경로를 단일 헤드 모델과 같게 둔다.
+    """
+
+    def __init__(self, num_classes: int, **kwargs):
+        super().__init__(num_classes, **kwargs)
+        self.aux_head = nn.Linear(self.convs[0].out_channels, num_classes)
+
+    def forward_heads(self, x: torch.Tensor) -> list[torch.Tensor]:
+        emb = self.embedding(x).transpose(1, 2)
+        pooled = [torch.relu(conv(emb)).max(dim=2).values for conv in self.convs]
+        main = self.classifier(self.dropout(torch.cat(pooled, dim=1)))
+        return [self.aux_head(pooled[0]), main]
+
+    def forward(self, x: torch.Tensor):
+        heads = self.forward_heads(x)
+        return heads if self.training else heads[-1]
+
+
 class BiLSTM(nn.Module):
     """바이트 임베딩 + 양방향 LSTM 분류기."""
 
@@ -77,6 +103,11 @@ def build_model(name: str, num_classes: int, **kwargs) -> nn.Module:
     """이름으로 텍스트 베이스라인 모델을 생성한다."""
     if name == "charcnn":
         return CharCNN(num_classes=num_classes, **kwargs)
+    if name == "charcnn_tiny":
+        # DL-B 1차. 구조는 사전 문서 E8 에 고정 — 결과를 보고 바꾸지 않는다.
+        return CharCNN(num_classes=num_classes, embed_dim=32, num_filters=64, kernel_sizes=(3,), **kwargs)
+    if name == "charcnn_ee":
+        return EarlyExitCharCNN(num_classes=num_classes, **kwargs)
     if name == "bilstm":
         return BiLSTM(num_classes=num_classes, **kwargs)
-    raise ValueError(f"알 수 없는 텍스트 모델: {name} (charcnn | bilstm)")
+    raise ValueError(f"알 수 없는 텍스트 모델: {name} (charcnn | charcnn_tiny | charcnn_ee | bilstm)")
