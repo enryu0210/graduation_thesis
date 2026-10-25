@@ -118,6 +118,22 @@
 - 확인: (바)~(차) 합과 (파)의 p50 차이를 보고한다(분해가 측정을 왜곡하는지). 분해 순전파 출력은 원 모델 출력과 같아야 한다(테스트로 고정).
 - DL-A 관문(트랜스포머 단독 CV)은 E7 결과와 무관하게 따로 판정한다.
 
+## E8. DL-B·DL-C 본 측정 — char-CNN 단독 대비 (GPU 5-fold `--exclude-test`, seed 42 · 2026-10-25 추가)
+
+> E7 두 관문 통과(docs/14 §8.31) 뒤의 본 측정. **이 절의 커밋이 학습보다 앞선다.** 구조·학습 설정은 아래 하나로 고정하고 결과를 본 뒤 바꾸지 않는다.
+
+- **DL-B 1차 `charcnn_tiny`**: char-CNN 과 같은 꼴에서 임베딩 32차원 · 커널 3 하나 · 필터 64. 2차는 기존 `cvprobs_srbh_4class_charcnn_raw_sealed.npz`(같은 fold·같은 내부 val, 정렬 검증).
+- **DL-C `charcnn_ee`**: char-CNN 과 같은 구조에 커널 3 분기의 max-pool 출력(128) 위 보조 헤드(선형 128→4)를 단다. 학습은 `cnn_ee` 와 같은 결합 손실 L = CE(본 헤드) + 0.3·CE(보조 헤드). 1차 = 보조 헤드 확률, 2차 = 같은 모델 본 헤드 확률.
+- 학습 설정: `cross_validate.py` 기본값(30 에폭, 배치 128, lr 1e-3, 조기 종료 5, class weight), `--exclude-test --save-probs`, seed 42.
+- 지연(같은 실행 안에서 번갈아, E7 과 같은 표본·스레드 1·배치 1·p50): t_tiny = 인코딩 + tiny 순전파, t2 = 인코딩 + char-CNN 순전파, t_front = 인코딩 + 임베딩 + k3 + 보조 헤드, t_rest = k5 + k7 + 분류기. 배수: DL-B S = t2 / (t_tiny + E_π·t2), DL-C S = t2 / (t_front + E_π·t_rest). 비교 대상 char-CNN 단독은 S = 1.
+- 넘김 = 표준 MaxProb(B0). 운영점은 fold 마다 **val** 에서 고른다: val Macro-F1 ≥ char-CNN 단독 val Macro-F1 − 0.5%p 인 점 중 val E_π 최소(`gate_confirm.secondary_rule` 과 같은 규칙). 클래스별 τ(G2)는 같은 규칙으로 병기만 한다(판정 아님).
+- **판정 E8 (후보마다, 실사용자 r_N 판본 · π = 3.3%)**: 아래 셋을 모두 채우면 "char-CNN 단독보다 정확도–속도 그래프에서 위"(교수 기준 §8.20)로 쓴다.
+  1. fold-test 배수 S 평균 ≥ **1.2** (지연 측정의 날 간 표류 8% 를 넘는 크기)
+  2. 다섯 fold 모두 S > 1
+  3. fold-test Macro-F1 평균이 char-CNN 단독 fold-test 평균보다 **0.3%p 넘게 낮지 않다**
+  검증 분포(val_mix) 판본은 같은 규칙으로 병기한다. 실사용자 판본에서 하나라도 못 채우면 그 후보는 "위가 아니다"로 기록한다.
+- DL-C 는 본 헤드 단독 Macro-F1 도 보고한다(결합 손실이 본 헤드를 깎았는지).
+
 ## 하지 않는 것
 
 - T8(2인 라벨 감사)은 사람 판정자가 한 명 더 필요하다. 이 문서의 범위 밖이다.
