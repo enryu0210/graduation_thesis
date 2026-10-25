@@ -43,7 +43,9 @@
   `DL-A` char-CNN → 트랜스포머 · `DL-B` 더 작은 문자 모델 → char-CNN · `DL-C` char-CNN 내부 조기 종료. 관문: DL-B·C 는 char-CNN 층별 시간 측정(학습 불필요), DL-A 는 트랜스포머 단독 CV 가 0.9884 를 넘는가. 비교 대상은 char-CNN 단독.
   ✅ **DL-B·C 관문 통과(2026-10-25, E7, docs/14 §8.31)**: `latency_fair.py --charcnn-breakdown` — 호출 고정비는 t2 의 8.5% 뿐, 91% 가 합성곱 → 상한 DL-B 7.24배·DL-C 3.03배(넘김 5.3% 가정). DL-A 관문은 미실시.
   📌 **본 측정 E8(2026-10-25, docs/14 §8.32 · `dl_cascade.py --latency|--analyze`)**: DL-C(`charcnn_ee`) **char-CNN 단독보다 위**(실사용자 3.53배, F1 −0.10%p) · DL-B(`charcnn_tiny`) **위가 아니다**(2.39배지만 F1 −0.45%p > 0.3%p).
-    ⚠️ DL-C 이득은 넘김이 아니라 **보조 헤드(k3 분기) 자체**에서 나온다 — 5 fold 중 3개가 넘김 0%. "넘김 판단 개선"으로 쓰지 말 것. k3 단독 char-CNN 대조·확인 seed 는 미측정. seed 42 단일 CV.
+    ⚠️ DL-C 이득은 넘김이 아니라 **보조 헤드(k3 분기) 자체**에서 나온다 — 5 fold 중 3개가 넘김 0%. "넘김 판단 개선"으로 쓰지 말 것.
+    📌 **E9(docs/14 §8.33)**: seed 43 확인 **통과(2/2, 3.62배·F1 +0.33%p, 전 fold 넘김 0%)** · k3 단독 대조 `charcnn_k3` 0.9748(−1.36%p) → E8 미충족 = "결합 학습의 몫"(단 보조 헤드와 차이 p 0.34, k3 단독은 조기 종료로 불안정 — 최적화 안정성일 수 있음).
+    → DL-C 는 넘김 축이 아니라 **2차 모델 압축(결합 학습한 k3 출구)**으로 서술. "유사 연구 대비 개선" 금지(그림은 `literature_compare.py --dl-only` 에 점만 추가).
 - ⚠️ `docs/thetics/` 는 **.gitignore 대상**(PDF 미추적) → **수집 목록의 유일한 추적본은 `docs/12` §1**. 논문을 추가하면 docs/12 도 함께 갱신.
 
 ## 데이터 파이프라인
@@ -73,7 +75,7 @@
 
 ## 모델 / 학습
 - 이미지 모델(같은 npz 입력): `cnn`(93,988p) · `cnn_ee`(조기종료, 백본 동일 + 보조 헤드 2개) · `vit`(단일 ViT, 2.7M) · `hybrid`(CNN stem+Transformer, 0.58M) — `src/models/cnn.py`, `vit.py`.
-  텍스트 모델: `charcnn` · `charcnn_tiny`(DL-B, 임베딩 32·k3·필터 64) · `charcnn_ee`(DL-C, k3 분기 보조 헤드 + 가중 0.3 결합 손실) · `bilstm`(`text_models.py`), 별도 sklearn 베이스라인 `baseline_tfidf.py`.
+  텍스트 모델: `charcnn` · `charcnn_tiny`(DL-B, 임베딩 32·k3·필터 64) · `charcnn_ee`(DL-C, k3 분기 보조 헤드 + 가중 0.3 결합 손실) · `charcnn_k3`(E9 대조, 임베딩 64·k3·필터 128 단독) · `bilstm`(`text_models.py`), 별도 sklearn 베이스라인 `baseline_tfidf.py`.
   ⚠️ 새 텍스트 모델은 `train.TEXT_MODELS`·`cross_validate.TEXT_NN_MODELS` 2곳, 다중 헤드면 `train.MULTI_HEAD_MODELS` 도. `charcnn_ee --save-probs` 는 보조 헤드 확률을 `cvprobs_{tag}_aux.npz` 로 따로 남긴다.
 - ⚠️ 새 이미지 모델 추가 시 `IMAGE_MODELS` 를 **2곳** 갱신: `train.py`, `cross_validate.py`(트랙의 "5곳"과는 별개).
   1차 재설계 후보(E2, `cnn.build_e2_variant`): `cnn_crop8`(위 8행=384바이트) · `cnn_gmp`(전역 최대 풀링) · `cnn_1d`(3×2,304 1차원 conv).
