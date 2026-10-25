@@ -213,6 +213,88 @@ def measure_stage1_variants(texts: list[str], n_classes: int, repeats: int, warm
     return out
 
 
+BREAKDOWN_JSON = RESULTS_DIR / "latency_charcnn_breakdown_srbh_4class.json"
+BREAKDOWN_PARTS = ("enc", "emb", "conv3", "conv5", "conv7", "head", "aux3", "floor", "full")
+# 관측한 가장 낮은 1차 넘김률(TF-IDF 1차, docs/14 §8.26). 사전 문서 E7 에 고정된 값이다.
+E_REF = 0.053
+GATE_SPEEDUP = 1.5
+
+
+def charcnn_parts(net2, aux_head, x: torch.Tensor, clock=time.perf_counter_ns):
+    """CharCNN.forward 를 단계별로 나눠 실행하며 시간(ns)을 잰다. 반환: (로짓, 단계별 ns).
+
+    원 모델과 같은 연산 순서여야 분해 합이 실제 순전파를 대표한다(테스트가 출력 일치를 고정).
+    aux3 는 DL-C(내부 조기 종료)의 보조 헤드 비용 — 커널 3 출력만 보고 종료 여부를 정한다.
+    """
+    t0 = clock()
+    emb = net2.embedding(x).transpose(1, 2)
+    t1 = clock()
+    pooled, marks = [], []
+    for conv in net2.convs:
+        pooled.append(torch.relu(conv(emb)).max(dim=2).values)
+        marks.append(clock())
+    logits = net2.classifier(net2.dropout(torch.cat(pooled, dim=1)))
+    t5 = clock()
+    torch.softmax(aux_head(pooled[0]), dim=1).max().item()
+    t6 = clock()
+    t2, t3, t4 = marks
+    return logits, (t1 - t0, t2 - t1, t3 - t2, t4 - t3, t5 - t4, t6 - t5)
+
+
+def breakdown_gates(p50: dict) -> dict:
+    """사전 문서 E7 의 판정 재료. t2 = 인코딩 + 2차 전체 순전파."""
+    t2 = p50["enc"] + p50["full"]
+    t1_b = p50["enc"] + p50["floor"]
+    t_front = p50["enc"] + p50["emb"] + p50["conv3"] + p50["aux3"]
+    t_rest = p50["conv5"] + p50["conv7"] + p50["head"]
+    s_b = t2 / (t1_b + E_REF * t2)
+    s_c = t2 / (t_front + E_REF * t_rest)
+    return {"t2_ms": t2, "e_ref": E_REF, "threshold": GATE_SPEEDUP,
+            "dl_b": {"t1_floor_ms": t1_b, "speedup_ub": s_b, "pass": bool(s_b >= GATE_SPEEDUP)},
+            "dl_c": {"t_front_ms": t_front, "t_rest_ms": t_rest, "speedup_ub": s_c,
+                     "pass": bool(s_c >= GATE_SPEEDUP)},
+            "parts_sum_minus_full_ms": sum(p50[k] for k in ("emb", "conv3", "conv5", "conv7", "head")) - p50["full"]}
+
+
+@torch.inference_mode()
+def measure_charcnn_breakdown(texts: list[str], n_classes: int, repeats: int, warmup: int = 50) -> dict:
+    """E7: char-CNN 단계별 지연(CPU·배치 1·스레드 1) + 바닥 모델. 판정은 breakdown_gates."""
+    torch.set_num_threads(1)
+    clock = time.perf_counter_ns
+    net2 = cascade.load_net("charcnn", n_classes, TRACK, TEXT, True, torch.device("cpu"))
+    torch.manual_seed(SEED)
+    aux_head = torch.nn.Linear(net2.convs[0].out_channels, n_classes).eval()
+    # 가장 싼 딥러닝 1차의 하한: 임베딩 → 평균 → 선형. 이보다 싼 신경망 1차는 사실상 없다.
+    floor_net = torch.nn.Sequential(torch.nn.Embedding(257, 16), _MeanOverTime(), torch.nn.Linear(16, n_classes)).eval()
+
+    def one(text: str) -> np.ndarray:
+        t0 = clock()
+        x = enc_seq(text, False)
+        t1 = clock()
+        _, parts = charcnn_parts(net2, aux_head, x, clock)
+        t2 = clock()
+        floor_net(x)
+        t3 = clock()
+        net2(x)
+        t4 = clock()
+        return np.array((t1 - t0, *parts, t3 - t2, t4 - t3), dtype=np.int64)
+
+    for text in texts[:warmup]:
+        one(text)
+    times = np.empty((repeats, len(texts), len(BREAKDOWN_PARTS)), dtype=np.int64)
+    for r in range(repeats):
+        for i, text in enumerate(texts):
+            times[r, i] = one(text)
+    summary = {name: stats(times[:, :, k].ravel() / 1e6) for k, name in enumerate(BREAKDOWN_PARTS)}
+    return {"threads": 1, "components": summary,
+            "gates": breakdown_gates({name: row["p50"] for name, row in summary.items()})}
+
+
+class _MeanOverTime(torch.nn.Module):
+    def forward(self, emb: torch.Tensor) -> torch.Tensor:
+        return emb.mean(dim=1)
+
+
 def environment(args) -> dict:
     try:
         git_hash = subprocess.run(["git", "rev-parse", "HEAD"], cwd=PROJECT_ROOT, capture_output=True,
@@ -240,6 +322,8 @@ def parse_args():
     parser.add_argument("--gpu", action="store_true", help="E1-G: GPU 배치 지연도 잰다")
     parser.add_argument("--stage1-variants", action="store_true",
                         help="E2: 1차 후보(cnn·cnn_crop8·cnn_gmp·cnn_1d)의 변환+순전파 지연만 잰다")
+    parser.add_argument("--charcnn-breakdown", action="store_true",
+                        help="E7: char-CNN 단계별 지연과 DL-B·DL-C 관문(스레드 1)만 잰다")
     parser.add_argument("--smoke", action="store_true", help="n=50·2회·1스레드, 파일 저장 없음")
     args = parser.parse_args()
     if args.smoke:
@@ -274,6 +358,9 @@ def run(args) -> dict:
     if args.stage1_variants:
         return {"env": environment(args), "n": args.n, "repeats": args.repeats,
                 "stage1_e2e_ms": measure_stage1_variants(texts, len(classes), args.repeats)}
+    if args.charcnn_breakdown:
+        return {"env": environment(args), "n": args.n, "repeats": args.repeats,
+                "breakdown": measure_charcnn_breakdown(texts, len(classes), args.repeats)}
 
     device = torch.device("cpu")
     net1 = cascade.load_net("cnn", len(classes), TRACK, TEXT, False, device, channels="rgb", in_channels=3)
@@ -323,6 +410,17 @@ def report(result: dict) -> None:
                   f" · 2차 배치 최대 길이({row['batch_max_len']}) {row['stage2_batchmax_ms']:.5f}")
 
 
+def report_breakdown(row: dict) -> None:
+    print("\n[스레드 1] char-CNN 단계별 요청당 ms (p50 / p95 / 평균)")
+    for name, s in row["components"].items():
+        print(f"  {name:<6} {s['p50']:.4f} / {s['p95']:.4f} / {s['mean']:.4f}")
+    g = row["gates"]
+    print(f"  t2={g['t2_ms']:.4f} ms · 분해 합 - 전체 = {g['parts_sum_minus_full_ms']:+.4f} ms · E_ref={g['e_ref']:.1%}")
+    print(f"  DL-B: 하한 t1 {g['dl_b']['t1_floor_ms']:.4f} ms → 상한 {g['dl_b']['speedup_ub']:.3f}배 (통과={g['dl_b']['pass']})")
+    print(f"  DL-C: 앞 {g['dl_c']['t_front_ms']:.4f} · 나머지 {g['dl_c']['t_rest_ms']:.4f} ms"
+          f" → 상한 {g['dl_c']['speedup_ub']:.3f}배 (통과={g['dl_c']['pass']})")
+
+
 def main() -> None:
     args = parse_args()
     try:
@@ -334,6 +432,12 @@ def main() -> None:
         if not args.smoke:
             VARIANTS_JSON.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
             print(f"저장: {VARIANTS_JSON.relative_to(PROJECT_ROOT)}")
+        return
+    if args.charcnn_breakdown:
+        report_breakdown(result["breakdown"])
+        if not args.smoke:
+            BREAKDOWN_JSON.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(f"저장: {BREAKDOWN_JSON.relative_to(PROJECT_ROOT)}")
         return
     report(result)
     if args.smoke:
