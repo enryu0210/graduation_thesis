@@ -55,6 +55,21 @@ STAGE1_STYLE = {"rgb_cnn": ("tab:red", "RGB CNN (ours)"), "tfidflr": ("tab:purpl
                 # E2 후보 가운데 지연이 절반인 것과 정확도가 가장 높은 것만 올린다(셋 다 그리면 선이 겹쳐 읽히지 않는다).
                 "cnn_crop8": ("tab:brown", "RGB CNN top 8 rows (ours)"), "cnn_1d": ("tab:cyan", "RGB 1-D CNN (ours)")}
 CLASSICAL_STAGE1 = {"tfidflr", "hashlr"}
+# 딥러닝 판에만 올리는 char-CNN 내부 조기 종료(DL-C, E8 운영점)와 k3 단독 대조(E9-1). 기술만 한다(사전 문서 §E9-3).
+DL_CASCADE = GF.RESULTS / "dl_cascade_srbh_4class.json"
+
+
+def dl_cascade_points(view):
+    """(라벨, char-CNN 대비 배수 S, fold-test Macro-F1, 표식, 색). 파일이 없으면(E8 미실행) 빈 목록."""
+    if not DL_CASCADE.exists():
+        return []
+    result = json.loads(DL_CASCADE.read_text(encoding="utf-8"))
+    points = [("char-CNN early exit at k3 (ours)", result["dl_c"][view]["b0"]["speedup"],
+               result["dl_c"][view]["b0"]["macro_f1"], "D", "darkgoldenrod")]
+    if "k3_alone" in result:
+        points.append(("k3-only char-CNN alone (ours, control)", result["k3_alone"]["speedup"],
+                       result["k3_alone"]["macro_f1"], "s", "tab:gray"))
+    return points
 
 
 def stage1_styles(dl_only):
@@ -78,6 +93,9 @@ def ours_reported_style(analysis, styles, view="val_mix"):
             # 배수 S = t2 / (기대 지연) 이므로 기대 지연 = t2 / S.
             points.append((f"{label} -> char-CNN cascade", ms2 / row[view]["b0"]["speedup"],
                            row[view]["b0"]["macro_f1"], "D", color))
+    if "rgb_cnn" in styles and "tfidflr" not in styles:     # 딥러닝 판(stage1_styles(dl_only=True))에서만
+        points += [(label, ms2 / speedup, score, marker, color)
+                   for label, speedup, score, marker, color in dl_cascade_points(view)]
     return points
 
 
@@ -123,6 +141,9 @@ def plot(analysis, loaded, styles, dl_only=False):
             ax.scatter([ms2 / ms1], [L["solo"][0]], marker="s", s=60, color=color, zorder=5)
         ax.scatter([1.0], [analysis["stage2_solo_macro_f1"]], marker="*", s=180, c="k", zorder=6,
                    label="char-CNN alone")
+        for label, speedup, score, marker, color in (dl_cascade_points(GF.NORMAL_VIEWS[col][0]) if dl_only else []):
+            ax.scatter([speedup], [score], marker=marker, s=80, color=color, edgecolors="k", linewidths=.8,
+                       zorder=6, label=label)
         ax.axvline(1.0, color="k", lw=.8, ls=":")
         ax.set_ylim(0.88, 1.001)
         ax.set_xlabel("Speedup vs char-CNN alone (attack share 3.3%)")
