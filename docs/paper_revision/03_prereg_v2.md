@@ -150,6 +150,28 @@
 - **E9-3 유사 연구 그림**: `literature_compare.py --dl-only` 에 DL-C(seed 42 운영점)와 k3 단독을 점으로 더한다. (a) 패널은 지연 = E1 의 char-CNN 지연 / S, (b)(c) 패널은 (S, fold-test Macro-F1) 그대로.
   - 기술(記述)만 한다. (a) 는 데이터·클래스·기기가 달라 직접 비교가 안 되고, 딥러닝 판에는 같은 데이터로 재구현한 유사 연구 구성이 없다 → **이 그림으로 "유사 연구 대비 개선"을 쓰지 않는다.**
 
+## E10. DL-A — 트랜스포머 관문 · 같은 조건 유사 연구 재구현 · char-CNN → 트랜스포머 (GPU 5-fold `--exclude-test`, seed 42 · 2026-10-25 추가)
+
+> docs/14 §8.30 의 DL-A 관문과, 교수 기준(§8.20 "가장 좋은 유사 연구보다 위")에 필요한 **같은 데이터·같은 CPU 의 유사 연구 점**을 한 번의 학습으로 함께 얻는다. 같은 SR-BH 를 쓰고 지연을 보고한 유사 연구 중 딥러닝 최고는 WAMM'25 의 DistilBERT(Macro-F1 0.8547, 14.423ms, docs/12 §1.4)다. **이 절의 커밋이 학습보다 앞선다.** 구조·학습 설정은 아래 하나로 고정하고 결과를 본 뒤 바꾸지 않는다.
+
+- **모델 `distilbert`**: Hugging Face `distilbert-base-uncased` 사전학습 가중치 + 4분류 헤드(`AutoModelForSequenceClassification`, 66.96M 파라미터). 입력은 공식 토크나이저(소문자화 포함)의 토큰 id.
+  - **최대 길이 512 토큰**(WAMM 은 128). 이 풀(train+val 226,048건)의 토큰 수는 p50 54 · p99 189 · 최대 ≤ 512 라 512 면 잘림이 없고, 128 이면 6.9%(CodeInjection 24.7% · CommandInjection 26.5%)가 잘린다 — **비교 상대에 유리한 쪽으로** 바꾼 것이다(2026-10-25 이 기기에서 `load_text_pool(..., exclude_test=True)` + 토크나이저로 셈).
+  - 배치마다 실제 최대 길이까지만 계산한다(패딩 위치는 마스크로 가려져 결과가 같다 — 테스트로 고정).
+- **학습**: WAMM Table V 의 3 에폭 · 배치 16 · lr 2e-5 를 따른다. 나머지는 우리 CV 규칙: class weight 교차 엔트로피, 내부 val Macro-F1 최고 에폭 복원, `--exclude-test --save-probs`, seed 42(char-CNN 단독과 같은 fold·내부 val). 옵티마이저는 우리 학습 루프의 Adam(가중 감쇠·워밍업 없음, fp32)이다 — WAMM 의 AdamW 와 다르다는 것을 함께 보고한다. 산출 tag `srbh_4class_distilbert_raw_lr2e-05_sealed`.
+- **지연**(E8 과 같은 표본 — 검증 데이터 2,000건 · 30회 · CPU 스레드 1 · 배치 1 · p50, 같은 실행 안에서 번갈아): t2 = 바이트 인코딩 + char-CNN 순전파, t_front·t_rest = DL-C 앞·뒤(E8 정의), **t_R = 토큰화 + DistilBERT 순전파(실제 길이, 패딩 없음)**. E8 지연 파일은 덮어쓰지 않고 `dl_a_latency_srbh_4class.json` 에 따로 남긴다. 학습이 끝난 뒤 다른 작업이 없을 때 잰다.
+- **판정 E10-1 (관문)**: DistilBERT 단독 fold-test Macro-F1 평균이 같은 fold 의 char-CNN 단독 평균(0.9884)보다 **높으면** 통과. fold 별 차이의 보정 t 를 병기한다(관문은 진입 조건이지 우열 주장이 아니다 — 유의하지 않으면 그렇게 적는다).
+  못 넘으면 "SR-BH 4분류에서는 char-CNN 단독이 딥러닝 경계"로 기록하고 E10-3 은 기술만 한다.
+- **판정 E10-2 (같은 조건 재구현 대비)**: 재구현 DistilBERT 단독을 R(t_R, F1_R)이라 한다. 우리 구성 X ∈ {char-CNN 단독, DL-C(seed 42, 실사용자 B0 운영점 — 같은 실행의 t_front·t_rest 로 배수를 다시 낸다)} 가 아래 둘을 모두 채우면 "**같은 데이터·같은 CPU 로 재구현한 유사 연구 딥러닝 최고 모델보다 위**"로 쓴다.
+  1. t_R / t_X ≥ **1.2**
+  2. X 의 fold-test Macro-F1 평균이 F1_R 보다 **0.3%p 넘게 낮지 않다**
+  fold 별 F1 차이의 보정 t 를 병기한다. ⚠️ 원 논문의 보고값(13종·128 토큰·8 vCPU)과는 여전히 다른 설정이므로 "**재구현** 대비"를 빼고 쓰지 않는다.
+- **판정 E10-3 (DL-A 캐스케이드 char-CNN → DistilBERT)**: 1차 = char-CNN 단독 cvprobs, 2차 = DistilBERT cvprobs(정렬 검증). 운영점은 fold 마다 val 에서 `gate_confirm.secondary_rule`(2차 = DistilBERT 의 val Macro-F1 − 0.5%p 이상인 점 중 val E_π 최소). 배수 S_R = t_R / (t2 + E_π·t_R) — **비교 대상은 2차 단독 R** 이다.
+  - E8 의 세 조건(실사용자 판본, B0): S_R 평균 ≥ 1.2 · 다섯 fold 모두 S_R > 1 · F1 ≥ F1_R − 0.3%p 를 모두 채우면 "재구현 DistilBERT 단독보다 위".
+  - char-CNN 단독 대비는 판정이 아니라 기술: 이 캐스케이드는 모든 요청이 char-CNN 을 거치므로 **char-CNN 단독보다 빠를 수 없다**. F1 차이(보정 t)와 지연 배율(t2 / (t2 + E_π·t_R))을 함께 적고, 보정 p < 0.05 이고 평균 차이 > 0 일 때만 "char-CNN 단독보다 정확(대가 X배 지연)"으로 쓴다.
+  - 검증 분포 판본과 클래스별 τ(G2)는 같은 규칙으로 병기만 한다.
+- **그림(기술)**: R 과 DL-A 운영점을 `literature_compare.py --dl-only` 의 같은 데이터 패널에 더한다. (a) 보고값 패널의 WAMM 점은 그대로 둔다.
+- seed 43 확인은 이번에 하지 않는다. E10-2·E10-3 이 "위"여도 seed 42 한정으로 쓴다.
+
 ## 하지 않는 것
 
 - T8(2인 라벨 감사)은 사람 판정자가 한 명 더 필요하다. 이 문서의 범위 밖이다.
