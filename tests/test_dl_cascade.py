@@ -40,3 +40,16 @@ def test_e10_2_above_r_needs_speed_and_f1():
     assert dl_a.above_r(12.0, 10.0, [0.988] * 5, r)["above"]
     assert not dl_a.above_r(11.9, 10.0, [0.990] * 5, r)["above"]        # 1.19배
     assert not dl_a.above_r(20.0, 1.0, [0.9865] * 5, r)["above"]        # 0.35%p 손실
+
+
+def test_e11_pooled_speedup_is_speedup_at_mean_e_pi():
+    # 사전 문서 §E11: 합산 배수 = fold E_π 평균으로 다시 낸 S = fold S 의 조화평균. 넘김 많은 fold 를 무시하지 않는다.
+    from src.eval import dl_a
+    t2, t_r, e = 0.563, 45.15, [0.0, 0.0, 0.0, 0.33, 0.0]
+    folds = [t_r / (t2 + x * t_r) for x in e]
+    assert abs(dl_a.pooled_speedup(folds) - t_r / (t2 + sum(e) / 5 * t_r)) < 1e-9
+    assert dl_a.pooled_speedup(folds) < sum(folds) / 5 / 4               # 산술평균보다 크게 작다
+    row = {"per_fold_speedup": {"b0": [0.9] + folds[1:]}, "b0": {"macro_f1": 0.990}}
+    assert not dl_a.judge_pooled(row, 0.990)["all_folds_gt_1"]
+    row["per_fold_speedup"]["b0"] = folds
+    assert dl_a.judge_pooled(row, 0.990)["above"]

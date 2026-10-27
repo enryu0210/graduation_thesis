@@ -72,10 +72,11 @@ def dl_cascade_points(view):
         points.append(("k3-only char-CNN alone (ours, control)", result["k3_alone"]["speedup"],
                        result["k3_alone"]["macro_f1"], "s", "tab:gray"))
     if DL_A.exists():
-        # E10-3 운영점. 배수는 같은 실행의 char-CNN 지연 기준(t2 / (t2 + E_π·t_R)) — 이 그림의 다른 점과 같은 기준이다.
+        # E10-3 운영점. 배수는 같은 실행의 char-CNN 지연 기준(t2 / (t2 + Ē_π·t_R)) — 이 그림의 다른 점과 같은 기준이다.
+        # 평균 비용(합산, §E11)을 쓴다: fold 산술평균은 넘김이 많은 fold 4 를 거의 무시해 점을 실제보다 빠르게 찍는다.
         row = json.loads(DL_A.read_text(encoding="utf-8"))["e10_3"][view]
         if "reason" not in row:
-            points.append(("char-CNN -> DistilBERT cascade (ours)", row["vs_charcnn"]["latency_ratio"],
+            points.append(("char-CNN -> DistilBERT cascade (ours)", row["vs_charcnn"]["latency_ratio_pooled"],
                            row["b0"]["macro_f1"], "D", "tab:blue"))
     return points
 

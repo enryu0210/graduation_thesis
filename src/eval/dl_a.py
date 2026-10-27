@@ -6,6 +6,7 @@
               요청마다 번갈아 잰다(CPU·배치 1·스레드 1·p50, E8 과 같은 표본). E8 지연 파일은 건드리지 않는다.
               지연은 가중치 값과 무관하므로 학습하지 않은 같은 구조의 모델로 잰다.
   --analyze : E10-1(관문)·E10-2(재구현 R 대비)·E10-3(캐스케이드 char-CNN → DistilBERT)을 판정한다.
+              `--seed 43` 은 E11 확인(§E11) — 지연은 E10 측정값을 그대로 쓰고, 판정은 합산 배수(조화평균)로 한다.
 """
 from __future__ import annotations
 
@@ -31,7 +32,7 @@ from src.models import text_models  # noqa: E402
 
 LATENCY_JSON = GF.RESULTS / "dl_a_latency_srbh_4class.json"
 OUTPUT = GF.RESULTS / "dl_a_srbh_4class.json"
-DISTILBERT_CVPROBS = GF.RESULTS / "cvprobs_srbh_4class_distilbert_raw_lr2e-05_sealed.npz"
+DISTILBERT_CVPROBS = "cvprobs_srbh_4class_distilbert_raw_lr2e-05_sealed{}.npz"
 
 
 @torch.inference_mode()
@@ -93,6 +94,25 @@ def versus(f1_x, f1_r) -> dict:
             "corrected": GC.corrected_t(diffs)}
 
 
+def pooled_speedup(per_fold) -> float:
+    """평균 지연 기준 배수 — fold 운영점 E_π 의 평균으로 S 를 다시 낸 값.
+
+    S_k = t_R / (t2 + E_k·t_R) 라 1/S_k 가 E_k 에 선형이다 → 평균 E 로 낸 S 는 fold S 의 조화평균과 같다.
+    산술평균은 넘김이 많은 fold 하나(E10 seed 42 의 fold 4, 2.95배)를 거의 무시해 배포 비용을 과대평가한다(§E11).
+    """
+    return float(1.0 / np.mean(1.0 / np.asarray(per_fold, dtype=float)))
+
+
+def judge_pooled(row: dict, f1_r: float) -> dict:
+    """E11: E10-3 의 세 조건에서 조건 1 의 평균만 합산 배수로 바꾼 판정."""
+    folds = np.asarray(row["per_fold_speedup"]["b0"])
+    checks = {"pooled_speedup_ge_1.2": bool(pooled_speedup(folds) >= DC.MIN_SPEEDUP),
+              "all_folds_gt_1": bool((folds > 1).all()),
+              "f1_loss_le_0.3pp": bool(row["b0"]["macro_f1"] >= f1_r - DC.MAX_F1_LOSS)}
+    return {**checks, "above": all(checks.values()), "pooled_speedup": pooled_speedup(folds),
+            "f1_vs_r_pp": (row["b0"]["macro_f1"] - f1_r) * 100}
+
+
 def above_r(t_r: float, t_x: float, f1_x, f1_r) -> dict:
     """E10-2: t_R / t_X ≥ 1.2 그리고 F1_X ≥ F1_R − 0.3%p."""
     checks = {"speed_ratio_ge_1.2": bool(t_r / t_x >= DC.MIN_SPEEDUP),
@@ -101,22 +121,25 @@ def above_r(t_r: float, t_x: float, f1_x, f1_r) -> dict:
             "above": all(checks.values()), **versus(f1_x, f1_r)}
 
 
-def analyze() -> dict:
+def analyze(seed: int = DC.BASE_SEED) -> dict:
     ms = json.loads(LATENCY_JSON.read_text(encoding="utf-8"))["latency"]["ms"]
     t2, t_front, t_rest, t_r = ms["t2"], ms["t_front"], ms["t_rest"], ms["t_R"]
-    solo, bert = DC.load_cvprobs("charcnn"), load_npz(DISTILBERT_CVPROBS)
-    ee_main, ee_aux = DC.load_cvprobs("charcnn_ee"), DC.load_cvprobs("charcnn_ee", aux=True)
+    solo = DC.load_cvprobs("charcnn", seed=seed)
+    bert = load_npz(GF.RESULTS / DISTILBERT_CVPROBS.format(DC.cvprobs_suffix(seed)))
+    ee_main = DC.load_cvprobs("charcnn_ee", seed=seed)
+    ee_aux = DC.load_cvprobs("charcnn_ee", aux=True, seed=seed)
     DC.check_aligned(solo, bert, ee_main, ee_aux)
     strata = np.asarray(cross_validate.load_pool_strata("srbh_4class", exclude_test=True))
     f1_solo, f1_r = DC.fold_test_f1(solo), DC.fold_test_f1(bert)
-    result = {"prereg": "docs/paper_revision/03_prereg_v2.md §E10", "seed": DC.BASE_SEED, "pi": GF.PI,
+    prereg = "§E10" if seed == DC.BASE_SEED else "§E11"
+    result = {"prereg": f"docs/paper_revision/03_prereg_v2.md {prereg}", "seed": seed, "pi": GF.PI,
               "latency_ms": ms, "charcnn_per_fold_macro_f1": f1_solo, "distilbert_per_fold_macro_f1": f1_r,
               "charcnn_macro_f1": float(np.mean(f1_solo)), "distilbert_macro_f1": float(np.mean(f1_r))}
 
     # E10-1 관문: 진입 조건이지 우열 주장이 아니다(보정 t 는 병기).
     result["e10_1"] = {"pass": bool(np.mean(f1_r) > np.mean(f1_solo)), **versus(f1_r, f1_solo)}
 
-    # E10-2: X = char-CNN 단독, DL-C(seed 42 운영점 — 이 실행의 t_front·t_rest 로 다시 낸다).
+    # E10-2: X = char-CNN 단독, DL-C(같은 seed 의 운영점 — 이 실행의 t_front·t_rest 로 다시 낸다).
     e10_2 = {"charcnn": above_r(t_r, t2, f1_solo, f1_r)}
     paths, _ = GF.fold_paths(ee_aux, ee_main, strata)
     for view, col in GC.VIEWS:
@@ -144,8 +167,12 @@ def analyze() -> dict:
         vs_charcnn.update(
             # 모든 요청이 char-CNN 을 거치므로 char-CNN 단독 대비 배율은 항상 1 미만이다.
             latency_ratio=float(np.mean([s * t2 / t_r for s in row["per_fold_speedup"]["b0"]])),
+            # 평균 비용 기준(§E11) — 산술평균은 넘김이 많은 fold 의 지연을 거의 무시한다.
+            latency_ratio_pooled=pooled_speedup(row["per_fold_speedup"]["b0"]) * t2 / t_r,
             more_accurate=bool(vs_charcnn["mean_diff_pp"] > 0 and p is not None and p < 0.05))
-        block[view] = {**row, "e8_vs_r": DC.judge(row, float(np.mean(f1_r))), "vs_charcnn": vs_charcnn}
+        row["pooled_speedup"] = {gate: pooled_speedup(s) for gate, s in row["per_fold_speedup"].items()}
+        block[view] = {**row, "e8_vs_r": DC.judge(row, float(np.mean(f1_r))),
+                       "e11_vs_r": judge_pooled(row, float(np.mean(f1_r))), "vs_charcnn": vs_charcnn}
     result["e10_3"] = block
     return result
 
@@ -172,11 +199,15 @@ def report(result: dict) -> None:
             print(f"  {view}: {row['reason']}")
             continue
         vc = row["vs_charcnn"]
-        print(f"  {view}: B0 {row['b0']['speedup']:.3f}배 (fold {np.round(row['per_fold_speedup']['b0'], 3).tolist()})"
+        pooled = row["pooled_speedup"]
+        print(f"  {view}: B0 합산 {pooled['b0']:.3f}배 · 산술 {row['b0']['speedup']:.3f}배"
+              f" (fold {np.round(row['per_fold_speedup']['b0'], 3).tolist()})"
               f" F1 {row['b0']['macro_f1']:.4f} r_N {row['b0']['r_N']:.3f} r_A {row['b0']['r_A']:.3f}"
-              f" | G2 {row['g2']['speedup']:.3f}배 | R 대비 {row['e8_vs_r']}")
-        print(f"    char-CNN 대비 F1 {vc['mean_diff_pp']:+.2f}%p (보정 p {vc['corrected']['p']}) · 지연 배율"
-              f" {vc['latency_ratio']:.3f} · 더 정확 {vc['more_accurate']}")
+              f" | G2 합산 {pooled['g2']:.3f}배 · 산술 {row['g2']['speedup']:.3f}배")
+        print(f"    R 대비 E10-3(산술) {row['e8_vs_r']}")
+        print(f"    R 대비 E11(합산) {row['e11_vs_r']}")
+        print(f"    char-CNN 대비 F1 {vc['mean_diff_pp']:+.2f}%p (보정 p {vc['corrected']['p']}) · 지연 배율 합산"
+              f" {vc['latency_ratio_pooled']:.3f} · 산술 {vc['latency_ratio']:.3f} · 더 정확 {vc['more_accurate']}")
 
 
 def main():
@@ -187,6 +218,7 @@ def main():
     parser.add_argument("--n", type=int, default=2000)
     parser.add_argument("--repeats", type=int, default=30)
     parser.add_argument("--smoke", action="store_true", help="--latency 를 n=30·1회로, 저장 없이")
+    parser.add_argument("--seed", type=int, default=DC.BASE_SEED, help="--analyze 의 CV seed (43 = E11 확인)")
     args = parser.parse_args()
     try:
         if args.latency:
@@ -200,13 +232,15 @@ def main():
                 LATENCY_JSON.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                 print(f"저장: {LATENCY_JSON.relative_to(PROJECT_ROOT).as_posix()}")
             return 0
-        result = analyze()
+        result = analyze(args.seed)
     except (OSError, ValueError, KeyError) as error:
         print(f"[오류] E10 실패: {error}", file=sys.stderr)
         return 1
-    OUTPUT.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    output = OUTPUT if args.seed == DC.BASE_SEED else OUTPUT.with_name(f"{OUTPUT.stem}_s{args.seed}.json")
+    output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"seed {args.seed}")
     report(result)
-    print(f"저장: {OUTPUT.relative_to(PROJECT_ROOT).as_posix()}")
+    print(f"저장: {output.relative_to(PROJECT_ROOT).as_posix()}")
     return 0
 
 
