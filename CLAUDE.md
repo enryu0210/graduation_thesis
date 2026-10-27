@@ -7,6 +7,8 @@
 - git 커밋 메시지(한글 여러 줄)는 파일로 써서 `git commit -F <file>` 사용. Bash 도구에서 PowerShell here-string(`@'...'@`)은 메시지가 깨짐.
 - ⚠️ 노트북·데스크톱 양쪽에서 작업 → **착수 전 `git fetch` 필수**. 원격에 Phase 가 쌓여 있으면 문서 번호·모델 이름이 이미 선점됨(실제 사고: `docs/08` 과 모델명 `hybrid` 충돌 → push 거부 후 리베이스·개명 재작업).
 - 커밋 전 `python -m pytest tests/ -q` 실행(~3초, GPU 불필요).
+- 모든 작업(코드 포함)은 Claude 가 직접 한다 — 외부 코딩 도구 위임 없음(2026-10-27, 옛 `AGENTS.md`·`docs/handoff/` 삭제).
+- ⚠️ `liteLLM` 라이브러리 사용 금지(보안 문제).
 
 ## 논문 축 (RQ · 주장 강도)
 - **마스터 설계 문서는 `docs/web_attack_image_cnn_thesis_design.md`** — RQ 표·기여 문구·목차의 단일 진실 소스. Phase 문서와 어긋나면 마스터를 고친다.
@@ -84,6 +86,8 @@
   1차 재설계 후보(E2, `cnn.build_e2_variant`): `cnn_crop8`(위 8행=384바이트) · `cnn_gmp`(전역 최대 풀링) · `cnn_1d`(3×2,304 1차원 conv).
   ⚠️ `cnn_1d` 가 E2 판정에서 채택됐다(docs/14 §8.25). 단 3기의 다른 실험(G1~G6·T 계열)은 전부 현행 `cnn` 1차 위에서 잰 값이다 — 1차를 바꿔 인용하면 수치가 섞인다.
 - CV 축: `cross_validate.py --seed N`(tag `_sN`, 42 는 생략) · `--group-template`(tag `_gtpl`, 숫자·hex·긴 토큰을 가린 템플릿으로 묶어 fold 분할 — T5). 사전 판정 규칙은 `docs/paper_revision/03_prereg_v2.md`.
+- ⚠️ SR-BH 필드 조합은 `srbh_track.FIELD_COMBINATIONS`(CV)와 `measure_srbh_fields.COMBINATIONS`(E2 단계1) **2곳** — `tests/test_srbh_track.py` 가 일치를 검사.
+- ⚠️ CPU 지연 측정 중 같은 기기에서 pytest·학습을 돌리지 말 것. 실행 간 절대값이 4~6% 표류하므로 후보끼리는 **한 실행 안**(번갈아 측정)의 값만 비교.
 - CV 판정 도구: `gate_confirm.py --seed N [--group-template]`(C-G2 규칙, 보정 t 는 `gate_confirm.corrected_t`) · `linear_stage1.py --fit|--latency|--analyze`(선형 1차 E3 + E2 변형 경계 + T11) · `literature_compare.py [--dl-only]`(유사 연구 비교 그림, `--dl-only` 는 고전 ML 을 뺀 판을 `_dl_only` 파일로 따로 저장) · `latency_fair.py --stage1-variants`(1차 후보 지연, 반복마다 번갈아 측정).
   ⚠️ `cv_compare.py` 의 t 검정은 **보정 없는 대응 t**(fold 간 학습 집합 중복 무시) → 사전 판정에는 `corrected_t`(Nadeau–Bengio) + Holm 을 쓴다. ⚠️ `cross_validate.py --balance`(tag `_bal`)는 fold 내부 train 만 언더샘플링한다(T11).
 - 장시간 작업 로그는 `experiments/logs/`(gitignore).
@@ -120,7 +124,7 @@
 - ⚠️ CPU 강제는 Bash 에서 `CUDA_VISIBLE_DEVICES=` 이지만 **PowerShell 에서 빈 값 대입은 변수 삭제**라 GPU 가 그대로 보인다 → PowerShell 은 `$env:CUDA_VISIBLE_DEVICES='-1'`.
 - 클래스 불균형 트랙 학습: `train.py --balance`(train 만 언더샘플링, val/test 실분포 유지).
 - 모든 모델 평가는 `src/eval/metrics.py` 로 일원화(계산 방식 차이 배제). 지표: Acc·Macro-F1·PR-AUC·ROC-AUC·TPR@FPR + attack_focused(benign-evasion/FPR).
-  ⚠️ **MCC 는 3기에 교수 지시로 완전 제거**됐다(`metrics.py` 머리 주석, 근거·반대 근거 docs/13 §1.1). 기준 지표는 Macro-F1. 지시서에 MCC 를 요구하면 Codex 가 `KeyError` 로 멈춘다(2026-10-04 실제 발생). 아래 2기 서술의 MCC 수치는 기록으로만 읽을 것.
+  ⚠️ **MCC 는 3기에 교수 지시로 완전 제거**됐다(`metrics.py` 머리 주석, 근거·반대 근거 docs/13 §1.1). 기준 지표는 Macro-F1. MCC 를 요구하는 코드는 `KeyError` 로 멈춘다(2026-10-04 실제 발생). 아래 2기 서술의 MCC 수치는 기록으로만 읽을 것.
 
 ## 모델 용어 (2026-08-02 변경 — 혼동 사고 후 확정)
 - **제안 모델 = 캐스케이드**(1차 RGB CNN + 2차 char-CNN). 논문이 주장하는 대상은 이것.
