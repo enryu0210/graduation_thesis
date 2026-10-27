@@ -50,6 +50,7 @@
     → DL-C 는 넘김 축이 아니라 **2차 모델 압축(결합 학습한 k3 출구)**으로 서술. "유사 연구 대비 개선" 금지(그림은 `literature_compare.py --dl-only` 에 점만 추가).
   📌 **DL-A(E10, 2026-10-25, docs/14 §8.34 · `dl_a.py --latency|--analyze`, 모델 `distilbert` = WAMM'25 DistilBERT 같은 fold 재구현)**: 관문 통과(0.9914 > 0.9884, 단 p 0.57). t_R 45.15ms = char-CNN 의 80배(같은 실행).
     ✅ **char-CNN → DistilBERT 캐스케이드는 재구현 DistilBERT 단독보다 위**(실사용자 **평균 비용 기준 12.3배** · F1 −0.03%p, seed 42, fold 4 는 2.95배). ⚠️ 처음 적은 51.6배는 fold 산술평균이라 정정(2026-10-27) — 배수 평균은 `dl_a.pooled_speedup`(조화평균)으로 낸다 — 교수 기준을 **재구현 기준으로** 충족한 첫 구성. char-CNN 단독은 80배지만 −0.303%p 로 0.003%p 차 미달.
+    ❌ **확인 seed 43 재현 실패(E11, 2026-10-27, docs/14 §8.35)**: 합산 10.6배·전 fold > 1 은 충족, F1 −0.32%p(허용 0.3%p, 다섯 fold 모두 음수·p 0.038) — DistilBERT 가 0.9914 → 0.9947 로 강해졌고 캐스케이드는 0.9914 에 머묾. → "재구현 DistilBERT 보다 위"는 **seed 42 한정**. seed 43 의 G2(42.5배·−0.27%p)는 판정 대상 밖이라 뒤집는 데 쓰지 말 것.
     ⚠️ 캐스케이드의 char-CNN 대비 몫은 +0.28%p(p 0.34)·지연 평균 6.5배 — "char-CNN 보다 정확"·"원 논문 대비 개선" 금지. ⚠️ `distilbert` 는 토큰 id 입력이라 `cross_validate.TOKEN_MODELS` 에만 있고 `train.TEXT_MODELS` 에는 **일부러 없다**(train.py 는 바이트 경로뿐).
 - ⚠️ `docs/thetics/` 는 **.gitignore 대상**(PDF 미추적) → **수집 목록의 유일한 추적본은 `docs/12` §1**. 논문을 추가하면 docs/12 도 함께 갱신.
 
