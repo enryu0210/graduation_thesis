@@ -172,6 +172,22 @@
 - **그림(기술)**: R 과 DL-A 운영점을 `literature_compare.py --dl-only` 의 같은 데이터 패널에 더한다. (a) 보고값 패널의 WAMM 점은 그대로 둔다.
 - seed 43 확인은 이번에 하지 않는다. E10-2·E10-3 이 "위"여도 seed 42 한정으로 쓴다.
 
+## E11. DL-A 확인 seed — char-CNN → DistilBERT 의 seed 43 재현 (GPU 5-fold `--exclude-test`, seed 43 · 2026-10-27 추가)
+
+> E10-3 이 seed 42 에서 "재구현 DistilBERT 단독보다 위"였다(docs/14 §8.34). 교수 기준을 채운 첫 구성이라 다른 seed 에서 재현되는지 확인한다. **이 절의 커밋이 학습보다 앞선다.**
+> E10 은 "S_R 평균"의 평균 종류를 적지 않았고, 도구는 fold 배수의 **산술평균**(51.6배)을 냈다. fold 1개(fold 4, 2.95배)만 넘김이 많아도 산술평균은 그 fold 를 거의 무시한다. 평균 지연으로 낸 배수(fold E_π 평균으로 S 를 다시 계산 = fold 배수의 **조화평균**)는 12.3배다(docs/paper_revision/04_status_2026-10-27.md §1.2). 이 절부터 평균 종류를 미리 고정한다.
+
+- **학습**: E10 과 같은 설정에서 seed 만 43 으로 바꾼다 — `cross_validate.py --model distilbert --track srbh_4class --exclude-test --save-probs --epochs 3 --batch-size 16 --lr 2e-5 --seed 43`, 산출 tag `srbh_4class_distilbert_raw_lr2e-05_sealed_s43`. 1차는 이미 있는 `cvprobs_srbh_4class_charcnn_raw_sealed_s43.npz`(E9-2 와 같은 char-CNN seed 43)이며 정렬 검증을 거친다.
+- **지연**: E10 의 `dl_a_latency_srbh_4class.json`(t2 0.563ms · t_R 45.15ms)을 그대로 쓴다. 지연은 가중치 값과 무관하고(E10 에서 학습하지 않은 같은 구조로 쟀다), 같은 실행 값끼리만 배수를 낸다는 원칙을 지키려면 다시 재지 않는 편이 맞다.
+- **판정 E11 (실사용자 판본, B0)** — E10-3 의 세 조건을 seed 43 에 걸되, 조건 1 의 평균을 **평균 지연 기준**으로 고정한다:
+  1. S_R(합산) = t_R / (t2 + Ē_π·t_R) ≥ **1.2** — Ē_π 는 다섯 fold 의 운영점 E_π 평균(= fold S_R 의 조화평균)
+  2. 다섯 fold 모두 S_R > 1
+  3. 캐스케이드 fold-test Macro-F1 평균 ≥ 같은 seed 의 DistilBERT 단독 평균 − 0.3%p
+  - 세 조건을 채우면 "char-CNN → DistilBERT 는 seed 42·43 모두 재구현 DistilBERT 단독보다 위(2/2)"로 쓴다. 하나라도 못 채우면 "seed 42 의 결과가 seed 43 에서 재현되지 않았다"로 기록하고 E10-3 의 주장을 "seed 42 한정"으로 낮춘다.
+  - seed 42 도 같은 합산 규칙으로 다시 적는다(12.3배 ≥ 1.2 라 E10-3 판정은 바뀌지 않는다). 산술평균은 병기만 하고 헤드라인으로 쓰지 않는다.
+- **병기(판정 아님)**: E10-1 관문(seed 43 의 DistilBERT 단독 vs char-CNN 단독)·E10-2(재구현 R 대비 char-CNN 단독·DL-C seed 43)·char-CNN 단독 대비 F1 차이와 지연 배율·검증 분포 판본·클래스별 τ(G2). 특히 G2 는 seed 42 에서 합산 배수가 B0 의 4배 가까이(51.1 vs 12.3배) 나왔지만 **사후 관찰**이라 이번에도 판정하지 않는다 — G2 를 판정하려면 별도 사전 기준이 필요하다.
+- seed 44·45, DistilBERT 128 토큰, WAMM XGBoost 재구현, 지연 재측정은 이번에 하지 않는다. 2/2 를 "견고"라고 쓰지 않는다.
+
 ## 하지 않는 것
 
 - T8(2인 라벨 감사)은 사람 판정자가 한 명 더 필요하다. 이 문서의 범위 밖이다.
