@@ -53,3 +53,19 @@ def test_e11_pooled_speedup_is_speedup_at_mean_e_pi():
     assert not dl_a.judge_pooled(row, 0.990)["all_folds_gt_1"]
     row["per_fold_speedup"]["b0"] = folds
     assert dl_a.judge_pooled(row, 0.990)["above"]
+
+
+def test_dl_a_errors_separates_blocking_errors_from_attack_type_confusion():
+    import numpy as np
+    from src.eval import dl_a_errors as E
+    classes = ["CodeInjection", "CommandInjection", "Normal", "SQLInjection"]
+    y = np.array([3, 3, 2, 2, 1])
+    a = np.eye(4)[[1, 2, 3, 2, 1]] * 0.6   # SQLi→CmdI(종류 혼동) · SQLi→Normal(차단 실패) · Normal→SQLi(오탐)
+    b = np.eye(4)[y]
+    strata = np.array(["", "", "real_user", "scanner", ""])
+    out = E.compare(y, a, b, strata, classes)
+    assert (out["charcnn"]["attack_type_confusion"], out["charcnn"]["missed_attack"],
+            out["charcnn"]["false_alarm"]) == (1, 1, 1)
+    assert out["only_charcnn_wrong"] == 3 and out["only_distilbert_wrong"] == 0
+    assert out["normal_fpr_by_stratum"]["real_user"] == {"n": 1, "a": 1.0, "b": 0.0}
+    assert out["fixed_charcnn_conf_ge_confident"] == 0.0
