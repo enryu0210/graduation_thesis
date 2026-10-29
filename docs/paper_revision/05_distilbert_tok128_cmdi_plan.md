@@ -145,9 +145,11 @@ PYTHONIOENCODING=utf-8 python -m pytest tests/ -q
 
 ## 5. 체크리스트
 
-1. [ ] `03_prereg_v2.md` §E12 검토 → **커밋·푸시 (학습 전)**
-2. [ ] §2.1 코드 변경 + 테스트 (`pytest tests/ -q` 통과)
-3. [ ] seed 42 → seed 43 학습 (순차)
+1. [x] `03_prereg_v2.md` §E12 검토 → **커밋·푸시 (학습 전)**
+2. [x] §2.1 코드 변경 + 테스트 (`pytest tests/ -q` 통과)
+3. [x] seed 42 → seed 43 학습 (순차) — 2026-10-29 데스크톱(RTX 4080 SUPER)에서 완료.
+   산출물 `cv_/cvprobs_srbh_4class_distilbert_raw_lr2e-05_tok128_sealed{,_s43}` 는 gitignore 라
+   **학습한 기기에만 있다** → 4~6 단계는 같은 기기에서 잇는다(지연도 E10·E11 과 같은 기기여야 함).
 4. [ ] 지연 512·128 같은 실행에서 측정
 5. [ ] `dl_a.py --analyze`·`dl_a_errors.py` 실행
 6. [ ] `docs/14` §8.37 기록 · `results_manifest.md` · `CLAUDE.md` 요약 갱신
