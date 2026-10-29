@@ -67,5 +67,6 @@ def test_dl_a_errors_separates_blocking_errors_from_attack_type_confusion():
     assert (out["charcnn"]["attack_type_confusion"], out["charcnn"]["missed_attack"],
             out["charcnn"]["false_alarm"]) == (1, 1, 1)
     assert out["only_charcnn_wrong"] == 3 and out["only_distilbert_wrong"] == 0
+    assert out["charcnn"]["sqli_as_cmdi"] == 1 and out["distilbert"]["class_f1"]["SQLInjection"] == 1.0
     assert out["normal_fpr_by_stratum"]["real_user"] == {"n": 1, "a": 1.0, "b": 0.0}
     assert out["fixed_charcnn_conf_ge_confident"] == 0.0

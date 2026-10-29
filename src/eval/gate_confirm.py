@@ -65,14 +65,15 @@ def primary_rule(paths, normal_col):
 
 def secondary_rule(paths, val_solo2, normal_col, ms1, ms2):
     """E7: val Macro-F1 이 char-CNN 단독의 0.5%p 이내인 점 중 val E_π 최소(= S 최대)를 게이트별로 고른다."""
-    chosen = {}
+    chosen, chosen_index = {}, {}
     for gate, folds in paths.items():
-        rows = []
+        rows, chosen_index[gate] = [], []
         for P, target in zip(folds, val_solo2):
             eligible = np.flatnonzero(P[:, VAL_F1] >= target - 0.005)
             if not len(eligible):
                 return {"reason": f"{gate}: val 목표에 닿는 점이 없는 fold 가 있어 판정하지 않는다."}
             i = eligible[np.argmin(e_pi(P[eligible], VAL_R_N, VAL_R_A))]
+            chosen_index[gate].append(int(i))
             rows.append((ms2 / (ms1 + e_pi(P[i:i + 1], normal_col)[0] * ms2), P[i, F1_TEST],
                          e_pi(P[i:i + 1], normal_col)[0], P[i, normal_col], P[i, R_ATTACK]))
         chosen[gate] = np.array(rows)
@@ -85,6 +86,8 @@ def secondary_rule(paths, val_solo2, normal_col, ms1, ms2):
     out.update(speedup_gain=gain, f1_loss_vs_b0_pp=loss_pp, corrected_t=test["t"], corrected_p=test["p"],
                per_fold_speedup={gate: rows[:, 0].tolist() for gate, rows in chosen.items()},
                per_fold_macro_f1={gate: rows[:, 1].tolist() for gate, rows in chosen.items()},
+               # 경로 안의 점 번호 — 운영점의 예측을 다시 만들 때 쓴다(B0 는 GF.b0_taus 의 순서).
+               per_fold_index=chosen_index,
                adopted=bool(gain >= 0.20 and test["p"] is not None and test["p"] < 0.05 and loss_pp <= 0.3))
     return out
 

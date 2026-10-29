@@ -45,6 +45,11 @@ def frontier(speeds, f1s, grid):
     return np.array([f1s[speeds >= x].max() if (speeds >= x).any() else np.nan for x in grid])
 
 
+def b0_taus(conf_val):
+    """B0(MaxProb 넘김) 경로의 임계값 — val 넘김 예산 0~100% 를 STEP 간격으로. 경로의 점 순서와 같다."""
+    return [gates.tau_for_budget(conf_val, q) for q in np.r_[np.arange(0, 1, STEP), 1.0]]
+
+
 def fold_paths(first, second, strata):
     """fold 마다 게이트 경로의 점별 (r_N 전체, r_N 실사용자, r_A, test F1, val r_N, val r_A, val F1) 과
     단독 모델 F1 을 모은다. val 열은 운영점을 검증에서 고르는 판정(gate_confirm.py)이 쓴다."""
@@ -60,8 +65,7 @@ def fold_paths(first, second, strata):
         is_real = is_normal & (strata[first[f"test_idx_{k}"]] == "real_user")
         val_normal = y_val == normal
         # 같은 임계값을 test 와 val 에 그대로 적용한 (test 마스크, val 마스크) 쌍.
-        masks = {"b0": [(conf_test < tau, conf_val < tau) for tau in
-                        (gates.tau_for_budget(conf_val, q) for q in np.r_[np.arange(0, 1, STEP), 1.0])],
+        masks = {"b0": [(conf_test < tau, conf_val < tau) for tau in b0_taus(conf_val)],
                  "g2": [(gates.apply_classwise(p1t, conf_test, point["taus"]),
                          gates.apply_classwise(p1v, conf_val, point["taus"]))
                         for point in gates.classwise_tau_path(p1v, p2v, y_val, n_classes, STEP)]}
