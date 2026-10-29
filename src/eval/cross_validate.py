@@ -522,6 +522,8 @@ def main() -> None:
     parser.add_argument("--rgb-encoders", default="raw_byte,char_class,local_entropy")
     parser.add_argument("--patch", default="8x8", help="ViT 패치 '높이x너비'(--model vit 전용)")
     parser.add_argument("--max-len", type=int, default=48 * 48)
+    parser.add_argument("--max-tokens", type=int, default=None,
+                        help="토큰 모델(distilbert) 입력 토큰 수(기본 512, E12 의 원 설정은 128 · tag _tok{N})")
     parser.add_argument("--max-features", type=int, default=20000, help="TF-IDF 특징 수")
     parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--val-ratio", type=float, default=0.1,
@@ -546,6 +548,9 @@ def main() -> None:
         parser.error("--save-train-embeddings는 --save-embeddings와 함께 사용해야 합니다.")
     if args.save_probs and args.model in TFIDF_MODELS:
         parser.error("--save-probs는 torch 모델에서만 허용됩니다.")
+    # 바이트 모델의 --max-len 과 섞여 조용히 무시되는 일을 막는다.
+    if args.max_tokens is not None and args.model not in TOKEN_MODELS:
+        parser.error("--max-tokens 는 토큰 모델(distilbert)에서만 허용됩니다(바이트 모델은 --max-len).")
     if args.fields is not None and (args.track != "srbh_4class" or args.text != "raw"):
         parser.error("--fields는 --track srbh_4class --text raw에서만 허용됩니다.")
 
@@ -564,6 +569,7 @@ def main() -> None:
         patch=args.patch if args.model == "vit" else None,
         lr=args.lr, fields=args.fields, sealed_test=args.exclude_test,
         cv_seed=args.seed, group_template=args.group_template, balance=args.balance,
+        max_tokens=args.max_tokens,
     )
     tag = embeddings_tag(tag, args.save_embeddings, args.save_train_embeddings)
     if args.save_embeddings:
@@ -600,8 +606,9 @@ def main() -> None:
     if args.model in TOKEN_MODELS:
         import text_models
         print("  토큰 인코딩 중...")
-        pool_x, truncated_upper = text_models.encode_token_matrix_int16(pool_texts)
-        print(f"  최대 {text_models.DISTILBERT_MAX_TOKENS} 토큰 · 끝까지 찬 행 {truncated_upper:,} (잘림 상한)")
+        max_tokens = args.max_tokens or text_models.DISTILBERT_MAX_TOKENS
+        pool_x, truncated_upper = text_models.encode_token_matrix_int16(pool_texts, max_tokens)
+        print(f"  최대 {max_tokens} 토큰 · 끝까지 찬 행 {truncated_upper:,} (잘림 상한)")
     elif not is_image and not is_tfidf:
         print("  바이트 시퀀스 인코딩 중...")
         pool_x = encode_byte_matrix_int16(pool_texts, args.max_len)
@@ -711,6 +718,7 @@ def main() -> None:
                    "rgb_encoders": list(encoders) if (is_image and args.channels == "rgb") else None,
                    "epochs": args.epochs, "batch_size": args.batch_size, "lr": args.lr,
                    "val_ratio": args.val_ratio, "fields": args.fields,
+                   "max_tokens": (args.max_tokens or 512) if args.model in TOKEN_MODELS else None,
                    "exclude_test": args.exclude_test,
                    "group_template": args.group_template,
                    "n_template_groups": int(groups.max() + 1) if groups is not None else None,

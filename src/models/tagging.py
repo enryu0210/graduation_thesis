@@ -11,7 +11,7 @@ Phase 11 — 산출물 tag 규칙 (단일 진실 소스)
     (train / cross_validate / cascade / run_evasion)이 되므로, 규칙 자체를 여기로 모은다.
 
 tag 형식:
-    {track}_{model}_{text}{채널}{폭}{패치}{lr}{필드}{봉인}{CV seed}{묶음 분할}{보조가중치}{방어}{_bal}
+    {track}_{model}_{text}{채널}{폭}{패치}{lr}{토큰}{필드}{봉인}{CV seed}{묶음 분할}{보조가중치}{방어}{_bal}
     예) payload_4class_csicnorm_cnn_raw_rgb_def-advtrain_SA_r0.5_bal
         payload_4class_cnn_raw                      (기본값만 쓰면 접미사 없음)
 
@@ -91,7 +91,7 @@ def build_tag(track: str, model: str, text: str = "raw", *,
               aux_weight: float | None = None,
               fields: str | None = None, sealed_test: bool = False,
               width: float | None = None, cv_seed: int | None = None,
-              group_template: bool = False) -> str:
+              group_template: bool = False, max_tokens: int | None = None) -> str:
     """산출물/체크포인트 공통 tag 를 만든다.
 
     인자는 "이미 결정된 값"만 받는다(모델이 이미지인지 등의 판정은 호출부 책임).
@@ -104,11 +104,14 @@ def build_tag(track: str, model: str, text: str = "raw", *,
     - cv_seed           : 교차검증 fold seed. 42(기존 산출물의 seed)이거나 None 이면 생략 —
                           축이 없으면 확인 실험(seed 43~)이 seed 42 산출물을 덮어쓴다
     - group_template    : 템플릿 묶음 분할(T5). fold 배정 자체가 달라 일반 CV 산출물과 갈라야 한다
+    - max_tokens        : 토큰 모델(distilbert) 입력 길이(E12). 512(E10·E11 산출물의 값)이거나 None 이면 생략 —
+                          축이 없으면 128 토큰판이 512 판본을 덮어쓴다
     """
     ch_tag = data_image._channel_suffix(channels, encoders)
     width_tag = "" if width in (None, 1.0) else f"_w{width:g}"
     patch_tag = f"_p{patch}" if patch else ""
     lr_tag = "" if (lr is None or lr == DEFAULT_LR) else f"_lr{lr:g}"
+    lr_tag += "" if max_tokens in (None, 512) else f"_tok{max_tokens}"
     # F2는 기본 입력과 같으므로 별도 실험 이름을 만들지 않는다.
     fields_tag = "" if fields in (None, "F2") else f"_f{fields}"
     sealed_tag = "_sealed" if sealed_test else ""

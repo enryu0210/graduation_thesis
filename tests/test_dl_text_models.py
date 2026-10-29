@@ -51,3 +51,14 @@ def test_distilbert_trims_padding_without_changing_logits():
         full = net.bert(input_ids=x, attention_mask=(x != 0).long()).logits
         assert torch.allclose(net(x), full, atol=1e-5)
     assert "distilbert" in CV.TOKEN_MODELS and "distilbert" not in T.TEXT_MODELS
+
+
+def test_token_length_axis_keeps_512_filenames():
+    # E12: 128 토큰판이 E10·E11(512) 산출물을 덮어쓰면 안 되고, 512 는 기존 파일명 그대로여야 한다.
+    from tagging import build_tag
+
+    base = build_tag("srbh_4class", "distilbert", lr=2e-5, sealed_test=True)
+    assert base == "srbh_4class_distilbert_raw_lr2e-05_sealed"
+    assert build_tag("srbh_4class", "distilbert", lr=2e-5, sealed_test=True, max_tokens=512) == base
+    assert (build_tag("srbh_4class", "distilbert", lr=2e-5, sealed_test=True, max_tokens=128, cv_seed=43)
+            == "srbh_4class_distilbert_raw_lr2e-05_tok128_sealed_s43")
