@@ -1,38 +1,25 @@
 # 논문 초안 (정보보호학회논문지 투고)
 
-- `draft_kiisc_submission.html` — 초안 원본. 양식은 `#(투고양식)submission_form_2026.hwp`(심사용, 저자·소속 없음)를 따랐다.
-  `draft_kiisc_submission.pdf` 는 이 HTML 을 Chrome 으로 인쇄한 확인용 사본이다.
-- 최종 제출본은 HWP 양식 파일에 본문을 옮겨 넣어 만든다(학회 접수는 HWP). 수식은 HWP 수식 편집기로 다시 입력한다.
-- 그림은 `../figures/` 를 참조한다 — HTML 을 다른 위치로 옮기면 그림이 깨진다.
+- `draft_kiisc_submission.md` — 초안 원본(2026-10-30 개정판, 새 제목·딥러닝 한정 범위·DL-A 속도/CmdI 오탐/정확도–속도 교환 상세 반영). 양식은 `#(투고양식)submission_form_2026.hwp`(심사용, 저자·소속 없음)의 순서·번호·캡션 규칙을 따른다.
+  옛 HTML·PDF 판(RGB 캐스케이드 제안 시기)은 삭제했다 — 필요하면 `git log -- docs/paper_write/draft_kiisc_submission.html` 로 되살린다.
+- `draft_kiisc_submission.pdf` — 위 초안을 양식 모양(190×260mm, 여백 20mm, 2단·단 간격 10mm, 본문 9pt)으로 찍은 **확인용 사본**.
+  초안을 고친 뒤 `python docs/paper_write/build_pdf.py` 로 다시 만든다(Chrome 필요). 신명 글꼴 대신 바탕·맑은 고딕·Times New Roman 을 쓴다.
+- 최종 제출본은 HWP 양식 파일에 본문을 옮겨 넣어 만든다(학회 접수는 HWP, 2단 190×260mm). 수식은 HWP 수식 편집기로 다시 입력한다.
+- 그림은 `../figures/` 의 PNG 를 HWP 에 직접 넣는다(`build_pdf.py` 는 `【그림: ...】` 구문을 읽어 PDF 에 자동 삽입).
 - 게재 확정 후에는 `(게재양식)` 파일로 옮기고 저자·소속·사사를 추가한다.
-
-## PDF 재생성
-
-```bash
-WIN=$(cd "$(git rev-parse --show-toplevel)/docs/paper_write" && pwd -W)
-"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless --disable-gpu --no-sandbox --no-pdf-header-footer \
-  --print-to-pdf="$WIN/draft_kiisc_submission.pdf" "file:///$WIN/draft_kiisc_submission.html"
-```
-
-Chrome 설치 경로는 기기마다 다를 수 있다.
 
 ## 제출 전 확인 목록
 
-- [ ] **참고문헌 서지 확인** — 아래는 docs/12 의 메모로 채운 것이라 원문과 대조하지 않았다.
-  - [4] Eroğlu Demirkan & Aydos (Appl. Sci. 2025) — 저자 이니셜, 권(호)
-  - [9] Sevri & Karacan (KSII TIIS 2022) — 쪽 범위 632-657
-  - [10] Kutlimuratov et al. (Computers 2026) — 전체 저자, 호
-  - [24] Lucz & Forstner (Data 2025) — 저자 이니셜, 정확한 제목
-  - [25]~[29] (거리 기반 점수 Lee·Ren·Sun·Jiang·Jaeger) — docs/12 §1.8 메모로 채움, PDF 미수집. 학회명·연도·쪽 확인
-  - [34] Kuncheva & Whitaker (Machine Learning 2003) — Q 통계량의 출처. 권(호) 51(2), 쪽 181-207 을 기억으로 적었다. 원문 대조 필요
-  - [20] Reddi et al., [23] Ovadia et al. — "et al." 대신 전체 저자를 요구하는지 학회 규정 확인
-- [ ] Fig. 2 — 두 수평 기준선(RGB CNN·char-CNN)이 같은 색이다. 그림을 다시 그리거나 캡션의 (lower)/(upper) 구분을 유지한다.
-- [ ] 5.5절·Table 6 의 운영점 비교와 Table 7 아래쪽(class weight 1차 위 게이트)은 **사후·탐색**이다(docs/14 §8.6·§8.12). 심사 과정에서 "개선"으로 승격하지 않는다.
-- [ ] 출처를 섞지 않는다: Table 2·3·7 은 고정 분할(단일 seed), Table 4·5·6 은 CV(class weight 1차). 언더샘플링 1차(`_bal`)와 class weight 1차(`_s2bal` 구성)는 표 안에서 열로 갈라 둔다.
-- [ ] Table 3 은 두 구성에 **같은 지연 측정값**(T2 CPU·1 0.350/1.114ms)을 써서 class weight 헤드라인이 1.63·1.42배다. 같은 실행의 도구 출력은 1.67·1.45배(docs/14 §8.11) — 캡션에 병기했고 판정(H-T4a 채택, 2배 미만이라 "조건부")은 어느 쪽이든 같다.
-- [ ] 5.7절 라벨 감사는 LLM 1인 판정(`docs/audit/srbh_tail_label_audit.csv`)이다. 전문가 2인 재판정 전에는 "라벨 잡음이 주원인"으로 쓰지 않는다.
-- [ ] 분량: 학회 투고 규정(쪽수)을 HWP 로 옮긴 뒤 확인한다.
-- [ ] 5.10절 T3 의 TF-IDF "대안 병기"는 F1 0.94 이하 구간 한정이고, TF-IDF 단독이 저정확도 구간을 지배한다는 관찰은 **탐색**이다(docs/14 §8.18). TF-IDF 1차 캐스케이드는 5.13절에서 측정했다(docs/14 §8.26): 검증 분포 1.24배, 실사용자 정상 요청 0.86배. TF-IDF 1차 + 클래스별 임계값의 1.31배는 **탐색**이라 본문 주장으로 쓰지 않는다.
-- [ ] 5.13절 Table 13·14 는 **seed 42 한 번**의 교차검증이다. 1차원 합성곱 1차와 선형 1차는 seed 를 반복하지 않았고, seed 간 1차 Macro-F1 표준편차가 1.15%p 다(5.12절). 심사에서 "1차원 합성곱이 더 낫다"를 일반화하지 않는다.
-- [ ] Fig. 5 의 (a) 패널은 각 논문이 **보고한 값**이라 데이터·장치·지연 정의가 다르다. 같은 조건 비교는 (b)·(c) 뿐이다. 유사 연구 [31] 의 XGBoost 는 재구현하지 않았다(이 기기에 `xgboost` 미설치, 2026-10-11 `python -c "import xgboost"` 로 확인).
-- [ ] 초록·서론·결론의 숫자는 `docs/paper_revision/results_manifest.md` 에 출처 파일·키가 있다. 숫자를 고치면 그 표도 같이 고친다.
+- [ ] **교수 피드백 반영** — 받은 뒤 항목으로 풀어 적는다.
+- [ ] **E12(DistilBERT 128 토큰판)** — 데스크톱에서 학습 완료(seed 42·43), 지연·분석(`dl_a.py --latency|--analyze`, `dl_a_errors.py`) 실행 후 5.6절·VI절에 `docs/paper_revision/03_prereg_v2.md` §E12 판정대로 병기.
+- [ ] **새 참고문헌 서지 확인** — [12] Sanh et al.(DistilBERT), [13] Zhang et al.(char-CNN, NIPS 2015 쪽 649-657) 원문 대조.
+- [ ] **옛 확인 목록의 서지 항목** — 번호: [8] Eroğlu Demirkan · [15] Sevri · [16] Kutlimuratov · [36] Lucz · [24]~[28] 거리 점수 · [34] Kuncheva(51(2), 181-207). ([30]·[35] 의 `et al.` 은 전체 저자명으로 전개 완료)
+- [x] **참고문헌 번호** — 첫 인용 순서로 매겼다. 문단을 옮기면 다시 매긴다.
+- [x] **DL 실험의 CV 풀** — 4.2절의 "학습+검증 226,048행"이 DL-A·B·C 모두 동일함을 `03_prereg_v2.md` §E10 및 `cross_validate.py` 로 확인 완료.
+- [x] **Table 1** — `char-CNN` 141,252 · `char-CNN-tiny` 14,692 · `char-CNN-k3` 41,668 · `char-CNN-EE` 141,768 · `DistilBERT` 66.96M 파라미터 및 학습 방식(class-weighted CE) 반영 완료.
+- [x] **서론의 사전 고정 커밋 해시** — 실제 커밋(`2a456d7`, `4b7843b`, `f5a002a`, `7a1f725`, `00c52ce`, `f37fd70`) 반영 완료.
+- [x] 주장 강도: "개선"·"해결" 무제한 표현 금지 준수. DL-A 는 seed 42 한정(seed 43 미재현 병기), DL-C 는 "2차 모델 압축"으로, 5.6절 CmdI 오탐 분석은 **사후 분석**이며 "공격을 더 잘 막는다"가 아니라 "SQLi→CmdI 공격 종류 오탐을 줄인다"로 기술.
+- [x] "채움 기준" 수치(1.22·0.99·1.63·1.42·1.34·1.01배 등)는 헤드라인에 쓰지 않고 5.2절·5.4절 재평가 대상으로만 기술.
+- [x] 5.3절 라벨 감사는 LLM 1인 판정임을 명시하고 2인 재판정 필요성을 한계에 기록.
+- [ ] 분량: HWP 로 옮긴 뒤 학회 쪽수 규정 확인.
+- [x] 초록·서론·결론의 숫자와 5.5·5.6절 수치를 `docs/paper_revision/results_manifest.md` 에 동기화 완료.

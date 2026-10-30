@@ -69,7 +69,25 @@
 | └ 언더샘플링 1차 단독 0.8178 | 0.8178 | 같은 파일 · `cv_srbh_4class_cnn_raw_rgb_sealed_bal.json` | `t11_stage1_training.solo_macro_f1_undersampled` | docs/14 §8.28 |
 | 확신 오답의 70.9% 가 라벨 불일치 (대조 31.8%) | 78/110 (wrong 64 + doubtful 14) · 대조 35/110 | `docs/audit/srbh_tail_label_audit.csv` (**추적 파일**) | `group` 별 `judgment` 집계 | docs/14 §8.10 |
 | seed 42~45 단독 Macro-F1 (5.12절) | 0.8949 · 0.9229 · 0.9054 · 0.9080 | `cv_srbh_4class_cnn_raw_rgb_sealed.json` · `_s43` · `_s44` · `_s45` | `summary.macro_f1` | docs/14 §8.24 |
-| 템플릿 묶음 분할 −0.06%p · +0.10%p (5.14절) | — | `cv_srbh_4class_{cnn_raw_rgb,charcnn_raw}_sealed_gtpl.json` | `summary.macro_f1` | docs/14 §8.27 |
+| 템플릿 묶음 분할 −0.06%p · +0.10%p (5.7절) | — | `cv_srbh_4class_{cnn_raw_rgb,charcnn_raw}_sealed_gtpl.json` | `summary.macro_f1` | docs/14 §8.27 |
+
+## 3b. 딥러닝 캐스케이드(DL-B · DL-C · DL-A)와 CmdI 오답 분해 (5.5절 · 5.6절)
+
+| 원고의 수치 | 값 | 결과 파일 | 키 | 기록 |
+|---|---|---|---|---|
+| char-CNN 합성곱 비중 91.0% · 고정비 8.5% | 0.3271 / 0.3516 · 0.0307 / 0.3609 | `latency_charcnn_breakdown_srbh_4class.json` | `components` (`conv3`·`conv5`·`conv7`, `enc`·`floor`) | docs/14 §8.31 |
+| DL-B (`charcnn_tiny` → `char-CNN`) 합산 2.13배 (산술 2.39배), F1 0.9839 (−0.45%p) | 2.13 · 2.39 · 0.9839 | `dl_cascade_srbh_4class.json` | `dl_b.real_user.b0` | docs/14 §8.32 · 04_status §1.2 |
+| DL-C (`charcnn_ee`) seed 42 합산 3.52배 (산술 3.53배), F1 0.9874 (−0.10%p) | 3.52 · 3.53 · 0.9874 | `dl_cascade_srbh_4class.json` | `dl_c.real_user.b0` | docs/14 §8.32 · 04_status §1.2 |
+| DL-C seed 43 확인 3.62배, F1 0.9895 (+0.33%p) | 3.617 · 0.9895 | `dl_cascade_srbh_4class_s43.json` | `dl_c.real_user.b0` | docs/14 §8.33 |
+| 대조 `charcnn_k3` 단독 3.62배, F1 0.9748 (−1.36%p) | 3.617 · 0.9748 | `dl_cascade_srbh_4class.json` · `cv_srbh_4class_charcnn_k3_raw_sealed.json` | `summary.macro_f1` | docs/14 §8.33 |
+| DL-A 지연: char-CNN 0.563 ms · DistilBERT 45.15 ms (80.2배) | 0.563 · 45.15 · 80.19 | `dl_a_latency_srbh_4class.json` | `latency.ms.t2` · `latency.ms.t_R` | docs/14 §8.34 |
+| DistilBERT 단독 F1: seed 42 0.9914 · seed 43 0.9947 | 0.9914 · 0.9947 | `dl_a_srbh_4class.json` · `dl_a_srbh_4class_s43.json` | `distilbert_macro_f1` | docs/14 §8.34·§8.35 |
+| DL-A (`char-CNN` → `DistilBERT`, B0) seed 42: 합산 12.3배 (산술 51.6배), F1 0.9911 (−0.03%p), r_N 7.1% · r_A 0.7% | 12.32 · 51.6 · 0.9911 · 0.071 · 0.007 | `dl_a_srbh_4class.json` | `e10_3.real_user.pooled_speedup.b0` · `e10_3.real_user.b0` | docs/14 §8.34·§8.35 |
+| DL-A (B0) seed 43: 합산 10.6배 (산술 38.3배), F1 0.9914 (−0.32%p, 보정 p = 0.038) | 10.56 · 38.3 · 0.9914 · −0.32 | `dl_a_srbh_4class_s43.json` | `e10_3.real_user.e11_vs_r` | docs/14 §8.35 |
+| DL-A + 클래스별 τ (G2, 병기): seed 42 합산 51.1배 (F1 0.9920) · seed 43 합산 42.5배 (F1 0.9920, −0.27%p) | 51.1 · 42.5 · 0.9920 | `dl_a_srbh_4class{,_s43}.json` | `e10_3.real_user.pooled_speedup.g2` · `e10_3.real_user.g2` | docs/14 §8.34·§8.35 |
+| 오답 분해(5.6절): 차단 실패 791→736 (s42) · 839→777 (s43), 공격 종류 혼동 266→167 (s42) · 359→59 (s43) | — | `dl_a_errors_srbh_4class.json` | `s42.{charcnn,distilbert}` · `s43.{charcnn,distilbert}` | docs/14 §8.36 |
+| └ SQLi→CmdI 오탐: seed 42 192→99 (−48.4%) · seed 43 252→2 (−99.2%), CmdI F1 0.9682→0.9784 · 0.9618→0.9903 | — | 같은 파일 | `sqli_as_cmdi` · `class_f1.CommandInjection` | docs/14 §8.36 |
+| └ DistilBERT 교정 오답의 char-CNN 확신도 중앙값 0.775 · 0.766, ≥0.99 비율 15.1% · 10.7% (전체 97.0%) | 0.775 · 0.766 · 0.151 · 0.107 · 0.970 | 같은 파일 | `fixed_charcnn_conf_median` · `fixed_charcnn_conf_ge_confident` · `all_charcnn_conf_ge_confident` | docs/14 §8.36 |
 
 ## 4. 다시 만드는 순서
 
