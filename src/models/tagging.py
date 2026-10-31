@@ -39,6 +39,9 @@ DEFENSE_MODES = ("none", "advtrain", "norm")
 # 기본값이면 접미사를 생략해 기존 파일명과 호환된다.
 DEFAULT_AUX_WEIGHT = 0.3
 
+# 조기 종료 인내 기본값(cross_validate.py --patience 기본). 이 값이면 접미사를 생략한다.
+DEFAULT_PATIENCE = 5
+
 
 def defense_suffix(defense: str = "none", mutation_split: str | None = None,
                    aug_ratio: float | None = None) -> str:
@@ -91,7 +94,8 @@ def build_tag(track: str, model: str, text: str = "raw", *,
               aux_weight: float | None = None,
               fields: str | None = None, sealed_test: bool = False,
               width: float | None = None, cv_seed: int | None = None,
-              group_template: bool = False, max_tokens: int | None = None) -> str:
+              group_template: bool = False, max_tokens: int | None = None,
+              patience: int | None = None) -> str:
     """산출물/체크포인트 공통 tag 를 만든다.
 
     인자는 "이미 결정된 값"만 받는다(모델이 이미지인지 등의 판정은 호출부 책임).
@@ -106,12 +110,15 @@ def build_tag(track: str, model: str, text: str = "raw", *,
     - group_template    : 템플릿 묶음 분할(T5). fold 배정 자체가 달라 일반 CV 산출물과 갈라야 한다
     - max_tokens        : 토큰 모델(distilbert) 입력 길이(E12). 512(E10·E11 산출물의 값)이거나 None 이면 생략 —
                           축이 없으면 128 토큰판이 512 판본을 덮어쓴다
+    - patience          : 조기 종료 인내(E16). 5(기존 산출물의 값)이거나 None 이면 생략 —
+                          축이 없으면 인내 10 대조가 기본 실행을 덮어쓴다
     """
     ch_tag = data_image._channel_suffix(channels, encoders)
     width_tag = "" if width in (None, 1.0) else f"_w{width:g}"
     patch_tag = f"_p{patch}" if patch else ""
     lr_tag = "" if (lr is None or lr == DEFAULT_LR) else f"_lr{lr:g}"
     lr_tag += "" if max_tokens in (None, 512) else f"_tok{max_tokens}"
+    lr_tag += "" if patience in (None, DEFAULT_PATIENCE) else f"_pat{patience}"
     # F2는 기본 입력과 같으므로 별도 실험 이름을 만들지 않는다.
     fields_tag = "" if fields in (None, "F2") else f"_f{fields}"
     sealed_tag = "_sealed" if sealed_test else ""

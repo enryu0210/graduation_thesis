@@ -1,6 +1,6 @@
 # 01. 결과가 왜 낮게 나왔나 — 원인 조사와 다음 실험 추천 (2026-10-07)
 
-> 상위 계획: `docs/paper_revision_plan.md` · 원고: `docs/paper_write/draft_kiisc_submission.html`
+> 상위 계획: `docs/paper_revision_plan.md` · 원고: `docs/paper_write/draft_kiisc_submission.md`
 > 조사는 **노트북 CPU**에서 했다(GPU 없음). 학습된 체크포인트는 쓰지 않았다.
 > 지연은 무작위 초기화 모델로 쟀다. 구조만으로 결정되는 값이라 가중치와 무관하다.
 > 일회성 분석 스크립트는 세션 스크래치(`why_low.py`)에 있다. 저장소에 넣을지는 미정이다.

@@ -48,6 +48,7 @@ import metrics as M  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
+CHECKPOINT_DIR = PROJECT_ROOT / "experiments" / "checkpoints"
 
 # 모델 종류별 입력 경로가 다르다(이미지 npz / 문자열 CSV / TF-IDF).
 # ⚠️ train.py 의 IMAGE_MODELS 와 함께 갱신할 것(이미지 모델 추가 시 두 곳).
@@ -453,6 +454,13 @@ def run_fold_torch(model_name: str, pool_x, y, classes, tr_idx, va_idx, te_idx,
                 del train_eval_loader
         fold_probabilities.append(fold)
 
+    if getattr(args, "model_dir", None) is not None:
+        # 변형 입력에 1차를 다시 돌리는 분석(E15)용. fold 번호는 test 인덱스와 함께 저장해 정렬을 검증할 수 있게 한다.
+        args.model_dir.mkdir(parents=True, exist_ok=True)
+        fold_no = len(fold_probabilities)   # 위에서 이번 fold 를 막 붙였다 → 1-기반 fold 번호
+        torch.save({"state_dict": model.state_dict(), "model": model_name, "test_idx": te_idx},
+                   args.model_dir / f"fold{fold_no}.pt")
+
     # fold 마다 GPU 메모리를 반납하지 않으면 5폴드 누적으로 OOM 이 난다.
     del model, train_ds, val_ds, test_ds, train_loader, val_loader, test_loader
     if torch.cuda.is_available():
@@ -514,6 +522,8 @@ def main() -> None:
     parser.add_argument("--exclude-test", action="store_true", help="test를 읽지 않고 train+val만 사용")
     parser.add_argument("--fields", choices=list(FIELD_COMBINATIONS), default=None)
     parser.add_argument("--save-probs", action="store_true", help="torch 모델의 fold별 val/test 확률 저장")
+    parser.add_argument("--save-models", action="store_true",
+                        help="fold 별 best 가중치를 experiments/checkpoints/cv/{tag}/ 에 저장(tag 에 _ckpt, E15)")
     parser.add_argument("--save-embeddings", action="store_true", help="CNN GAP 표현을 확률과 함께 저장")
     parser.add_argument("--save-train-embeddings", action="store_true",
                         help="fold 내부 train 표현도 cvembtr_*.npz 로 저장(--save-embeddings 필요, G6 참조 분포)")
@@ -542,6 +552,8 @@ def main() -> None:
         parser.error("--balance 는 torch 모델에서만 지원합니다.")
     if args.group_template and args.model in TFIDF_MODELS:
         parser.error("--group-template 은 torch 모델에서만 지원합니다.")
+    if args.save_models and (not args.save_probs or args.model in TFIDF_MODELS):
+        parser.error("--save-models 는 torch 모델의 --save-probs 실행에서만 씁니다(운영점을 같은 실행 확률로 고르므로).")
     if args.save_embeddings and (not args.save_probs or args.model != "cnn"):
         parser.error("--save-embeddings는 --model cnn --save-probs와 함께 사용해야 합니다.")
     if args.save_train_embeddings and not args.save_embeddings:
@@ -569,9 +581,15 @@ def main() -> None:
         patch=args.patch if args.model == "vit" else None,
         lr=args.lr, fields=args.fields, sealed_test=args.exclude_test,
         cv_seed=args.seed, group_template=args.group_template, balance=args.balance,
-        max_tokens=args.max_tokens,
+        max_tokens=args.max_tokens, patience=args.patience,
     )
     tag = embeddings_tag(tag, args.save_embeddings, args.save_train_embeddings)
+    if args.save_models:
+        # 다시 학습한 값은 cuDNN 비결정성으로 기존 cvprobs 와 조금 다르다 → 이름을 갈라 기존 산출물을 지킨다(E15).
+        tag += "_ckpt"
+        args.model_dir = CHECKPOINT_DIR / "cv" / tag
+        if (RESULTS_DIR / f"cv_{tag}.json").exists():
+            parser.error(f"가중치 저장 실행의 산출물이 이미 있습니다: cv_{tag}.json (덮어쓰지 않습니다)")
     if args.save_embeddings:
         targets = [RESULTS_DIR / f"{prefix}_{tag}.{ext}"
                    for prefix, ext in (("cv", "json"), ("cvprobs", "npz"), ("cvemb", "npz"),

@@ -1,7 +1,7 @@
 # 02. 원고 수정 진행 현황 (2026-10-07)
 
 > 기준: `docs/paper_revision_plan.md` 의 T1~T16
-> 원고: `docs/paper_write/draft_kiisc_submission.html` (PDF 재생성 완료)
+> 원고: `docs/paper_write/draft_kiisc_submission.md` (PDF 재생성 완료)
 
 ## 1. 이번에 반영한 것 (실험 없이 확정 가능한 수정)
 

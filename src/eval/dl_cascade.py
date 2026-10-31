@@ -152,6 +152,7 @@ def analyze(seed: int = BASE_SEED) -> dict:
                 for gate in ("b0", "g2"):
                     row[gate]["speedup"] *= scale
                     row["per_fold_speedup"][gate] = [s * scale for s in row["per_fold_speedup"][gate]]
+                    row["pooled_speedup"][gate] *= scale
                 row.pop("adopted")   # C-G2 의 G2 채택 규칙이라 E8 과 무관하다.
             block[view] = {**row, "e8": judge(row, solo_test)}
         result[name] = block
@@ -204,7 +205,7 @@ def main():
                 continue
             print(f"  {view}: B0 {row['b0']['speedup']:.3f}배 (fold {np.round(row['per_fold_speedup']['b0'], 3).tolist()})"
                   f" F1 {row['b0']['macro_f1']:.4f} r_N {row['b0']['r_N']:.3f} r_A {row['b0']['r_A']:.3f}"
-                  f" | G2 {row['g2']['speedup']:.3f}배 F1 {row['g2']['macro_f1']:.4f} | E8 {row['e8']}")
+                  f" | G2 {row['g2']['speedup']:.3f}배 F1 {row['g2']['macro_f1']:.4f} | 합산 B0 {row['pooled_speedup']['b0']:.3f}배 G2 {row['pooled_speedup']['g2']:.3f}배 | E8 {row['e8']}")
     print(f"저장: {output.relative_to(PROJECT_ROOT).as_posix()}")
     return 0
 

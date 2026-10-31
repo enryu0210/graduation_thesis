@@ -36,6 +36,8 @@ from src.models import text_models  # noqa: E402
 LATENCY_JSON = GF.RESULTS / "dl_a_latency_srbh_4class.json"
 OUTPUT = GF.RESULTS / "dl_a_srbh_4class.json"
 FULL_TOKENS = text_models.DISTILBERT_MAX_TOKENS   # E10·E11 판본(주 기준). 이 값이면 파일명에 토큰 축이 없다.
+E12_TOKENS = (FULL_TOKENS, 128)   # E12 지연 실행 — E13·E14 도 이 실행 값을 쓴다(§E13·§E14).
+E10_E11_SEEDS = (42, 43)          # E10 지연 실행(45.15ms)으로 판정한 seed. 이후 seed 는 E12 실행 값.
 
 
 def tok_suffix(max_tokens: int) -> str:
@@ -48,11 +50,20 @@ def distilbert_cvprobs(seed: int, max_tokens: int = FULL_TOKENS) -> Path:
                          f"_sealed{DC.cvprobs_suffix(seed)}.npz")
 
 
-def latency_path(tokens: tuple[int, ...]) -> Path:
-    """E10 은 512 만 잰 기존 파일, 그 밖의 조합은 별도 파일 — 실행이 다른 지연 값을 섞지 않으려고 파일째 가른다."""
+def latency_path(tokens: tuple[int, ...], threads: int = 1) -> Path:
+    """E10 은 512 만 잰 기존 파일, 그 밖의 조합은 별도 파일 — 실행이 다른 지연 값을 섞지 않으려고 파일째 가른다.
+    스레드 수가 1 이 아니면(B3) `_thr{n}` 을 붙인다 — 스레드 1 판정 값을 덮어쓰지 않는다."""
+    thr = "" if threads == 1 else f"_thr{threads}"
     if tokens == (FULL_TOKENS,):
-        return LATENCY_JSON
-    return LATENCY_JSON.with_name(f"{LATENCY_JSON.stem}_tok{'-'.join(map(str, tokens))}.json")
+        return LATENCY_JSON.with_name(f"{LATENCY_JSON.stem}{thr}.json")
+    return LATENCY_JSON.with_name(f"{LATENCY_JSON.stem}_tok{'-'.join(map(str, tokens))}{thr}.json")
+
+
+def analysis_tokens(seed: int, max_tokens: int) -> tuple[int, ...]:
+    """어느 지연 실행을 쓸지 — E10·E11(512, seed 42·43)만 E10 실행, 나머지는 E12 실행(§E12·§E13)."""
+    if max_tokens == FULL_TOKENS and seed in E10_E11_SEEDS:
+        return (FULL_TOKENS,)
+    return E12_TOKENS
 
 
 def t_r_key(max_tokens: int) -> str:
@@ -61,10 +72,10 @@ def t_r_key(max_tokens: int) -> str:
 
 @torch.inference_mode()
 def measure_latency(texts: list[str], repeats: int, warmup: int = 20,
-                    tokens: tuple[int, ...] = (FULL_TOKENS,)) -> dict:
+                    tokens: tuple[int, ...] = (FULL_TOKENS,), threads: int = 1) -> dict:
     from transformers import AutoTokenizer
 
-    torch.set_num_threads(1)
+    torch.set_num_threads(threads)
     clock = time.perf_counter_ns
     torch.manual_seed(LF.SEED)
     full = text_models.build_model("charcnn", DC.N_CLASSES).eval()
@@ -111,7 +122,7 @@ def measure_latency(texts: list[str], repeats: int, warmup: int = 20,
           "t_rest": p50["ee_rest_fwd"]}
     for n in tokens:
         ms[t_r_key(n)] = p50[f"tokenize{tok_suffix(n)}"] + p50[f"bert_fwd{tok_suffix(n)}"]
-    return {"threads": 1, "tokens": list(tokens), "components": parts, "ms": ms}
+    return {"threads": threads, "tokens": list(tokens), "components": parts, "ms": ms}
 
 
 def load_npz(path: Path) -> dict:
@@ -184,17 +195,23 @@ def cascade_block(solo: dict, bert: dict, strata, t2: float, t_r: float, f1_solo
 
 def analyze(seed: int = DC.BASE_SEED, max_tokens: int = FULL_TOKENS) -> dict:
     # 128 판본은 512 와 같은 실행에서 잰 지연만 쓴다(§E12) — E10 의 45.15ms 와 섞지 않는다.
-    tokens = (FULL_TOKENS,) if max_tokens == FULL_TOKENS else (FULL_TOKENS, max_tokens)
+    tokens = analysis_tokens(seed, max_tokens)
     ms = json.loads(latency_path(tokens).read_text(encoding="utf-8"))["latency"]["ms"]
     t2, t_front, t_rest, t_r = ms["t2"], ms["t_front"], ms["t_rest"], ms[t_r_key(max_tokens)]
     solo = DC.load_cvprobs("charcnn", seed=seed)
     bert = load_npz(distilbert_cvprobs(seed, max_tokens))
-    ee_main = DC.load_cvprobs("charcnn_ee", seed=seed)
-    ee_aux = DC.load_cvprobs("charcnn_ee", aux=True, seed=seed)
-    DC.check_aligned(solo, bert, ee_main, ee_aux)
+    # DL-C(charcnn_ee)는 seed 42·43 만 학습했다 → seed 44·45(E13)에서는 E10-2 의 DL-C 행을 건너뛴다.
+    has_ee = (GF.RESULTS / DC.CVPROBS.format("charcnn_ee", DC.cvprobs_suffix(seed, aux=True))).exists()
+    if has_ee:
+        ee_main = DC.load_cvprobs("charcnn_ee", seed=seed)
+        ee_aux = DC.load_cvprobs("charcnn_ee", aux=True, seed=seed)
+        DC.check_aligned(solo, bert, ee_main, ee_aux)
+    else:
+        DC.check_aligned(solo, bert)
     strata = np.asarray(cross_validate.load_pool_strata("srbh_4class", exclude_test=True))
     f1_solo, f1_r = DC.fold_test_f1(solo), DC.fold_test_f1(bert)
-    prereg = "§E12" if max_tokens != FULL_TOKENS else "§E10" if seed == DC.BASE_SEED else "§E11"
+    prereg = ("§E12" if max_tokens != FULL_TOKENS else "§E10" if seed == DC.BASE_SEED
+              else "§E11" if seed in E10_E11_SEEDS else "§E13")
     result = {"prereg": f"docs/paper_revision/03_prereg_v2.md {prereg}", "seed": seed, "pi": GF.PI,
               "max_tokens": max_tokens,
               "latency_ms": ms, "charcnn_per_fold_macro_f1": f1_solo, "distilbert_per_fold_macro_f1": f1_r,
@@ -205,8 +222,11 @@ def analyze(seed: int = DC.BASE_SEED, max_tokens: int = FULL_TOKENS) -> dict:
 
     # E10-2: X = char-CNN 단독, DL-C(같은 seed 의 운영점 — 이 실행의 t_front·t_rest 로 다시 낸다).
     e10_2 = {"charcnn": above_r(t_r, t2, f1_solo, f1_r)}
-    paths, _ = GF.fold_paths(ee_aux, ee_main, strata)
+    paths = GF.fold_paths(ee_aux, ee_main, strata)[0] if has_ee else None
     for view, col in GC.VIEWS:
+        if paths is None:
+            e10_2[f"dl_c_{view}"] = {"above": False, "reason": f"charcnn_ee seed {seed} 미학습"}
+            continue
         row = GC.secondary_rule(paths, fold_val_f1(solo), col, t_front, t_rest)
         if "reason" in row:
             e10_2[f"dl_c_{view}"] = {"above": False, "reason": row["reason"]}
@@ -284,6 +304,7 @@ def main():
     parser.add_argument("--repeats", type=int, default=30)
     parser.add_argument("--smoke", action="store_true", help="--latency 를 n=30·1회로, 저장 없이")
     parser.add_argument("--seed", type=int, default=DC.BASE_SEED, help="--analyze 의 CV seed (43 = E11 확인)")
+    parser.add_argument("--threads", type=int, default=1, help="--latency 의 torch 스레드 수(B3: 4·8)")
     parser.add_argument("--max-tokens", default=str(FULL_TOKENS),
                         help="DistilBERT 토큰 길이. --latency 는 쉼표 목록(512,128 = E12), --analyze 는 하나")
     args = parser.parse_args()
@@ -299,10 +320,11 @@ def main():
             texts_all, _ = LF.data_text.load_text_split(LF.TRACK, "val", LF.TEXT)
             picked = np.random.default_rng(LF.SEED).choice(len(texts_all), n, replace=False)
             result = {"env": LF.environment(args), "n": n, "repeats": repeats,
-                      "latency": measure_latency([texts_all[i] for i in picked], repeats, tokens=tokens)}
+                      "latency": measure_latency([texts_all[i] for i in picked], repeats, tokens=tokens,
+                                                         threads=args.threads)}
             print(json.dumps(result["latency"]["ms"], indent=2))
             if not args.smoke:
-                path = latency_path(tokens)
+                path = latency_path(tokens, args.threads)
                 path.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
                 print(f"저장: {path.relative_to(PROJECT_ROOT).as_posix()}")
             return 0

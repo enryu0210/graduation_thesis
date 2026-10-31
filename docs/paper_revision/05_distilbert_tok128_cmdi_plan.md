@@ -153,4 +153,4 @@ PYTHONIOENCODING=utf-8 python -m pytest tests/ -q
 4. [ ] 지연 512·128 같은 실행에서 측정
 5. [ ] `dl_a.py --analyze`·`dl_a_errors.py` 실행
 6. [ ] `docs/14` §8.37 기록 · `results_manifest.md` · `CLAUDE.md` 요약 갱신
-7. [ ] 초안(`draft_kiisc_submission.html`)에 §3.3 의 ✅ 문장만 반영. 제목도 2026-10-27 판으로 교체
+7. [ ] 초안(`docs/paper_write/draft_kiisc_submission.md`)에 §3.3 의 ✅ 문장만 반영. 제목도 2026-10-27 판으로 교체

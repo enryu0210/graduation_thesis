@@ -62,3 +62,13 @@ def test_token_length_axis_keeps_512_filenames():
     assert build_tag("srbh_4class", "distilbert", lr=2e-5, sealed_test=True, max_tokens=512) == base
     assert (build_tag("srbh_4class", "distilbert", lr=2e-5, sealed_test=True, max_tokens=128, cv_seed=43)
             == "srbh_4class_distilbert_raw_lr2e-05_tok128_sealed_s43")
+
+
+def test_patience_axis_keeps_default_filenames():
+    """E16: 인내 5(기존 산출물)는 접미사가 없고, 10 은 _pat10 으로 갈라 기존 k3 cvprobs 를 덮어쓰지 않는다."""
+    from tagging import DEFAULT_PATIENCE, build_tag
+
+    base = build_tag("srbh_4class", "charcnn_k3", sealed_test=True)
+    assert DEFAULT_PATIENCE == 5
+    assert build_tag("srbh_4class", "charcnn_k3", sealed_test=True, patience=5) == base
+    assert build_tag("srbh_4class", "charcnn_k3", sealed_test=True, patience=10) == "srbh_4class_charcnn_k3_raw_pat10_sealed"

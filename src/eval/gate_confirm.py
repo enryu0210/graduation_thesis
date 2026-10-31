@@ -85,6 +85,9 @@ def secondary_rule(paths, val_solo2, normal_col, ms1, ms2):
            for gate, rows in chosen.items()}
     out.update(speedup_gain=gain, f1_loss_vs_b0_pp=loss_pp, corrected_t=test["t"], corrected_p=test["p"],
                per_fold_speedup={gate: rows[:, 0].tolist() for gate, rows in chosen.items()},
+               # 병기: 평균 지연 기준 배수(fold S 의 조화평균 = 평균 E_π 로 낸 S, dl_a.pooled_speedup 과 같은 식).
+               # 판정 규칙(산술평균)은 사전 문서대로 두고 보고용으로만 싣는다(§E11 정정).
+               pooled_speedup={gate: float(1 / np.mean(1 / rows[:, 0])) for gate, rows in chosen.items()},
                per_fold_macro_f1={gate: rows[:, 1].tolist() for gate, rows in chosen.items()},
                # 경로 안의 점 번호 — 운영점의 예측을 다시 만들 때 쓴다(B0 는 GF.b0_taus 의 순서).
                per_fold_index=chosen_index,

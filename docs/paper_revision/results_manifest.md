@@ -1,6 +1,6 @@
 # 원고 수치 출처표 (results manifest)
 
-> 대상 원고: `docs/paper_write/draft_kiisc_submission.html`
+> 대상 원고: `docs/paper_write/draft_kiisc_submission.md`
 > 작성: 2026-10-11 · 판정 규칙: `docs/paper_revision/03_prereg_v2.md`
 >
 > **이 표가 하는 일**: 초록·서론·결론에 나오는 숫자마다 "어느 결과 파일의 어느 키에서 왔고, 어느 기록 절에 풀이가 있는지"를 한 줄로 잇는다.
