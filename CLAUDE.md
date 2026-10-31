@@ -52,7 +52,10 @@
     ✅ **char-CNN → DistilBERT 캐스케이드는 재구현 DistilBERT 단독보다 위**(실사용자 **평균 비용 기준 12.3배** · F1 −0.03%p, seed 42, fold 4 는 2.95배). ⚠️ 처음 적은 51.6배는 fold 산술평균이라 정정(2026-10-27) — 배수 평균은 `dl_a.pooled_speedup`(조화평균)으로 낸다 — 교수 기준을 **재구현 기준으로** 충족한 첫 구성. char-CNN 단독은 80배지만 −0.303%p 로 0.003%p 차 미달.
     ❌ **확인 seed 43 재현 실패(E11, 2026-10-27, docs/14 §8.35)**: 합산 10.6배·전 fold > 1 은 충족, F1 −0.32%p(허용 0.3%p, 다섯 fold 모두 음수·p 0.038) — DistilBERT 가 0.9914 → 0.9947 로 강해졌고 캐스케이드는 0.9914 에 머묾. → "재구현 DistilBERT 보다 위"는 **seed 42 한정**. seed 43 의 G2(42.5배·−0.27%p)는 판정 대상 밖이라 뒤집는 데 쓰지 말 것.
     📌 사후 점검(병기, docs/14 §8.36 · `dl_a_errors.py`): 기기 원인 가능성은 낮다(같은 기기·코드·설정, 지연 재사용). DistilBERT 의 이득은 **공격 종류 구분**(SQLi→CmdI 혼동 192→99 · 252→2)이고 차단 실패는 두 seed 모두 약 7% 감소뿐 — "공격을 더 잘 막는다" 금지.
-    ⚠️ 캐스케이드의 char-CNN 대비 몫은 +0.28%p(p 0.34)·지연 평균 6.5배 — "char-CNN 보다 정확"·"원 논문 대비 개선" 금지. ⚠️ `distilbert` 는 토큰 id 입력이라 `cross_validate.TOKEN_MODELS` 에만 있고 `train.TEXT_MODELS` 에는 **일부러 없다**(train.py 는 바이트 경로뿐).
+    ⚠️ 캐스케이드의 char-CNN 대비 몫은 +0.28%p(p 0.34)·지연 평균 6.5배 — "char-CNN 보다 정확"·"원 논문 대비 개선" 금지.
+    📌 **E12·E14·A2(2026-10-31, docs/14 §8.37~§8.39 · `dl_a_followup.py`)**: 128 토큰(원 설정) DistilBERT 는 512 보다 −1.96·−1.70%p(p 0.006) — 원 설정 재구현은 char-CNN 보다도 낮다.
+    E14 k3 출구 → DistilBERT 는 **DL-A 보다 위(2/2, 배수 ×2.40·×2.27)** — 단 DistilBERT 단독 대비 −0.31·−0.28%p 라 "DistilBERT 보다 위" 금지. A2: fold 4 의 2.95배는 단일 τ 의 실사용자 정상 넘김(사후 진단).
+    E12~E15 의 지연은 E12 실행(`dl_a_latency_srbh_4class_tok512-128.json`)을 쓴다 — E10 실행 값과 섞지 말 것. 집필용 정리는 `docs/paper_write/RESULTS_FOR_WRITING.md`(외부 집필 도구 입력, ✅/❌ 문장). ⚠️ `distilbert` 는 토큰 id 입력이라 `cross_validate.TOKEN_MODELS` 에만 있고 `train.TEXT_MODELS` 에는 **일부러 없다**(train.py 는 바이트 경로뿐).
 - ⚠️ `docs/thetics/` 는 **.gitignore 대상**(PDF 미추적) → **수집 목록의 유일한 추적본은 `docs/12` §1**. 논문을 추가하면 docs/12 도 함께 갱신.
 
 ## 데이터 파이프라인
