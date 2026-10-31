@@ -136,7 +136,7 @@ DB="--model distilbert --track srbh_4class --exclude-test --save-probs --epochs 
 python src/eval/cross_validate.py --model charcnn_ee   --track srbh_4class --exclude-test --save-probs   # DL-C (+ _aux)
 python src/eval/cross_validate.py --model charcnn_tiny --track srbh_4class --exclude-test --save-probs   # DL-B
 python src/eval/cross_validate.py --model charcnn_k3   --track srbh_4class --exclude-test --save-probs   # E9 대조
-python src/eval/cross_validate.py --model charcnn_k3   --track srbh_4class --exclude-test --save-probs --patience 10  # E16
+python src/eval/cross_validate.py --model charcnn_k3   --track srbh_4class --exclude-test --save-probs --patience 10  # E16(2026-10-31 미실시)
 python src/eval/cross_validate.py $DB                     # DL-A 2차 (E10)
 python src/eval/cross_validate.py $DB --max-tokens 128    # E12 원 설정
 python src/eval/cross_validate.py --model charcnn --track srbh_4class --exclude-test --save-probs --save-models  # E15 가중치(_ckpt)
@@ -145,7 +145,7 @@ python src/eval/cross_validate.py --model charcnn --track srbh_4class --exclude-
 python src/eval/dl_cascade.py --latency
 python src/eval/dl_a.py --latency                          # E10
 python src/eval/dl_a.py --latency --max-tokens 512,128     # E12 (E12~E15 가 쓰는 실행)
-python src/eval/dl_a.py --latency --threads 4              # B3 (8 도 같은 방식)
+python src/eval/dl_a.py --latency --threads 4              # B3(2026-10-31 미실시)
 
 # (7) 판정 — 학습 없음
 python src/eval/dl_cascade.py --analyze [--seed 43]        # DL-B·DL-C
@@ -153,7 +153,7 @@ python src/eval/dl_a.py --analyze [--seed 43] [--max-tokens 128]   # DL-A · E11
 python src/eval/dl_a_followup.py --e14 [--seed 43]          # E14
 python src/eval/dl_a_followup.py --fold-diag                # A2
 python src/eval/dl_a_followup.py --e13 --seed 44            # E13 (45 도)
-python src/eval/dl_a_followup.py --e16                      # E16
+python src/eval/dl_a_followup.py --e16                      # E16(미실시 — 산출물 없음)
 python src/eval/dl_a_slowdown.py                            # E15 (--limit 50 은 저장 없는 스모크)
 ```
 
