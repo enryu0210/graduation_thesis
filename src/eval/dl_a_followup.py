@@ -6,6 +6,7 @@
   --e13 --seed 44|45 : char-CNN → DistilBERT 에서 G2 vs B0 (실사용자, 합산 배수 이득·F1 손실·E_π 차 보정 t)
   --e14 --seed 42|43 : 1차 = charcnn_ee 보조 헤드(k3 출구) → DistilBERT 가 DL-A 보다 위인가
   --fold-diag        : seed 42 DL-A B0 운영점의 fold 별 넘김 분해(클래스·층·val τ) — 판정 아님
+  --e16              : DL-C 보조 헤드 − k3 단독(인내 10)의 fold 평균 차 D (seed 42, 학습 안정성 대조)
 """
 from __future__ import annotations
 
@@ -30,6 +31,8 @@ from src.models import gate_signals as gates  # noqa: E402
 MIN_GAIN = 0.20      # §E13 조건 1
 MAX_LOSS_PP = 0.3    # §E13 조건 2 · §E14 조건 2
 E14_RATIO = 1.2      # §E14 조건 1
+E16_LIMIT_PP = 0.5   # §E16: E9 의 +1.01%p 의 절반
+K3_PAT10 = "cvprobs_srbh_4class_charcnn_k3_raw_pat10_sealed.npz"
 REAL = dict(GC.VIEWS)["real_user"]
 
 
@@ -110,6 +113,31 @@ def e14(seed: int) -> dict:
     return out
 
 
+def best_epochs(tag: str) -> list[int]:
+    data = json.loads((GF.RESULTS / f"cv_{tag}.json").read_text(encoding="utf-8"))
+    return [int(f["best_epoch"]) for f in data["fold_results"]]
+
+
+def e16() -> dict:
+    """§E16: 인내만 5 → 10 으로 바꾼 k3 단독과 DL-C 보조 헤드(seed 42)의 fold 대응 차."""
+    aux = DC.load_cvprobs("charcnn_ee", aux=True)
+    k3 = dl_a.load_npz(GF.RESULTS / K3_PAT10)
+    k3_old = DC.load_cvprobs("charcnn_k3")
+    DC.check_aligned(aux, k3, k3_old)
+    f1 = {"aux": DC.fold_test_f1(aux), "k3_pat10": DC.fold_test_f1(k3), "k3_pat5": DC.fold_test_f1(k3_old)}
+    diffs = np.subtract(f1["aux"], f1["k3_pat10"])
+    d_pp = float(diffs.mean() * 100)
+    return {"prereg": "docs/paper_revision/03_prereg_v2.md §E16", "seed": DC.BASE_SEED,
+            "per_fold_macro_f1": f1, "macro_f1": {k: float(np.mean(v)) for k, v in f1.items()},
+            "D_pp": d_pp, "per_fold_D_pp": (diffs * 100).tolist(), "D_corrected": GC.corrected_t(diffs),
+            # 병기: 인내 5 → 10 이 k3 단독 자체를 얼마나 올렸나.
+            "pat10_minus_pat5_corrected": GC.corrected_t(np.subtract(f1["k3_pat10"], f1["k3_pat5"])),
+            "best_epoch": {"aux": best_epochs("srbh_4class_charcnn_ee_raw_sealed"),
+                           "k3_pat10": best_epochs("srbh_4class_charcnn_k3_raw_pat10_sealed"),
+                           "k3_pat5": best_epochs("srbh_4class_charcnn_k3_raw_sealed")},
+            "verdict": "학습 안정성으로 상당 부분 설명" if d_pp <= E16_LIMIT_PP else "인내를 늘려도 차이가 남는다"}
+
+
 def fold_diag(seed: int = DC.BASE_SEED) -> dict:
     """A2: B0 운영점(E10 지연 — E10-3 과 같은 운영점)에서 fold 별 넘김을 분해한다."""
     ms = json.loads(dl_a.latency_path((dl_a.FULL_TOKENS,)).read_text(encoding="utf-8"))["latency"]["ms"]
@@ -152,6 +180,7 @@ def main() -> int:
     mode.add_argument("--e13", action="store_true")
     mode.add_argument("--e14", action="store_true")
     mode.add_argument("--fold-diag", action="store_true")
+    mode.add_argument("--e16", action="store_true")
     parser.add_argument("--seed", type=int, default=DC.BASE_SEED)
     args = parser.parse_args()
     if args.e13 and args.seed in dl_a.E10_E11_SEEDS:
@@ -159,6 +188,8 @@ def main() -> int:
     try:
         if args.e13:
             result, name = e13(args.seed), f"dl_a_e13_srbh_4class_s{args.seed}.json"
+        elif args.e16:
+            result, name = e16(), "dl_a_e16_srbh_4class.json"
         elif args.e14:
             result, name = e14(args.seed), f"dl_a_e14_srbh_4class{DC.cvprobs_suffix(args.seed)}.json"
         else:

@@ -89,6 +89,21 @@
 | └ SQLi→CmdI 오탐: seed 42 192→99 (−48.4%) · seed 43 252→2 (−99.2%), CmdI F1 0.9682→0.9784 · 0.9618→0.9903 | — | 같은 파일 | `sqli_as_cmdi` · `class_f1.CommandInjection` | docs/14 §8.36 |
 | └ DistilBERT 교정 오답의 char-CNN 확신도 중앙값 0.775 · 0.766, ≥0.99 비율 15.1% · 10.7% (전체 97.0%) | 0.775 · 0.766 · 0.151 · 0.107 · 0.970 | 같은 파일 | `fixed_charcnn_conf_median` · `fixed_charcnn_conf_ge_confident` · `all_charcnn_conf_ge_confident` | docs/14 §8.36 |
 
+## 3c. 2026-10-31 후속 (E12 · E14 · A2)
+
+지연은 E12 실행(`dl_a_latency_srbh_4class_tok512-128.json`, t2 0.604 · t_front 0.159 · t_R 512 46.10 · 128 46.08 ms) 값만 쓴다.
+
+| 원고의 수치 | 값 | 결과 파일 | 키 | 기록 |
+|---|---|---|---|---|
+| E12 지연: DistilBERT 512 46.10 ms · 128 46.08 ms | 46.10 · 46.08 | `dl_a_latency_srbh_4class_tok512-128.json` | `latency.ms.t_R` · `latency.ms.t_R_tok128` | docs/14 §8.37 |
+| E12-1 128 vs 512: seed 42 0.9718 vs 0.9914 (−1.96%p, p 0.006) · seed 43 0.9777 vs 0.9947 (−1.70%p) | — | `dl_a_srbh_4class_tok128{,_s43}.json` | `distilbert_macro_f1` · `e12_1` | docs/14 §8.37 |
+| E12-2 CmdI F1 512→128 · SQLi→CmdI · 잘린 행 정답률 | 0.9784→0.9038 · 99→847 (s42) | `dl_a_errors_srbh_4class_tok128.json` | `s42.by_tokens.{512,128}` · `s43.by_tokens` | docs/14 §8.37 |
+| E12-3 char-CNN → DistilBERT-128 vs R128: 합산 67.5배 · +1.66%p (s42), 76.3배 · +0.84%p (s43) | 67.5 · 76.3 | `dl_a_srbh_4class_tok128{,_s43}.json` | `e10_3.real_user.e11_vs_r` | docs/14 §8.37 |
+| └ 병기: 512 캐스케이드 vs R128 12.2배 · +1.93%p | 12.22 · 1.93 | 같은 파일 | `bystander_cascade_full_vs_r` | docs/14 §8.37 |
+| 캐스케이드(B0) SQLi→CmdI: 192→123→99 (s42) · 252→113→2 (s43) | — | `dl_a_errors_srbh_4class_tok128.json` | `s42.by_tokens.512.cascade_b0` | docs/14 §8.37 |
+| E14 k3 출구 → DistilBERT: 합산 29.3배 vs DL-A 12.2배 (×2.40), F1 −0.28%p (s42) · 23.8 vs 10.5 (×2.27), +0.05%p (s43) | — | `dl_a_e14_srbh_4class{,_s43}.json` | `vs_dl_a_b0` · `e14.pooled_speedup` · `dl_a.pooled_speedup` | docs/14 §8.38 |
+| A2 fold 4: 예산 3.0% · τ 0.985 · 실사용자 r_N 33.6% [25.4, 43.0] | — | `dl_a_fold_diag_srbh_4class.json` | `folds[3]` | docs/14 §8.39 |
+
 ## 4. 다시 만드는 순서
 
 데이터 트랙과 층 CSV 가 먼저 있어야 한다(`CLAUDE.md` "데이터 파이프라인"의 `srbh_4class` 순서). 그다음은 아래 순서다. GPU 는 1대이므로 학습은 하나씩 돌린다.
