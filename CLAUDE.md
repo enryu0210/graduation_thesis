@@ -55,6 +55,7 @@
     ⚠️ 캐스케이드의 char-CNN 대비 몫은 +0.28%p(p 0.34)·지연 평균 6.5배 — "char-CNN 보다 정확"·"원 논문 대비 개선" 금지.
     📌 **E12·E14·A2(2026-10-31, docs/14 §8.37~§8.39 · `dl_a_followup.py`)**: 128 토큰(원 설정) DistilBERT 는 512 보다 −1.96·−1.70%p(p 0.006) — 원 설정 재구현은 char-CNN 보다도 낮다.
     E14 k3 출구 → DistilBERT 는 **DL-A 보다 위(2/2, 배수 ×2.40·×2.27)** — 단 DistilBERT 단독 대비 −0.31·−0.28%p 라 "DistilBERT 보다 위" 금지. A2: fold 4 의 2.95배는 단일 τ 의 실사용자 정상 넘김(사후 진단).
+    📌 **E13·E15(2026-10-31, docs/14 §8.40·§8.41)**: DL-A 위 G2 는 seed 44·45 에서 **"그 밖"**(재현 안 됨) → 넘김 판단 "개선" 금지. E15: url_encode 로 B0 공격 넘김 ×31.9·공격 요청당 지연 ×6.4 — slowdown 공격면 성립, G2/B0 0.25(대가 조항 미발동), 1차 공격 판정률 99.4→86.7%(회피, 최종 정확도 미측정). E16·B3 미실시(사용자 결정).
     E12~E15 의 지연은 E12 실행(`dl_a_latency_srbh_4class_tok512-128.json`)을 쓴다 — E10 실행 값과 섞지 말 것. 집필용 정리는 `docs/paper_write/RESULTS_FOR_WRITING.md`(외부 집필 도구 입력, ✅/❌ 문장). ⚠️ `distilbert` 는 토큰 id 입력이라 `cross_validate.TOKEN_MODELS` 에만 있고 `train.TEXT_MODELS` 에는 **일부러 없다**(train.py 는 바이트 경로뿐).
 - ⚠️ `docs/thetics/` 는 **.gitignore 대상**(PDF 미추적) → **수집 목록의 유일한 추적본은 `docs/12` §1**. 논문을 추가하면 docs/12 도 함께 갱신.
 

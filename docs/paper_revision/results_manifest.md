@@ -89,7 +89,7 @@
 | └ SQLi→CmdI 오탐: seed 42 192→99 (−48.4%) · seed 43 252→2 (−99.2%), CmdI F1 0.9682→0.9784 · 0.9618→0.9903 | — | 같은 파일 | `sqli_as_cmdi` · `class_f1.CommandInjection` | docs/14 §8.36 |
 | └ DistilBERT 교정 오답의 char-CNN 확신도 중앙값 0.775 · 0.766, ≥0.99 비율 15.1% · 10.7% (전체 97.0%) | 0.775 · 0.766 · 0.151 · 0.107 · 0.970 | 같은 파일 | `fixed_charcnn_conf_median` · `fixed_charcnn_conf_ge_confident` · `all_charcnn_conf_ge_confident` | docs/14 §8.36 |
 
-## 3c. 2026-10-31 후속 (E12 · E14 · A2)
+## 3c. 2026-10-31 후속 (E12 · E13 · E14 · E15 · A2)
 
 지연은 E12 실행(`dl_a_latency_srbh_4class_tok512-128.json`, t2 0.604 · t_front 0.159 · t_R 512 46.10 · 128 46.08 ms) 값만 쓴다.
 
@@ -103,6 +103,9 @@
 | 캐스케이드(B0) SQLi→CmdI: 192→123→99 (s42) · 252→113→2 (s43) | — | `dl_a_errors_srbh_4class_tok128.json` | `s42.by_tokens.512.cascade_b0` | docs/14 §8.37 |
 | E14 k3 출구 → DistilBERT: 합산 29.3배 vs DL-A 12.2배 (×2.40), F1 −0.28%p (s42) · 23.8 vs 10.5 (×2.27), +0.05%p (s43) | — | `dl_a_e14_srbh_4class{,_s43}.json` | `vs_dl_a_b0` · `e14.pooled_speedup` · `dl_a.pooled_speedup` | docs/14 §8.38 |
 | A2 fold 4: 예산 3.0% · τ 0.985 · 실사용자 r_N 33.6% [25.4, 43.0] | — | `dl_a_fold_diag_srbh_4class.json` | `folds[3]` | docs/14 §8.39 |
+| E13 G2 vs B0 합산 배수: s44 76.0→59.6배(−21.6%, p 0.34) · s45 42.4→54.4배(+28.4%, p 0.54) | — | `dl_a_e13_srbh_4class_s44.json` · `_s45.json` | `pooled_gain` · `operating.pooled_speedup` · `e_pi_diff_corrected` | docs/14 §8.40 |
+| E15 r_A 배율 평균 B0 11.0 · G2 2.78 · G2/B0 0.25 | 0.252 | `dl_a_slowdown_srbh_4class.json` | `mean_inflation` · `E15.g2_over_b0` | docs/14 §8.41 |
+| E15 url_encode: B0 r_A 0.27→8.76% · 지연 0.73→4.64ms · 1차 공격 판정률 99.4→86.7% | — | 같은 파일 | `per_mutation.url_encode` | docs/14 §8.41 |
 
 ## 4. 다시 만드는 순서
 
