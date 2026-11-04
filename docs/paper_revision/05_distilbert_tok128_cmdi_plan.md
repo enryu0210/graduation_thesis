@@ -3,7 +3,7 @@
 > 상위 문서: `docs/14_cascade_tradeoff_gate_roadmap.md` §8.34~§8.36 · 판정 기준 `docs/paper_revision/03_prereg_v2.md` §E12
 > 목적 (1) WAMM'25 원 설정(128 토큰)으로 DistilBERT 를 다시 재구현해, 512 토큰 판본과 함께 보고한다.
 > 목적 (2) 기존 실험 전반의 약한 고리가 "공격 종류 구분(특히 CmdI)"이었고 DistilBERT 가 SQLi→CmdI 혼동을 크게 줄였다는 내용을 논문에 넣을 수 있는 강도로 정리한다.
-> ⚠️ `04_next_actions_plan.md`(미추적)는 51.6배·"Q4 답 예" 등 정정 전 수치가 남아 있다 — 이 문서가 DL-A 관련 후속 계획을 대신한다.
+> ⚠️ 옛 `04_next_actions_plan.md`(미추적, 51.6배 등 정정 전 수치)는 2026-11-04 삭제했다. 이 문서가 DL-A 후속 계획을 대신한다.
 
 ---
 

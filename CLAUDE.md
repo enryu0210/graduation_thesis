@@ -1,7 +1,8 @@
 # 프로젝트: 웹 공격 페이로드 이미지화 CNN 탐지 (졸업논문)
 
 ## 워크플로우
-- Phase 단위 진행. 각 Phase 의 결정/실측/리스크는 `docs/0N_*_design.md`(설계·의사결정 기록)에 남긴다.
+- 결정·실측·리스크는 `docs/14` §8 에 이어 적는다. 옛 Phase 문서(`docs/01`~`11`)와 옛 그림·보고서는 2026-11-04 작업 트리에서 지웠다 → 아래에 나오는 `docs/03`~`11` 은 `docs/DELETED_DOCS.md` 로 복구해 읽는다. `preprocess.py`·`eda.py`·`train.py` 가 그 파일을 다시 만들면 커밋하지 말 것.
+- 📌 **논문 마무리 순서는 `docs/paper_write/SUBMISSION_ROADMAP.md`.** 문서 찾기: `graphify query "E10"` · `graphify explain "DL-A"`(하이픈 이름은 query 로 안 잡힘) · `graphify path "RQ5" "E15" --undirected`(갱신: `python docs/build_docs_graph.py` 뒤 `graphify cluster-only . --no-label`). ⚠️ `graphify extract`·`graphify label` 은 미발표 본문을 외부 LLM 으로 보내므로 쓰지 말 것.
 - 실측 지표 → `experiments/results/*.json`(⚠️ 전체 .gitignore, 재생성으로 확보 — 커밋 대상 아님), 그림 → `docs/figures/`(추적·커밋 대상).
 - 커밋/푸시 대상 브랜치는 **`main`**. ⚠️ 2026-08-24 이전 문서·커밋에 나오는 `phase1-data-acquisition` 은 **삭제된 옛 이름**이다(전 Phase 가 그 브랜치에 쌓여 있다가 main 으로 fast-forward 통합됨).
 - git 커밋 메시지(한글 여러 줄)는 파일로 써서 `git commit -F <file>` 사용. Bash 도구에서 PowerShell here-string(`@'...'@`)은 메시지가 깨짐.
@@ -13,11 +14,11 @@
 ## 논문 축 (RQ · 주장 강도)
 - **마스터 설계 문서는 `docs/web_attack_image_cnn_thesis_design.md`** — RQ 표·기여 문구·목차의 단일 진실 소스. Phase 문서와 어긋나면 마스터를 고친다.
 - 📌 **"지금 무엇이 유효한가"는 `docs/CURRENT_BASELINE.md`** — 1기(gray CNN)·2기(MCC)·3기(Phase 13 개편)를 시기별로 갈라 RQ·지표·데이터셋을 통합 정리한 참조본(§0.2 에 단일 진실 소스 지도). 새 사실은 여기서 만들지 않고 Phase 문서에 먼저 남긴다.
-- ⚠️ **RQ 번호는 재배열 금지.** 번호가 파일명에 박혀 있다(`05_..._rq2`, `06_..._rq4`, `10_..._rq3`). 새 질문은 **뒤 번호로 추가**(현행 RQ1~RQ6). 논문 서술 순서만 마스터 §1.3 을 따른다.
-- 📌 **논문 제목(2026-10-27 교체)**: *딥러닝 캐스케이드 웹 공격 탐지: 넘김 판단의 한계와 배포 조건별 속도–정확도 교환의 재평가*(직전 10-04 판은 "표현 이질적 … 한계와 개선 …", 근거 docs/14 §8.36·마스터 §1.4.1). ⚠️ **RQ4 는 논문 제외**(번호는 결번 보존 — 재사용 금지). 흐름 트랙 `ustc_flow_binary` 는 RQ4b 용이라 현재 논문에 쓰이지 않는다.
+- ⚠️ **RQ 번호는 재배열 금지.** 번호가 코드 주석과 옛 기록에 박혀 있다. 새 질문은 **뒤 번호로 추가**(현행 RQ1~RQ6, RQ1·RQ4 는 결번). 논문 서술 순서만 마스터 §1.3 을 따른다.
+- 📌 **논문 제목(2026-11-03 확정)**: *문자 수준 CNN과 DistilBERT 기반 캐스케이드 웹 공격 탐지의 속도–정확도 교환 분석*(투고 초안 제목, 직전 10-27 판은 "딥러닝 캐스케이드 … 재평가", 근거 docs/14 §8.42·마스터 §1.4.1). ⚠️ **RQ1·RQ4 는 논문 제외**(번호는 결번 보존 — 재사용 금지). 흐름 트랙 `ustc_flow_binary` 는 RQ4b 용이라 현재 논문에 쓰이지 않는다.
 - 📌 **3기 연구 초점(2026-09-15 사용자 결정) = RQ5 의 두 축**: ① 캐스케이드 속도·정확도 교환 ② 2차 넘김 판단(게이트) 개선.
   **새 실험·주제를 제안할 때는 이 두 축으로 잡는다.** 실험 목록(T0~T4·G1~G5)·우선순위·판정 기준 초안은 `docs/14_cascade_tradeoff_gate_roadmap.md`. RQ 번호·문구는 불변.
-- ⚠️ **RQ1 의 답은 "아니오"다**(이미지 단독은 텍스트 모델에 유의하게 열세, F1). 원 문구와 음성 결과를 **그대로 보고**하고 RQ5(캐스케이드)가 거기서 파생됐음을 명시할 것 — 조용히 비용 질문으로 바꾸면 HARKing 이 된다.
+- ⚠️ **RQ1 은 논문에서 뺐다**(2026-11-04 저자 결정, docs/14 §8.43). 답이 "아니오"였다는 사실(RGB CNN 0.8949 vs char-CNN 0.9884)은 내부 기록으로 남긴다. 논문에서 지킬 것: 사전 고정 주장은 E7~E15 범위로 한정 · RGB 1차에서 잰 결과(G1·G3·G6·H-G4 등)를 딥러닝 구성의 근거로 옮겨 쓰지 않기 · 심사에서 연구 경위를 물으면 사실대로 답하기.
 - ⚠️ **주장 강도는 마스터 §11 표를 따른다.** 선행 대조로 이미 하향된 것:
   - 비용 기반 공격(F7) → "새 공격면 **발견**" ❌ / "DeepSloth(ICLR'21) slowdown 공격의 **problem-space 도메인 이전**" ✅
   - 표현 불일치(M1) → "새 발상" ❌ / "Feature Squeezing(NDSS'18) 대비 **추가 비용 정확히 0**" ✅
@@ -97,7 +98,7 @@
 - CV 판정 도구: `gate_confirm.py --seed N [--group-template]`(C-G2 규칙, 보정 t 는 `gate_confirm.corrected_t`) · `linear_stage1.py --fit|--latency|--analyze`(선형 1차 E3 + E2 변형 경계 + T11) · `literature_compare.py [--dl-only]`(유사 연구 비교 그림, `--dl-only` 는 고전 ML 을 뺀 판을 `_dl_only` 파일로 따로 저장) · `latency_fair.py --stage1-variants`(1차 후보 지연, 반복마다 번갈아 측정).
   ⚠️ `cv_compare.py` 의 t 검정은 **보정 없는 대응 t**(fold 간 학습 집합 중복 무시) → 사전 판정에는 `corrected_t`(Nadeau–Bengio) + Holm 을 쓴다. ⚠️ `cross_validate.py --balance`(tag `_bal`)는 fold 내부 train 만 언더샘플링한다(T11).
 - 장시간 작업 로그는 `experiments/logs/`(gitignore).
-- ⚠️ `train.py` 를 `--smoke` 없이 돌리면 **추적 대상 그림**(`docs/figures/models/cm_*.png`)을 덮어씀 → 로컬 코드 검증은 반드시 `--smoke`(저장 생략).
+- ⚠️ `train.py` 를 `--smoke` 없이 돌리면 그림(`docs/figures/models/cm_*.png`)을 새로 만든다(2026-11-04 폴더 삭제, 논문 미사용) → 로컬 코드 검증은 반드시 `--smoke`(저장 생략).
 - 체크포인트가 필요한 스크립트(cascade 등)의 로컬 스모크: 스크래치에서 소량 학습한 임시 `.pt` 를 `experiments/checkpoints/` 에 만들고 검증 후 삭제.
 - ⚠️ 산출물 tag 는 **실험을 가르는 하이퍼파라미터를 전부 반영**해야 함. 안 그러면 서로 덮어씀(커밋 5eede2f 사고: RGB 조합이 전부 `_rgb` 로 저장돼 상호 덮어쓰기).
   현행 규칙: 채널 `_rgb-rb-cc-bd` (`data_image._channel_suffix`) + ViT 패치 `_p1x48` + 학습률 `_lr0.0003` + 균형화 `_bal`.

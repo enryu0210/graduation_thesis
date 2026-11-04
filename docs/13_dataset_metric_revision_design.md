@@ -1,5 +1,7 @@
 # Phase 13 — 데이터셋·평가지표 재확정 (2026-08-13 교수 미팅 반영)
 
+> ℹ️ 이 문서가 가리키는 `docs/01`~`11`·`docs/archive`·옛 그림·옛 보고서는 2026-11-04 정리로 작업 트리에서 지웠다 → 복구 방법은 `docs/DELETED_DOCS.md`.
+
 > 이 문서는 사람이 읽는 **설계·의사결정 기록**입니다. 실제 수치는 `experiments/results/*.json`,
 > 그림은 `docs/figures/` 에서 확인하세요.
 >
@@ -777,7 +779,7 @@ CSV 에는 E2 용으로 `row_id`·URI·body·cookie·UA 원문 컬럼을 함께 
 - ⚠️ **CodeInjection 은 XSS 가 아니라 서버측 코드 주입**이다. 원문 표본은 스캐너의 PHP 탐침
   `;print(chr(122).chr(97)…)`, `${@print(…)}` 류이고, 감사 시그니처(`<script>` 등)는 이 클래스에서 1.7%만 걸렸다(§2.6.1).
   → 논문 매핑 표에 "CAPEC-242, 실데이터는 PHP 코드 주입 탐침 위주, XSS 와 동일시하지 않음"으로 적는다. §2.5 권고(`CodeInj` 표기)가 옳았다.
-- 이미지로 보면 요청이 **48×48 의 위 1~3줄**만 채우고 나머지는 0 이다(`docs/figures/imaging/srbh_4class_samples_text_raw_48_rgb.png`).
+- 이미지로 보면 요청이 **48×48 의 위 1~3줄**만 채우고 나머지는 0 이다(옛 그림 `docs/figures/imaging/srbh_4class_samples_text_raw_48_rgb.png`, 2026-11-04 삭제).
   2기 페이로드보다 여백 비율이 크다 — CNN 수용영역·GAP 에 미치는 영향은 RQ1 재측정에서 확인할 항목.
 - `run_evasion.py` 에는 트랙을 **의도적으로 추가하지 않았다** — `mutations.py` 가 `XSS` 라벨명에 묶여 있어 `CodeInjection` 에 조용히
   변형이 적용되지 않는다. RQ2 착수 시 변형 규칙과 함께 푼다(§4.2 "막아둔 조합" 원칙: 풀 때 tag·라벨 매핑부터 점검).

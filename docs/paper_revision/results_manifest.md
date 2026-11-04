@@ -1,5 +1,7 @@
 # 원고 수치 출처표 (results manifest)
 
+> ℹ️ 이 문서가 가리키는 `docs/01`~`11`·`docs/archive`·옛 그림·옛 보고서는 2026-11-04 정리로 작업 트리에서 지웠다 → 복구 방법은 `docs/DELETED_DOCS.md`.
+
 > 대상 원고: `docs/paper_write/draft_kiisc_submission.md`
 > 작성: 2026-10-11 · 판정 규칙: `docs/paper_revision/03_prereg_v2.md`
 >
