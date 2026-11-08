@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>진행 보고 2026-11-08 — 교수님 피드백 반영 논문 초안 개편 및 수치 정합화</title>
+<style>
+  @page { size: A4; margin: 18mm 17mm 16mm 17mm; }
+  html { font-size: 10.3pt; }
+  body { font-family: "Malgun Gothic", "맑은 고딕", "Noto Sans KR", sans-serif; line-height: 1.65; color: #1a1a1a; margin: 0; }
+  header { border-bottom: 1.5px solid #333; padding-bottom: 8px; margin-bottom: 16px; }
+  header h1 { font-size: 15.2pt; margin: 0 0 4px; line-height: 1.4; }
+  header p { margin: 0; font-size: 9.2pt; color: #555; }
+  h2 { font-size: 12pt; margin: 22px 0 6px; page-break-after: avoid; }
+  h3 { font-size: 10.6pt; margin: 14px 0 4px; page-break-after: avoid; }
+  p { margin: 6px 0; text-align: justify; }
+  ul, ol { margin: 5px 0; padding-left: 20px; }
+  li { margin: 2px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0 4px; font-size: 8.8pt; page-break-inside: avoid; }
+  th, td { border-top: 1px solid #bbb; border-bottom: 1px solid #bbb; padding: 3.5px 6px; text-align: left; vertical-align: top; }
+  th { border-top: 1.5px solid #333; border-bottom: 1px solid #333; font-weight: 600; }
+  tr:last-child td { border-bottom: 1.5px solid #333; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  figure { margin: 10px 0 12px; page-break-inside: avoid; }
+  figure img { width: 100%; height: auto; display: block; border: 1px solid #ddd; }
+  figcaption, .cap { font-size: 8.4pt; color: #555; margin: 3px 0 10px; }
+  .note { background: #f5f8fb; border-left: 3px solid #2b5c8f; padding: 7px 11px; margin: 8px 0; font-size: 9.4pt; }
+  .warn { background: #fdf6f0; border-left: 3px solid #c05621; padding: 7px 11px; margin: 8px 0; font-size: 9.4pt; }
+  code { font-family: Consolas, monospace; font-size: 0.9em; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>진행 보고: 교수님 피드백 반영 논문 초안 개편, Fig. 1 재제작 및 수치 전수 정합화</h1>
+  <p>학부 졸업논문 · 보고일 2026-11-08 · 직전 보고(2026-10-31) 이후 투고 원고(<code>draft_kiisc_submission.md</code>) 수정 내역</p>
+</header>
+
+<h2>1. 요약</h2>
+<p>교수님 피드백 6가지 항목을 정보보호학회논문지 투고 초안(<code>docs/paper_write/draft_kiisc_submission.md</code>)과 비교 그림(<code>Fig. 1</code>)에 전면 반영하고, 저장소 내 모든 실험 결과 원본(<code>experiments/results/*.json</code>)과 대조하여 수치 불일치를 바로잡았습니다.</p>
+<ul>
+  <li><b>속도–정확도 교환(Trade-off) 부각:</b> 제안한 <code>char-CNN → DistilBERT</code> 캐스케이드가 전체 요청의 0.7~0.8%만 2차로 넘기면서 <b><code>char-CNN</code> 단독 대비 F1을 소폭 개선(전체 Macro-F1 +0.28%p, 확인 분할 +0.53%p; CmdI F1 +0.94%p, 확인 분할 +1.74%p)</b>하는 동시에 <b><code>DistilBERT</code> 단독 대비 12.3배(확인 분할 10.6배) 추론 가속</b>을 달성한다는 점을 표(Table 2)와 본문 전면에 배치했습니다(2절).</li>
+  <li><b>SQLi–CmdI 오분류 개선과 보안 관제(SOC)에서의 유효한 CmdI 경고 확보:</b> <code>SQLi</code>와 <code>CmdI</code> 사이의 공격 종류 오분류를 절반 이상(56~74%) 제거하고 실제 <code>CmdI</code> 미탐(<code>CmdI → Normal</code>)까지 줄여, 관제 환경에서 거짓 경보 피로 없이 신뢰할 수 있는 <code>CmdI</code> 경고를 더 내릴 수 있다는 실무적 가치를 입증하고 Table 3에 캐스케이드 열을 직접 추가했습니다(3절).</li>
+  <li><b>초록 구조 개편 및 분량 축소:</b> 볼드체와 내부 실험 코드를 모두 제거하고, 핵심 수치 1~2개만 남겨 <b>[문제 → 해결 → 한계]</b> 3문장 구조로 국·영문 초록 분량을 대폭 줄였습니다(4절).</li>
+  <li><b>RQ1(RGB-CNN) 제외 및 내부 코드명 전면 서술어화:</b> 원고와 그림에 남아 있던 이미지 기반 CNN(RQ1) 흔적을 모두 지우고, <code>DL-A/B/C</code>, <code>B0</code>, <code>G2</code>, <code>E7~E16</code>, <code>A2</code>, <code>T5/T8/T10</code>, <code>G4-corrected</code> 등 내부 코드명을 자연스러운 학술 용어로 교체했습니다(5절).</li>
+  <li><b><code>Fig. 1</code> 범례 축소 및 프런티어 재구성:</b> 25개가 넘던 기존 범례(특히 RGB-CNN 계열)를 걷어내고 패널별 7~10개 항목으로 압축했으며, 가로축을 <code>DistilBERT</code> 단독 대비 가속 배수(1×~80.2×)로 바꾸어 속도–정확도 교환이 한눈에 읽히도록 다시 그렸습니다(6절).</li>
+  <li><b>원고 내 수치 불일치 8건 전수 정정:</b> <code>CmdI</code> 표본 수(4,718건), 정상 트래픽 스캐너 층화 비율(96.0% / 99.0% / 97.8%), 4.1절과 Table 3 간 FPR 차이(2.00% 대 0.35%), Table 2의 확인 분할 넘김률(8.5% / 0.7%) 등 어긋나 있던 수치를 모두 원본과 일치시켰습니다(7절).</li>
+</ul>
+
+<h2>2. 속도–정확도 교환(Trade-off) 어필 및 Table 2 개편</h2>
+<p>기존 원고의 Table 2는 캐스케이드를 2차 모델(<code>DistilBERT</code>)과만 비교해 손실(<code>−0.03%p</code>, <code>−0.32%p</code>)만 적혀 있어, 1차 경량 모델(<code>char-CNN</code>) 대비 얼마나 정확해졌는지가 표에서 바로 보이지 않았습니다. 수정본에서는 Table 2의 <code>Macro-F1</code> 열에 <b><code>(ΔR / Δchar-CNN)</code>을 함께 표기</b>하여, <code>char-CNN</code> 단독 대비 정확도 향상과 <code>DistilBERT</code> 단독 대비 12배 가속이 한눈에 대비되도록 개편했습니다.</p>
+<table>
+  <tr><th>구성 (서술형 명칭)</th><th>비교 기준 R (F1)</th><th class="n">분할 seed</th><th>임계값 규칙</th><th class="n">Macro-F1 (ΔR / Δchar-CNN)</th><th class="n">정상/공격 넘김률 (r_N / r_A)</th><th class="n">합산 배수 S̄ (산술*)</th><th class="n">폴드별 배수 범위</th></tr>
+  <tr><td>char-CNN-tiny → char-CNN</td><td>char-CNN (0.9884)</td><td class="n">42</td><td>단일 τ</td><td class="n">0.9839 (−0.45 / −0.45%p)</td><td class="n">30.2% / 4.0%</td><td class="n">2.13× (2.39×*)</td><td class="n">1.52–4.10×</td></tr>
+  <tr><td>char-CNN-EE (내부 조기 종료)</td><td>char-CNN (0.9884)</td><td class="n">42</td><td>단일 τ</td><td class="n">0.9874 (−0.10 / −0.10%p)</td><td class="n">1.1% / 0.4%</td><td class="n"><b>3.52×</b> (3.53×*)</td><td class="n">3.24–3.62×</td></tr>
+  <tr><td>char-CNN-EE (확인 분할)</td><td>char-CNN (0.9862)</td><td class="n">43</td><td>단일 τ</td><td class="n">0.9895 (+0.33 / +0.33%p)</td><td class="n">0.0% / 0.005%</td><td class="n"><b>3.62×</b> (3.62×*)</td><td class="n">3.62–3.62×</td></tr>
+  <tr><td>char-CNN 단독 vs. DistilBERT</td><td>DistilBERT (0.9914)</td><td class="n">42</td><td>—</td><td class="n">0.9884 (−0.303 / 0.00%p)</td><td class="n">0.0% / 0.0%</td><td class="n">80.2×</td><td class="n">80.2–80.2×</td></tr>
+  <tr><td><b>char-CNN → DistilBERT (주 캐스케이드)</b></td><td>DistilBERT (0.9914)</td><td class="n">42</td><td>단일 τ</td><td class="n"><b>0.9911 (−0.03 / +0.28%p)</b></td><td class="n">7.1% / 0.7%</td><td class="n"><b>12.3×</b> (51.6×*)</td><td class="n">2.95–80.2×</td></tr>
+  <tr><td><b>char-CNN → DistilBERT (확인 분할)</b></td><td>DistilBERT (0.9947)</td><td class="n">43</td><td>단일 τ</td><td class="n"><b>0.9914 (−0.32 / +0.53%p)</b></td><td class="n">8.5% / 0.7%</td><td class="n"><b>10.6×</b> (38.3×*)</td><td class="n">3.93–80.2×</td></tr>
+  <tr><td><b>k3 exit → DistilBERT (출구 결합)</b></td><td>주 캐스케이드 (12.2×)</td><td class="n">42</td><td>단일 τ</td><td class="n">0.9883 (−0.28 / −0.00%p)</td><td class="n">3.2% / 0.4%</td><td class="n"><b>29.3×</b> (86.8×*)</td><td class="n">15.0–289.8×</td></tr>
+  <tr><td><b>k3 exit → DistilBERT (확인 분할)</b></td><td>주 캐스케이드 (10.5×)</td><td class="n">43</td><td>단일 τ</td><td class="n">0.9919 (+0.05 / +0.57%p)</td><td class="n">4.0% / 0.4%</td><td class="n"><b>23.8×</b> (124.9×*)</td><td class="n">12.1–289.8×</td></tr>
+</table>
+<p class="cap">추가 확인 분할인 seed 44·45에서도 <code>char-CNN → DistilBERT</code>(단일 τ)는 <code>char-CNN</code> 단독 대비 +0.07%p(0.9901→0.9908), +0.06%p(0.9897→0.9903)로 4개 분할 모두에서 일관된 양(+)의 개선을 보였습니다.</p>
+
+<h2>3. SQLi–CmdI 오분류 개선과 유효한 CmdI 경고 확보 (혼동행렬 검증 포함)</h2>
+<div class="warn">
+  <b>⚠️ 혼동행렬 방향성 점검 (심사 리스크 예방):</b><br>
+  5-fold 합산 226,048행(실제 <code>SQLi</code> 156,039건 [69.0%], 실제 <code>CmdI</code> 4,718건 [2.1%])의 혼동행렬 원본(<code>dl_a_errors_srbh_4class_tok128.json</code>)을 확인한 결과, 가장 크게 줄어든 오분류 수치(<b>seed 42: 192 → 123 → 99건, seed 43: 252 → 113 → 2건</b>)는 <b>실제 <code>SQLi</code>가 <code>CmdI</code>로 잘못 분류되던 거짓 경보(<code>SQLi → CmdI</code>)</b>입니다.<br>
+  만약 본문에서 이 수치를 반대로 <code>CmdI → SQLi</code>라고 적으면 Table 3의 실제 혼동행렬 수치와 모순되어 심사 과정에서 지적받을 위험이 있습니다. 따라서 아래와 같이 <b>실제 혼동행렬 수치와 100% 일치하면서도 교수님 피드백("CmdI에 대한 유효한 경고를 더 할 수 있다")을 정확히 뒷받침하는 논리</b>로 5.3절과 Table 3을 구성했습니다.
+</div>
+<ul>
+  <li><b>왜 <code>SQLi → CmdI</code> 오분류 제거가 <code>CmdI</code> 경고 능력을 살리는가:</b> 실제 트래픽에서 <code>SQLi</code>(156,039건)는 <code>CmdI</code>(4,718건)보다 <b>33배</b> 많습니다. 따라서 <code>char-CNN</code>이 세미콜론(<code>;</code>), 파이프(<code>|</code>), 따옴표(<code>'</code>) 등 국소 구분자만 보고 <code>SQLi</code> 192~252건과 정상 요청 38~50건을 <code>CmdI</code>로 잘못 분류하면, 관제 시스템의 소수 고위험 <code>CmdI</code> 경보 대기열이 거짓 경보로 오염되어 <b><code>CmdI</code> 경보 정밀도(Precision)가 95.18%(seed 42)·93.90%(seed 43)로 떨어집니다.</b></li>
+  <li><b>캐스케이드의 해결 효과:</b> <code>char-CNN → DistilBERT</code> 캐스케이드는 전체 요청의 0.7~0.8%만 2차로 넘기면서도 <code>SQLi → CmdI</code> 오분류를 <b>192 → 123건(감소분의 74% 회수, seed 42), 252 → 113건(감소분의 56% 회수, seed 43)</b>으로 줄이고, 실제 <code>CmdI</code>를 정상으로 놓치던 미탐(<code>CmdI → Normal</code>)도 <b>28 → 25건(seed 42), 30 → 25건(seed 43)</b>으로 줄였습니다.</li>
+  <li><b>관제 실무적 이득:</b> 그 결과 캐스케이드의 <b><code>CmdI</code> 경보 정밀도는 97.07%(+1.89%p, seed 42)·97.32%(+3.42%p, seed 43)</b>로, <b><code>CmdI</code> F1은 0.9682 → 0.9776(+0.94%p) 및 0.9618 → 0.9792(+1.74%p)</b>로 향상되었습니다. 또한 선행 연구의 128 토큰 설정에서 긴 <code>CmdI</code>의 26.5%가 잘려 <code>CmdI → Normal</code> 미탐이 67건으로 폭증하고 <code>CmdI</code> F1이 0.9038·0.9284로 급락하던 문제까지 512 토큰 캐스케이드로 방지하여, 관제 인력이 오탐 피로 없이 실제 <code>CmdI</code> 경고를 신뢰하고 즉각 대응할 수 있음을 명확히 서술했습니다.</li>
+</ul>
+
+<table>
+  <tr><th>지표 / 오류 건수 (226,048행 합산)</th><th class="n">s42 char-CNN</th><th class="n">s42 제안 캐스케이드</th><th class="n">s42 DistilBERT(512)</th><th class="n">s42 DistilBERT(128)</th><th class="n">s43 char-CNN</th><th class="n">s43 제안 캐스케이드</th><th class="n">s43 DistilBERT(512)</th><th class="n">s43 DistilBERT(128)</th></tr>
+  <tr><td>전체 Macro-F1</td><td class="n">0.9884</td><td class="n"><b>0.9911</b></td><td class="n">0.9914</td><td class="n">0.9718</td><td class="n">0.9862</td><td class="n"><b>0.9914</b></td><td class="n">0.9947</td><td class="n">0.9777</td></tr>
+  <tr><td>공격 미탐 (Attack → Normal)</td><td class="n">791</td><td class="n"><b>697 (−11.9%)</b></td><td class="n">736 (−7.0%)</td><td class="n">773</td><td class="n">839</td><td class="n"><b>743 (−11.4%)</b></td><td class="n">777 (−7.4%)</td><td class="n">826</td></tr>
+  <tr><td>└ CmdI 미탐 (CmdI → Normal)</td><td class="n">28</td><td class="n"><b>25</b></td><td class="n">23</td><td class="n">31</td><td class="n">30</td><td class="n"><b>25</b></td><td class="n">23</td><td class="n">67</td></tr>
+  <tr><td><b>공격 종류 혼동 합계</b></td><td class="n"><b>266</b></td><td class="n"><b>196 (−26.3%)</b></td><td class="n"><b>167 (−37.2%)</b></td><td class="n"><b>934</b></td><td class="n"><b>359</b></td><td class="n"><b>220 (−38.7%)</b></td><td class="n"><b>59 (−83.6%)</b></td><td class="n"><b>629</b></td></tr>
+  <tr><td><b>└ SQLi → CmdI 오분류</b></td><td class="n"><b>192</b></td><td class="n"><b>123 (−35.9%)</b></td><td class="n"><b>99 (−48.4%)</b></td><td class="n"><b>847</b></td><td class="n"><b>252</b></td><td class="n"><b>113 (−55.2%)</b></td><td class="n"><b>2 (−99.2%)</b></td><td class="n"><b>551</b></td></tr>
+  <tr><td><b>CmdI 정밀도 / 재현율 (%)</b></td><td class="n">95.18 / 98.52</td><td class="n"><b>97.07 / 98.45</b></td><td class="n">97.26 / 98.41</td><td class="n">83.52 / 98.47</td><td class="n">93.90 / 98.58</td><td class="n"><b>97.32 / 98.52</b></td><td class="n">99.64 / 98.43</td><td class="n">88.24 / 97.84</td></tr>
+  <tr><td><b>CommandInjection (CmdI) F1</b></td><td class="n"><b>0.9682</b></td><td class="n"><b>0.9776 (+0.94%p)</b></td><td class="n"><b>0.9784 (+1.02%p)</b></td><td class="n"><b>0.9038</b></td><td class="n"><b>0.9618</b></td><td class="n"><b>0.9792 (+1.74%p)</b></td><td class="n"><b>0.9903 (+2.85%p)</b></td><td class="n"><b>0.9284</b></td></tr>
+</table>
+
+<h2>4. 초록 개편 ([문제 → 해결 → 한계] 구조 및 분량 축소)</h2>
+<p>기존 초록에 나열되어 있던 부차적 수치(3.5~3.6배, 23.8~29.3배, −0.03%p, −0.32%p, 6.4배 등)와 코드명(<code>G2</code>, <code>seed 42/43</code>), 볼드체를 모두 걷어내고, 핵심 수치 2개(<b><code>char-CNN</code> 대비 F1 개선</b> 및 <b><code>DistilBERT</code> 대비 12.3배 가속</b>)만 남겨 <b>[문제 → 해결 → 한계]</b> 구조로 압축했습니다.</p>
+<div class="note">
+  <b>개편된 국문 초록 전문:</b><br>
+  <b>[문제]</b> 인라인 웹 애플리케이션 방화벽(web application firewall, WAF)의 다중 웹 공격 탐지에서 경량 문자 수준 합성곱 신경망(character-level convolutional neural network, char-CNN)은 추론은 빠르나 짧은 수용 영역 때문에 세미콜론이나 파이프 등 국소 구분자를 공유하는 SQL 삽입(SQL injection, SQLi)과 명령 삽입(command injection, CmdI)을 혼동하여 위험도가 높은 CmdI 경보의 신뢰도를 떨어뜨리고, 사전학습 트랜스포머인 DistilBERT는 긴 문맥을 포착해 이 오분류를 줄이지만 단일 스트림 CPU 추론 지연이 커 실시간 인라인 배치에 부담이 된다. <b>[해결]</b> 본 논문은 이를 해결하기 위해 char-CNN이 대다수 요청을 즉시 판정하고 확신도가 낮은 모호한 요청만 DistilBERT로 넘기는 2단계 캐스케이드와 내부 조기 종료 구조를 구성하고, 실트래픽 기반 SR-BH 2020 데이터셋에서 단일 스레드 CPU(배치 1) 종단간 지연과 실사용자 정상 트래픽 기준으로 속도–정확도 교환을 평가한다. 실험 결과, 제안한 char-CNN → DistilBERT 캐스케이드는 전체 요청의 0.7~0.8%만 2차로 넘기면서 char-CNN 단독 대비 전체 Macro-F1(0.9884에서 0.9911로 +0.28%p, 확인 분할 +0.53%p)과 CmdI F1(0.9682에서 0.9776으로 +0.94%p, 확인 분할 +1.74%p)을 개선하고 SQLi–CmdI 공격 종류 오분류를 절반 이상 줄여 보안 관제 환경에서 신뢰할 수 있는 CmdI 경고를 제공하는 동시에, DistilBERT 단독 대비 12.3배(확인 분할 10.6배) 빠른 추론 속도를 달성하였다. <b>[한계]</b> 그러나 다중 분할 검증에서 2차 모델의 미세조정 편차에 따라 단독 대비 소폭의 정확도 손실 차이가 발생하고 예측 클래스별 임계값 조정이 새 분할에서 재현되지 않았으며, URL 인코딩 변형 시 1차 탐지 회피와 지연 증가에 노출됨을 확인하여 캐스케이드의 성패는 임계값 조정이 아닌 1·2차 지연 격차와 1차 모델의 변형 강건성에 달려 있음을 규명하였다.
+</div>
+
+<h2>5. RQ1(RGB-CNN) 제외 및 내부 코드명 전면 제거</h2>
+<p>원고 본문과 표, 그림 캡션에 남아 있던 내부 실험 코드명과 RQ1(이미지 변환 RGB-CNN) 잔재를 모두 서술형 표현으로 바꾸었습니다.</p>
+<table>
+  <tr><th>기존 내부 코드명 / 잔재</th><th>수정된 서술형 표현</th><th>적용 위치</th></tr>
+  <tr><td><code>DL-A</code>, <code>DL-B</code>, <code>DL-C</code>, <code>E14</code></td><td>주 캐스케이드(<code>char-CNN → DistilBERT</code>), 초경량 1차 캐스케이드(<code>char-CNN-tiny → char-CNN</code>), 내부 조기 종료(<code>char-CNN-EE</code>), 조기 종료 출구 결합 캐스케이드(<code>k3 exit → DistilBERT</code>)</td><td>서론, 3.1절, Table 1·2, 5.1절, VI·VII절</td></tr>
+  <tr><td><code>B0</code>, <code>G2</code>, <code>G4-corrected</code></td><td>단일 임계값(single threshold), 예측 클래스별 임계값(class-wise threshold), 실사용자 정상 트래픽(browser UA)</td><td>3.2절, Table 2, Fig. 1, 5.1~5.2절</td></tr>
+  <tr><td><code>E7</code>, <code>E8</code>, <code>E10</code>, <code>E11</code>, <code>E12</code>, <code>E13</code>, <code>E15</code>, <code>E16</code>, <code>A2</code></td><td>층별 지연 분해 예비 측정, 확인 분할 실험, 128 토큰 설정 재구현, 추가 분할(seed 44·45) 확인 실험, 비용 기반 지연 유발 공격 실측, 느린 폴드 사후 진단 등</td><td>초록, 서론, III~VII절 전체</td></tr>
+  <tr><td><code>F2</code>, <code>F3</code>, <code>F3M</code>, <code>B3</code>, <code>T5</code>, <code>T8</code>, <code>T10</code></td><td>URI와 본문, 쿠키 헤더 추가 구성 및 마스킹 대조군, 다중 스레드 CPU 추론, 동일 템플릿 묶음 분할(group split), 보안 전문가 복수 독립 감사 등</td><td>4.1절, 5.3절, VI절</td></tr>
+  <tr><td>3.2절 온도 보정·마할라노비스 예비 실험 괄호 및 4.1절 "r_N 20%p 이상"</td><td>RQ1(RGB-CNN 1차) 당시 측정된 잔재이므로 3.2절 괄호는 삭제하고, 4.1절은 실제 <code>char-CNN</code> 넘김률(검증 분포 0.86% → 실사용자 평균 7.08%, 최대 33.6%)로 교체</td><td>3.2절, 4.1절</td></tr>
+</table>
+
+<h2>6. Fig. 1 재제작 및 범례 축소</h2>
+<p>기존 <code>Fig. 1</code>(<code>literature_comparison_dl_only_srbh_4class.png</code>)은 <code>RGB-CNN</code> 4종 곡선과 단독·캐스케이드 점이 겹쳐 범례가 25개 이상이었고, 패널 (b)(c)의 가로축이 <code>char-CNN</code> 기준 배수여서 주 제안 모델인 <code>char-CNN → DistilBERT</code>가 왼쪽 끝에 작은 점 하나로 눌려 있었습니다. <code>src/eval/literature_compare.py</code>(<code>--dl-only</code>)를 개편하여 <code>RGB-CNN</code>을 완전히 제거하고, 패널 (b)(c)의 가로축을 <b><code>DistilBERT</code> 단독 대비 가속 배수(1.0×~80.2×)</b>, 세로축을 <b>0.980~0.996 구간</b>으로 확대해 <code>char-CNN</code> 대비 F1 향상과 <code>DistilBERT</code> 대비 12.3배 가속 프런티어가 선명히 보이도록 재제작했습니다.</p>
+<figure>
+  <img src="../../figures/cascade/literature_comparison_dl_only_srbh_4class.png" alt="재제작된 Fig. 1">
+  <figcaption>그림 1. 재제작된 <code>Fig. 1</code> (<code>docs/figures/cascade/literature_comparison_dl_only_srbh_4class.png</code>). RGB-CNN 계열과 내부 코드명을 모두 제거하고 패널 (a) 범례 10개, 패널 (b)(c) 범례 7개로 압축했습니다.</figcaption>
+</figure>
+
+<h2>7. 원고 내 수치 불일치 8건 전수 교차검증 및 정정</h2>
+<p>원고의 모든 숫자를 <code>experiments/results/*.json</code> 및 <code>data/processed/srbh_4class/*.csv</code> 정본과 일대일 대조하여 발견된 8건의 불일치를 모두 수정했습니다.</p>
+<table>
+  <tr><th>원고 위치</th><th>기존 표기 (불일치/오류)</th><th>원본 대조 결과 및 수정된 표기</th></tr>
+  <tr><td>3.1절 입력 길이</td><td>고정 길이 패딩 없이 실제 길이 L 그대로</td><td>상한 2,304바이트 안에서 실제 길이 L 사용 명시 (본 데이터셋 URI+본문은 중앙값 96B, p99 352B, 최댓값 674B로 잘리는 요청 0건)</td></tr>
+  <tr><td>4.1절 CmdI 건수</td><td>학습+검증 풀 3,886건(2.1%)</td><td>3,886건은 학습(train) 단독 건수임 → <b>학습+검증 풀 4,718건(학습 3,886 + 검증 832, 2.1%; 전체 265,939행 중 5,551건)</b>으로 정정</td></tr>
+  <tr><td>4.1절 스캐너 비율</td><td>중복 제거 후 정상 요청의 97.8%가 스캐너 (Fig. 1의 96%와 불일치)</td><td><code>srbh_normal_strata.json</code>(정상 56,906건) 기준 <b>스캐너 전용 텍스트 96.0%(54,600건), 혼합 3.1%(1,756건)(스캐너 관찰 합계 99.0%, 단일 최빈 스캐너 UA 행 기준 97.8%), 순수 실사용자 1.0%(550건)</b>으로 정확히 병기</td></tr>
+  <tr><td>4.1절 char-CNN FPR</td><td>실사용자 2.73% 대 스캐너 0.36% (7.6배, 초기 필드 선택 실험 값)</td><td>Table 3과 동일한 본 실험 5-fold CV 값인 <b>2.00% 대 0.35%(5.7배, seed 42; seed 43은 1.27% 대 0.24%로 5.3배)</b>로 통일</td></tr>
+  <tr><td>4.1절 실사용자 r_N</td><td>검증 분포보다 20%p 이상 높음 (RGB-CNN 잔재)</td><td><code>char-CNN → DistilBERT</code> 실제 값인 <b>검증 분포 0.86% → 실사용자 평균 7.08%(8.2배, 특정 폴드 최대 33.6%; seed 43은 0.79% → 8.48%로 10.7배)</b>로 교체</td></tr>
+  <tr><td>Table 2 seed 43 r_N / r_A</td><td>8.9% / 0.6%</td><td><code>dl_a_srbh_4class_s43.json</code> 정본(<code>r_N = 0.0848</code>, <code>r_A = 0.0072</code>)에 맞춰 <b>8.5% / 0.7%</b>로 정정</td></tr>
+  <tr><td>Table 2 k3 exit → DistilBERT</td><td>r_N / r_A 및 폴드 배수 범위 <code>—</code> (누락)</td><td><code>dl_a_e14_srbh_4class*.json</code> 정본에 맞춰 seed 42 <b>3.2% / 0.4%, 15.0–289.8×</b>, seed 43 <b>4.0% / 0.4%, 12.1–289.8×</b> 기입</td></tr>
+  <tr><td>VI절 단독 배수 및 지연 공격 조건</td><td>약 80~280배, 0.3~0.8%p, 재학습 조건 미명시</td><td><b>char-CNN 단독 80.2배(−0.30~−0.85%p), 내부 조기 종료 284~289배(−0.40~−0.52%p)</b>로 명시하고, URL 인코딩 실험(6.4배 지연 증가)이 가중치 저장용 재학습 실행(비변형 기준 합산 23.5배) 위에서 측정되었음을 병기</td></tr>
+</table>
+
+<h2>참고: 산출물 및 커밋 정보</h2>
+<p class="cap" style="font-size:8.6pt">원고 마크다운: <code>docs/paper_write/draft_kiisc_submission.md</code> · 원고 조판 PDF: <code>docs/paper_write/draft_kiisc_submission.pdf</code> · 그림 생성 스크립트 및 파일: <code>src/eval/literature_compare.py</code>, <code>docs/figures/cascade/literature_comparison_dl_only_srbh_4class.png</code> · 전체 단위 테스트 <code>pytest tests/ -q</code> 484개 통과 · 반영 커밋: <code>4ce36df</code>.</p>
+
+</body>
+</html>
