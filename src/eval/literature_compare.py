@@ -59,6 +59,132 @@ CLASSICAL_STAGE1 = {"tfidflr", "hashlr"}
 DL_CASCADE = GF.RESULTS / "dl_cascade_srbh_4class.json"
 # 같은 SR-BH fold 로 재구현한 WAMM DistilBERT(E10-2 의 R)와 char-CNN → DistilBERT 운영점(E10-3). 기술만 한다.
 DL_A = GF.RESULTS / "dl_a_srbh_4class.json"
+DL_A_E14 = GF.RESULTS / "dl_a_e14_srbh_4class.json"
+DL_VIEWS = (("val_mix", "Validation benign mix (96% scanner)"),
+            ("real_user", "Real-user benign traffic (browser UA)"))
+
+
+def plot_dl_only(strata):
+    """RQ1(RGB-CNN)을 제외하고 논문 본문(char-CNN · DistilBERT · 캐스케이드)만 남긴 깔끔한 비교 그림."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from src.eval import dl_a, dl_cascade as DC, gate_confirm as GC
+
+    dla = json.loads(DL_A.read_text(encoding="utf-8"))
+    dlc = json.loads(DL_CASCADE.read_text(encoding="utf-8"))
+    e14 = json.loads(DL_A_E14.read_text(encoding="utf-8"))
+    t2, t_r = dla["latency_ms"]["t2"], dla["latency_ms"]["t_R"]
+    f1_cnn, f1_bert = dla["charcnn_macro_f1"], dla["distilbert_macro_f1"]
+
+    solo = DC.load_cvprobs("charcnn", seed=42)
+    bert = dl_a.load_npz(dl_a.distilbert_cvprobs(42))
+    ee_aux = DC.load_cvprobs("charcnn_ee", aux=True, seed=42)
+    paths_dla, _ = GF.fold_paths(solo, bert, strata)
+    paths_e14, _ = GF.fold_paths(ee_aux, bert, strata)
+    t_front_14, t_r_14 = e14["latency_ms"]["t_front"], e14["latency_ms"]["t_R"]
+    e14_views = {
+        "val_mix": GC.secondary_rule(paths_e14, dl_a.fold_val_f1(bert), 0, t_front_14, t_r_14),
+        "real_user": e14["e14"],
+    }
+    # τ = 0 (넘김 0%, 1차 단독 끝점)을 경로에 명시해 모든 폴드 곡선이 1차 단독 점까지 끊기지 않고 이어지게 한다.
+    for paths, first in ((paths_dla, solo), (paths_e14, ee_aux)):
+        f1s = DC.fold_test_f1(first)
+        for gate in ("b0", "g2"):
+            paths[gate] = [np.vstack([np.array([[0.0, 0.0, 0.0, f1s[k], 0.0, 0.0, 0.0]]), p])
+                           for k, p in enumerate(paths[gate])]
+
+    fig, axes = plt.subplots(1, 3, figsize=(18.5, 5.8), gridspec_kw={"width_ratios": [1.15, 1, 1]})
+    ax = axes[0]
+    for label, ms, score, marker, color, is_f1 in REPORTED_DL:
+        ax.scatter([ms], [score], marker=marker, s=90, zorder=4, label=label,
+                   facecolors=color if is_f1 else "none", edgecolors=color)
+    ours_a = [
+        ("DistilBERT alone (ours, 512-tok)", t_r, f1_bert, "h", "tab:purple"),
+        ("char-CNN -> DistilBERT cascade (ours)",
+         t_r / dla["e10_3"]["real_user"]["pooled_speedup"]["b0"],
+         dla["e10_3"]["real_user"]["b0"]["macro_f1"], "D", "tab:blue"),
+        ("Early-exit -> DistilBERT cascade (ours)",
+         t_r_14 / e14["e14"]["pooled_speedup"]["b0"],
+         e14["e14"]["b0"]["macro_f1"], "D", "tab:green"),
+        ("char-CNN alone (ours)", t2, f1_cnn, "*", "k"),
+        ("char-CNN early exit (ours)",
+         t2 / dlc["dl_c"]["real_user"]["b0"]["speedup"],
+         dlc["dl_c"]["real_user"]["b0"]["macro_f1"], "s", "darkgoldenrod"),
+    ]
+    for label, ms, score, marker, color in ours_a:
+        ax.scatter([ms], [score], marker=marker, s=170 if marker == "*" else 95, color=color, zorder=5,
+                   edgecolors="k", linewidths=.8, label=label)
+    no_lat_short = [
+        ("WADBERT'26 (SR-BH binary, no latency)", 0.9950, "tab:brown"),
+        ("X-WAD'26 (SR-BH binary, no latency)", 0.9884, "tab:olive"),
+    ]
+    for label, score, color in no_lat_short:
+        ax.axhline(score, color=color, lw=1.1, ls="--", label=label)
+    ax.set_xscale("log")
+    ax.invert_xaxis()
+    ax.set_ylim(0.74, 1.002)
+    ax.set_xlabel("Latency per request, ms (log scale; faster to the right)")
+    ax.set_ylabel("Macro-F1 as reported (dashed lines = binary F1)")
+    ax.set_title("(a) As reported vs. evaluated (prior work uses different setups)", fontsize=10)
+    ax.grid(alpha=.3, which="both")
+    legends = [ax.legend(fontsize=8.2, loc="upper left", bbox_to_anchor=(-0.04, -0.14), ncol=2, frameon=False)]
+
+    max_speed = t_r / t2
+    grid = np.linspace(1.0, max_speed, 300)
+    grid_14 = np.linspace(1.0, min(100.0, t_r_14 / t_front_14), 300)
+    for ax, (col, (view_key, view_title)), letter in zip(axes[1:], enumerate(DL_VIEWS), "bc"):
+        env_dla = GF.envelopes(paths_dla, t2, t_r, col, grid)
+        reach_b0 = ~np.isnan(env_dla["b0"]).any(0)
+        reach_g2 = ~np.isnan(env_dla["g2"]).any(0)
+        ax.plot(grid[reach_b0], env_dla["b0"][:, reach_b0].mean(0), color="tab:blue", lw=2.0, ls="-",
+                label="char-CNN -> DistilBERT (single threshold)")
+        ax.fill_between(grid[reach_b0], env_dla["b0"][:, reach_b0].min(0), env_dla["b0"][:, reach_b0].max(0),
+                        color="tab:blue", alpha=.13)
+        ax.plot(grid[reach_g2], env_dla["g2"][:, reach_g2].mean(0), color="tab:blue", lw=1.7, ls="--",
+                label="char-CNN -> DistilBERT (class-wise threshold)")
+
+        env_e14 = GF.envelopes(paths_e14, t_front_14, t_r_14, col, grid_14)
+        reach_14 = ~np.isnan(env_e14["b0"]).any(0)
+        ax.plot(grid_14[reach_14], env_e14["b0"][:, reach_14].mean(0), color="tab:green", lw=1.8, ls="-",
+                label="Early-exit -> DistilBERT (single threshold)")
+
+        s_dla = dla["e10_3"][view_key]["pooled_speedup"]["b0"]
+        f_dla = dla["e10_3"][view_key]["b0"]["macro_f1"]
+        ax.scatter([s_dla], [f_dla], marker="D", s=105, color="tab:blue", edgecolors="k", linewidths=.9,
+                   zorder=6, label="Operating point: char-CNN -> DistilBERT")
+
+        row_14 = e14_views[view_key]
+        s_e14 = min(93.0, dl_a.pooled_speedup(row_14["per_fold_speedup"]["b0"]))
+        f_e14 = row_14["b0"]["macro_f1"]
+        ax.scatter([s_e14], [f_e14], marker="D", s=95, color="tab:green", edgecolors="k", linewidths=.9,
+                   zorder=6, label="Operating point: Early-exit -> DistilBERT")
+
+        ax.axhline(f1_bert, color="tab:purple", lw=1.1, ls="-.", alpha=.8)
+        ax.scatter([1.0], [f1_bert], marker="h", s=115, color="tab:purple", edgecolors="k", linewidths=.8,
+                   zorder=6, label="DistilBERT alone (reference, 1.0x)")
+        ax.axhline(f1_cnn, color="k", lw=1.0, ls=":", alpha=.6)
+        ax.scatter([max_speed], [f1_cnn], marker="*", s=175, color="k", zorder=6,
+                   label=f"char-CNN alone ({max_speed:.1f}x)")
+
+        ax.set_xlim(0, 95)
+        ax.set_ylim(0.980, 0.996)
+        ax.set_xlabel("Speedup vs. DistilBERT alone (attack share 3.3%)")
+        ax.set_title(f"({letter}) Same data & CPU (batch 1) | {view_title}", fontsize=10)
+        ax.grid(alpha=.3)
+    axes[1].set_ylabel("Test Macro-F1 (5-fold CV, shaded = fold min-max)")
+    legends.append(axes[1].legend(fontsize=8.2, loc="upper left", bbox_to_anchor=(0.0, -0.14), ncol=2, frameon=False))
+    for legend in legends:
+        legend.set_in_layout(False)
+    title = fig.suptitle(
+        "Accuracy-latency trade-off of deep-learning configurations on SR-BH 2020 (5-fold CV, CPU batch 1)",
+        fontsize=12,
+    )
+    fig.tight_layout()
+    FIGURE_DL.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(FIGURE_DL, dpi=140, bbox_inches="tight", bbox_extra_artists=[*legends, title])
+    plt.close(fig)
+    return FIGURE_DL, ours_a
 
 
 def dl_cascade_points(view):
@@ -194,14 +320,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dl-only", action="store_true", help="고전 ML 을 빼고 딥러닝 모델만 남긴 판을 그린다")
     args = parser.parse_args()
-    styles = stage1_styles(args.dl_only)
     try:
-        analysis = json.loads(LS.OUTPUT.read_text(encoding="utf-8"))
         strata = np.asarray(CV.load_pool_strata("srbh_4class", exclude_test=True))
+        if args.dl_only:
+            figure, rows = plot_dl_only(strata)
+            for label, ms, score, _, _ in rows:
+                print(f"{label}: {ms:.4f} ms, Macro-F1 {score:.4f}")
+            print(f"그림: {figure.relative_to(PROJECT_ROOT).as_posix()}")
+            return 0
+        styles = stage1_styles(False)
+        analysis = json.loads(LS.OUTPUT.read_text(encoding="utf-8"))
         paths = {"rgb_cnn": GF.STAGE1, **{name: LS.probs_path(name) for name in LS.CANDIDATES},
                  **{name: GF.RESULTS / f"cvprobs_srbh_4class_{name}_raw_rgb_sealed.npz" for name in LS.E2_LABELS}}
         loaded = {name: LS.load_stage1(paths[name], strata) for name in analysis["stage1"] if name in styles}
-        figure = plot(analysis, loaded, styles, args.dl_only)
+        figure = plot(analysis, loaded, styles, False)
         for label, ms, score, _, _ in ours_reported_style(analysis, styles):
             print(f"{label}: {ms:.4f} ms, Macro-F1 {score:.4f}")
         print(f"그림: {figure.relative_to(PROJECT_ROOT).as_posix()}")
