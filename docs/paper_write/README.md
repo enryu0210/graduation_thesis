@@ -1,6 +1,7 @@
 # 논문 초안 (정보보호학회논문지 투고)
 
 > 📌 **투고까지 남은 작업과 순서는 `SUBMISSION_ROADMAP.md`** 를 따른다(2026-11-04).
+> 📌 **11-08 개편본 기준 투고 가능성 검토는 `submission_review_2026-11-10.md`** — 심사 지적 예상 🔴 6개.
 
 - `draft_kiisc_submission.md` — 초안 원본(2026-10-31 딥러닝 캐스케이드 집중판, RGB 이미지 실험 제거 및 `char-CNN`·`DistilBERT` 캐스케이드 중심으로 개고, 표 3개·참고문헌 21개). 양식은 `#(투고양식)submission_form_2026.hwp`(심사용, 저자·소속 없음)의 순서·번호·캡션 규칙을 따른다.
   옛 HTML·PDF 판(RGB 캐스케이드 제안 시기)은 삭제했다 — 필요하면 `git log -- docs/paper_write/draft_kiisc_submission.html` 로 되살린다.
