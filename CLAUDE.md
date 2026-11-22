@@ -58,7 +58,7 @@
     E14 k3 출구 → DistilBERT 는 **DL-A 보다 위(2/2, 배수 ×2.40·×2.27)** — 단 DistilBERT 단독 대비 −0.31·−0.28%p 라 "DistilBERT 보다 위" 금지. A2: fold 4 의 2.95배는 단일 τ 의 실사용자 정상 넘김(사후 진단).
     📌 **E13·E15(2026-10-31, docs/14 §8.40·§8.41)**: DL-A 위 G2 는 seed 44·45 에서 **"그 밖"**(재현 안 됨) → 넘김 판단 "개선" 금지. E15: url_encode 로 B0 공격 넘김 ×31.9·공격 요청당 지연 ×6.4 — slowdown 공격면 성립, G2/B0 0.25(대가 조항 미발동), 1차 공격 판정률 99.4→86.7%(회피, 최종 정확도 미측정). E16·B3 미실시(사용자 결정).
     E12~E15 의 지연은 E12 실행(`dl_a_latency_srbh_4class_tok512-128.json`)을 쓴다 — E10 실행 값과 섞지 말 것. 집필용 정리는 `docs/paper_write/RESULTS_FOR_WRITING.md`(외부 집필 도구 입력, ✅/❌ 문장). ⚠️ `distilbert` 는 토큰 id 입력이라 `cross_validate.TOKEN_MODELS` 에만 있고 `train.TEXT_MODELS` 에는 **일부러 없다**(train.py 는 바이트 경로뿐).
-- ⚠️ **SR-BH 라벨 특이점(2026-11-22, docs/14 §8.45)**: URL **경로**의 셸 명령 삽입은 CmdI 라벨 0행(SQLi 17,643 · Normal 8,711) → 원 라벨의 SQLi→CmdI 오답 절반가량은 의미로는 맞힌 행. §8.44 주 기여(SQLi→CmdI 감소)는 특이점 학습일 수 있어 **E17(prereg §E17, `cross_validate.py --relabel-path-cmdi` tag `_rlp`, `relabel_eval.py --audit|--analyze`) 판정 전 확정 금지**. `_rlp` 는 fold 배정이 달라 원 라벨 실행과 짝 비교 불가.
+- ⚠️ **SR-BH 라벨 특이점(2026-11-22, docs/14 §8.45)**: URL **경로**의 셸 명령 삽입은 CmdI 라벨 0행(SQLi 17,643 · Normal 8,711) → 원 라벨의 SQLi→CmdI 오답 절반가량은 의미로는 맞힌 행. ❌ **E17 판정(11-22): 보정 라벨에서 DistilBERT·캐스케이드의 CmdI 이득 "유지 확인 안 됨"**(+0.04~0.06%p, p 0.30~0.66; 캐스케이드 넘김 0.01% = 사실상 char-CNN 단독) → §8.44 주 기여 A(SQLi→CmdI 감소)를 "공격 종류 오탐 개선"으로 쓰지 말 것, 기여는 "라벨 특이점 발견·정량화"로. 도구: `cross_validate.py --relabel-path-cmdi`(tag `_rlp`)·`relabel_eval.py --audit|--analyze`. ⚠️ 보정 라벨에선 char-CNN 0.996 으로 캐스케이드 교환 자체가 흐려짐 — 제목·RQ5 서술은 저자 결정(미결). `_rlp` 는 fold 배정이 달라 원 라벨 실행과 짝 비교 불가.
 - ⚠️ `docs/thetics/` 는 **.gitignore 대상**(PDF 미추적) → **수집 목록의 유일한 추적본은 `docs/12` §1**. 논문을 추가하면 docs/12 도 함께 갱신.
 
 ## 데이터 파이프라인
