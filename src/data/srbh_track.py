@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+from urllib.parse import unquote_plus
+
 import pandas as pd
 
 if __package__:
@@ -17,6 +20,47 @@ CLASS_CODES = {
     "CodeInjection": ("242",), "CommandInjection": ("88", "248"),
 }
 OUTPUT_COLUMNS = ["text_raw", "label", "row_id", *TEXT_FIELDS]
+
+# --------------------------------------------------------------------------
+# E17 라벨 보정 — URL 경로의 명령 삽입(docs/14 §8.45, 규칙 고정 docs/paper_revision/03_prereg_v2.md §E17)
+# SR-BH 는 URL 경로에 넣은 셸 명령 삽입(cat /etc/passwd, sleep 15, 셸쇼크)에 CmdI 라벨을 한 번도 붙이지 않았다
+# — SQLi(17,643행) 또는 Normal(8,711행, 거의 스캐너 층)로 붙었고, 같은 변형도 두 라벨로 갈린다. 쿼리·바디의 같은
+# 명령은 CmdI 다. 그대로 두면 모델이 "주입 위치·변형"을 외워야 맞히므로, 의미 기준 라벨 판을 만든다.
+# 정규식은 휴리스틱이다 — SQL 흔적이 조금이라도 있으면 보정하지 않는 쪽(보수적)으로 짰다.
+# --------------------------------------------------------------------------
+# 셸 명령 흔적. 'id'·'ls' 같은 짧은 단어는 쿼리의 '&id=' 와 겹쳐 뺐다. SQL 의 sleep(5) 와 갈리게 sleep 뒤 괄호는 받지 않는다.
+CMD_PATTERN = re.compile(
+    r"(cat\s+/etc/passwd|\bsleep(?:\s+|\$\{?\w*\}?\s*)\d+"
+    r"|[;&|`]\s*(?:cat|whoami|ping|echo|uname|nslookup)\b|\(\)\s*\{\s*:;\s*\}|\$\(|`[^`]+`)", re.I)
+SQL_PATTERN = re.compile(
+    r"(\bunion\b|\bselect\b|\b(?:or|and)\b\s+[\w'\"]+\s*(?:=|<|>|like)|--|/\*|\bsleep\s*\(|benchmark\s*\("
+    r"|waitfor\s+delay|information_schema|extractvalue|updatexml|\border\s+by\b|pg_sleep|\bxor\b)", re.I)
+
+
+def _decode(text: str) -> str:
+    # 스캐너 페이로드는 이중 인코딩(%2527 등)도 있어 두 번 푼다.
+    return unquote_plus(unquote_plus(text))
+
+
+# 보정 대상 원 라벨. CodeInjection 은 경로 셸 명령 0행이라 넣지 않는다(넣으면 규칙만 넓어지고 바뀌는 행은 없다).
+RELABEL_FROM = ("SQLInjection", "Normal")
+
+
+def path_cmdi_mask(texts: list[str], labels: list[str]) -> list[bool]:
+    """SQLi·Normal 라벨이면서 경로에 셸 명령이 있고 F2 전체에 SQL 흔적이 없는 행 → True(CmdI 로 보정할 행).
+
+    texts 는 F2 원문(text_raw = URI + '\\n' + body). 경로 = 첫 줄의 '?' 앞.
+    """
+    if len(texts) != len(labels):
+        raise ValueError("texts 와 labels 의 길이가 다릅니다.")
+    mask = []
+    for text, label in zip(texts, labels):
+        if label not in RELABEL_FROM:
+            mask.append(False)
+            continue
+        path = _decode(text.split("\n", 1)[0].partition("?")[0])
+        mask.append(bool(CMD_PATTERN.search(path)) and not SQL_PATTERN.search(_decode(text)))
+    return mask
 
 
 FIELD_COMBINATIONS = {

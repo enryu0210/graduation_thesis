@@ -164,3 +164,27 @@ def test_compose_f3m_masks_cookie_preserving_character_length(cookie, expected):
     assert masked == [expected]
     assert len(masked[0]) == len(srbh_track.compose_fields(frame, "F3")[0])
     pd.testing.assert_frame_equal(frame, original)
+
+
+@pytest.mark.parametrize("text,label,expected", [
+    ("/a/;cat /etc/passwd/b\n", "SQLInjection", True),              # 경로 명령 + SQLi 라벨 → 보정
+    ("/blog%26cat%24jj+%24jj%2Fetc%24jj%2Fpasswd%26/x\n", "Normal", True),  # 인코딩된 경로 명령 + Normal 라벨
+    ("/a/%28%29+%7B+%3A%3B%7D%3B+%2Fbin%2Fsleep+15/b\n", "SQLInjection", True),  # 셸쇼크
+    ("/a?q=;cat /etc/passwd\n", "SQLInjection", False),             # 쿼리 쪽은 원 라벨 체계가 이미 CmdI
+    ("/a\nx=;cat /etc/passwd", "SQLInjection", False),              # 바디도 마찬가지
+    ("/a/;cat /etc/passwd/b?id=1 union select 1\n", "SQLInjection", False),  # SQL 흔적 있으면 보수적으로 둠
+    ("/a/sleep(5)/b\n", "SQLInjection", False),                     # SQL 의 sleep(5) 는 셸 명령 아님
+    ("/a/;cat /etc/passwd/b\n", "CodeInjection", False),            # 대상 라벨 밖
+])
+def test_path_cmdi_mask(text, label, expected):
+    assert srbh_track.path_cmdi_mask([text], [label]) == [expected]
+
+
+def test_path_cmdi_mask_length_mismatch():
+    with pytest.raises(ValueError):
+        srbh_track.path_cmdi_mask(["/a\n"], [])
+
+
+def test_relabel_tag_axis():
+    from src.models.tagging import build_tag
+    assert build_tag("srbh_4class", "charcnn", sealed_test=True, relabel=True) == "srbh_4class_charcnn_raw_rlp_sealed"

@@ -95,7 +95,7 @@ def build_tag(track: str, model: str, text: str = "raw", *,
               fields: str | None = None, sealed_test: bool = False,
               width: float | None = None, cv_seed: int | None = None,
               group_template: bool = False, max_tokens: int | None = None,
-              patience: int | None = None) -> str:
+              patience: int | None = None, relabel: bool = False) -> str:
     """산출물/체크포인트 공통 tag 를 만든다.
 
     인자는 "이미 결정된 값"만 받는다(모델이 이미지인지 등의 판정은 호출부 책임).
@@ -112,6 +112,8 @@ def build_tag(track: str, model: str, text: str = "raw", *,
                           축이 없으면 128 토큰판이 512 판본을 덮어쓴다
     - patience          : 조기 종료 인내(E16). 5(기존 산출물의 값)이거나 None 이면 생략 —
                           축이 없으면 인내 10 대조가 기본 실행을 덮어쓴다
+    - relabel           : SR-BH 경로 명령 삽입(SQLi·Normal 라벨)을 CmdI 로 보정한 라벨(E17, srbh_track.path_cmdi_mask).
+                          라벨 자체가 달라 fold 배정도 달라진다 → 원 라벨 산출물과 반드시 갈라야 한다
     """
     ch_tag = data_image._channel_suffix(channels, encoders)
     width_tag = "" if width in (None, 1.0) else f"_w{width:g}"
@@ -121,6 +123,7 @@ def build_tag(track: str, model: str, text: str = "raw", *,
     lr_tag += "" if patience in (None, DEFAULT_PATIENCE) else f"_pat{patience}"
     # F2는 기본 입력과 같으므로 별도 실험 이름을 만들지 않는다.
     fields_tag = "" if fields in (None, "F2") else f"_f{fields}"
+    fields_tag += "_rlp" if relabel else ""
     sealed_tag = "_sealed" if sealed_test else ""
     seed_tag = "" if cv_seed in (None, 42) else f"_s{cv_seed}"
     seed_tag += "_gtpl" if group_template else ""

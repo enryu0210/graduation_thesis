@@ -27,6 +27,7 @@ Phase 4/RQ1 보강 — 5-fold 교차검증 (docs/04 §6 "통계 검증" 항목 �
 from __future__ import annotations
 
 import argparse
+import collections
 import hashlib
 import json
 import re
@@ -42,7 +43,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "models"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "imaging"))
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from src.data.srbh_track import FIELD_COMBINATIONS, compose_fields
+from src.data.srbh_track import FIELD_COMBINATIONS, compose_fields, path_cmdi_mask
 
 import metrics as M  # noqa: E402
 
@@ -194,6 +195,17 @@ def load_text_pool(track: str, text: str, *, fields: str | None = None,
     code = {name: i for i, name in enumerate(classes)}
     y = labels_all.map(code).to_numpy(dtype=np.int64)
     return texts, y, classes
+
+
+def relabel_path_cmdi(texts: list[str], y: np.ndarray, classes: list[str]) -> np.ndarray:
+    """E17: 경로 명령 삽입(SQLi·Normal 라벨) 행을 CmdI 로 바꾼 새 라벨 배열(원본 y 는 건드리지 않는다)."""
+    names = [classes[i] for i in y]
+    mask = np.array(path_cmdi_mask(texts, names))
+    relabeled = y.copy()
+    relabeled[mask] = classes.index("CommandInjection")
+    moved = collections.Counter(classes[i] for i in y[mask])
+    print(f"  E17 라벨 보정 → CmdI {int(mask.sum()):,}행 {dict(moved)}")
+    return relabeled
 
 
 # --------------------------------------------------------------------------
@@ -545,6 +557,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--balance", action="store_true",
                         help="fold 내부 train 만 클래스 균형 언더샘플링(T11: 고정 split 의 _bal 1차를 CV 로 재현, tag _bal)")
+    parser.add_argument("--relabel-path-cmdi", action="store_true",
+                        help="SR-BH 경로 명령 삽입(SQLi·Normal 라벨)을 CmdI 로 보정(E17, 텍스트 모델 전용, tag _rlp)")
     parser.add_argument("--group-template", action="store_true",
                         help="같은 템플릿이 한 fold 에만 들어가는 층화 묶음 분할(T5, tag _gtpl)")
     args = parser.parse_args()
@@ -566,6 +580,11 @@ def main() -> None:
     if args.fields is not None and (args.track != "srbh_4class" or args.text != "raw"):
         parser.error("--fields는 --track srbh_4class --text raw에서만 허용됩니다.")
 
+    if args.relabel_path_cmdi and (args.track != "srbh_4class" or args.text != "raw" or args.fields is not None
+                                   or args.model in IMAGE_MODELS):
+        # 규칙이 F2 원문(text_raw)의 경로를 읽으므로 다른 입력·이미지 풀에는 걸 수 없다.
+        parser.error("--relabel-path-cmdi 는 srbh_4class · raw · F2(기본 입력) · 텍스트 모델에서만 허용됩니다.")
+
     from sklearn.model_selection import StratifiedKFold
 
     encoders = tuple(name.strip() for name in args.rgb_encoders.split(","))
@@ -581,7 +600,7 @@ def main() -> None:
         patch=args.patch if args.model == "vit" else None,
         lr=args.lr, fields=args.fields, sealed_test=args.exclude_test,
         cv_seed=args.seed, group_template=args.group_template, balance=args.balance,
-        max_tokens=args.max_tokens, patience=args.patience,
+        max_tokens=args.max_tokens, patience=args.patience, relabel=args.relabel_path_cmdi,
     )
     tag = embeddings_tag(tag, args.save_embeddings, args.save_train_embeddings)
     if args.save_models:
@@ -610,6 +629,8 @@ def main() -> None:
         pool_texts, y, classes = load_text_pool(args.track, args.text,
                                                  fields=args.fields, exclude_test=args.exclude_test)
         pool_x = None
+        if args.relabel_path_cmdi:
+            y = relabel_path_cmdi(pool_texts, y, classes)
 
     pool_strata = None
     if args.track == "srbh_4class" and args.fields is not None:
